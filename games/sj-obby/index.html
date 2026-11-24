@@ -259,5 +259,5 @@ requestAnimationFrame(frame);
 window.__obby = { get W() { return W; }, get run() { return run; }, get SV() { return SV; }, startAt, step: (n, dt = 1 / 60, inp = {}) => { for (let i = 0; i < n; i++) step(dt, Object.assign({ mx: 0, mz: 0, run: false, jump: false, jumpHeld: false, lookX: 0, lookY: 0, wheel: 0 }, typeof inp === 'function' ? inp(i) : inp)); return { x: W.P.x, y: W.P.y, z: W.P.z, stage: stageAt(), dead: W.P.dead, ground: W.P.ground }; }, cps: () => cps, buildCourse };
 })();
 </script>
-<script>window.GL3D && GL3D.fullscreenButton();</script>
+<script>window.GL3D && (GL3D.fullscreenButton(), GL3D.viewButton());</script>
 </body></html>

@@ -342,7 +342,7 @@ function play(gameData, ctx = {}) {
   }
   playCtx = ctx;
   if (runner) runner.stop();
-  $('pc').style.display = d3 ? 'none' : '';
+  $('pc').style.display = d3 ? 'none' : ''; $('viewPlay').style.display = d3 ? '' : 'none';
   runner = (d3 ? (o => E3.run($('play'), gameData, o)) : (o => E.run($('pc'), gameData, o)))({
     sfx, countdown: ctx.race ? 3 : 0, startLevel: ctx.startLevel || 0,
     hud: (l, r, b) => { $('hLeft').textContent = l; $('hRight').textContent = r; $('banner').textContent = b; },
@@ -654,6 +654,7 @@ function claudeDialog(tab = 'new') {
 
 $('aiBtn').onclick = () => claudeDialog(game && game.levels.length ? 'edit' : 'new');
 $('onlineBtn').onclick = () => { game.title = $('title').value || game.title; race({ data: JSON.parse(JSON.stringify(game)), title: game.title || 'My game' }); };
+$('viewPlay').onclick = () => { if (window.GL3D) { GL3D.view.toggle(); $('viewPlay').textContent = GL3D.view.fp ? '🎥' : '👁'; } };
 $('fsPlay').onclick = async () => {
   const el = document.documentElement;
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await el.requestFullscreen(); }

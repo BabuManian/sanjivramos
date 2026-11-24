@@ -122,7 +122,9 @@
 
     /* ---------- camera ---------- */
     W.camera = (inp, dt) => {
-      W.cam.yaw -= inp.lookX * 0.0042; W.cam.pitch = clamp(W.cam.pitch - inp.lookY * 0.0036, -1.25, 0.5);
+      const fp = GL3D.view.fp;
+      W.cam.yaw -= inp.lookX * 0.0042; W.cam.pitch = clamp(W.cam.pitch - inp.lookY * 0.0036, fp ? -1.45 : -1.25, fp ? 1.3 : 0.5);
+      if (fp) { P.face = W.cam.yaw; return { eye: [P.x, P.y + 1.62, P.z], yaw: W.cam.yaw, pitch: W.cam.pitch, fov: 1.25, far: 260, fp: true }; }
       if (inp.wheel) W.cam.dist = clamp(W.cam.dist + inp.wheel * 0.7, 3, 14);
       const tgt = [P.x, P.y + 1.4, P.z], f = dirOf(W.cam.yaw, W.cam.pitch), d = W.cam.dist;
       return { eye: [tgt[0] - f[0] * d, tgt[1] - f[1] * d + 0.5, tgt[2] - f[2] * d], yaw: W.cam.yaw, pitch: W.cam.pitch - 0.06, fov: 1.15, far: 260 };
@@ -143,10 +145,12 @@
       }
       if (extra) extra(R);
       // you
-      if (P.dead <= 0) R.person(o.look ? o.look() : null, P.x, P.y, P.z, P.yaw, { walk: P.ground ? P.walk : 0, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 5), groundY: groundBelow(), swing: !P.ground && P.jumps === 2 ? Math.min(1, P.air * 3) : 0 });
+      if (cam.fp) {}
+      else if (P.dead <= 0) R.person(o.look ? o.look() : null, P.x, P.y, P.z, P.yaw, { walk: P.ground ? P.walk : 0, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 5), groundY: groundBelow(), swing: !P.ground && P.jumps === 2 ? Math.min(1, P.air * 3) : 0 });
       else for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28, k = 0.6 - P.dead; R.cube(M.chain(M.T(W.deathAt[0] + Math.cos(a) * k * 3, W.deathAt[1] + 1 + Math.sin(i) * k, W.deathAt[2] + Math.sin(a) * k * 3), M.S(0.25)), '#f8fafc', 1, 0.6); }
       if (W.trail) for (const t of W.trailPts) R.glow([t[0], t[1], t[2]], 0.35 + t[3] * 0.3, typeof W.trail === 'function' ? W.trail(t) : W.trail, t[3] * 0.8);
       R.end();
+      if (cam.fp) { if (P.dead <= 0) R.viewModel(cam, { walk: P.walk, speed: P.ground ? Math.min(1, Math.hypot(P.vx, P.vz) / 5) : 0, sleeve: (o.look && o.look() && o.look().shirt) || '#3b82f6', skin: (o.look && o.look() && o.look().skin) || '#f8c9a0' }); }
     };
     function groundBelow() { let best = -1e9; for (const k of solidsNear(P.x, P.y, P.z)) if (P.x > k[0] && P.x < k[3] && P.z > k[2] && P.z < k[5] && k[4] <= P.y + 0.05 && k[4] > best) best = k[4]; return best > -1e8 ? best : P.y - 50; }
     function drawDyn(ob) {

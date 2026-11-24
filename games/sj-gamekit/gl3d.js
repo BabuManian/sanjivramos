@@ -206,6 +206,15 @@ gl_FragColor=vec4(c,1.);}`;
         for (const [p, sz, c, a] of glows) { gl.uniform3fv(GLOW.u.uC, p); gl.uniform1f(GLOW.u.uSz, sz); gl.uniform3fv(GLOW.u.uCol, c); gl.uniform1f(GLOW.u.uAl, a); gl.drawArrays(gl.TRIANGLES, 0, 6); }
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.BLEND); gl.depthMask(true); gl.disableVertexAttribArray(GLOW.a); gl.useProgram(prog); bound = null; glows = [];
       },
+      /** first-person view model: your arm (and what you hold) in front of the camera. swing 0..1, bob = walk phase */
+      viewModel(cam, o = {}) {
+        const sw = o.swing ? Math.sin(Math.min(1, o.swing) * Math.PI) : 0, bob = o.walk ? Math.sin(o.walk * 2) * 0.025 * (o.speed || 0) : 0;
+        const base = chain(T(cam.eye[0], cam.eye[1], cam.eye[2]), RY(cam.yaw || 0), RX(cam.pitch || 0), T(0.32, -0.3 + bob - sw * 0.05, -0.55), RX(0.25 - sw * 1.2), RY(-0.15 + sw * 0.6));
+        gl.clear(gl.DEPTH_BUFFER_BIT);   // never clips into walls
+        R.cube(mul(base, chain(T(0, 0, 0.05), S(0.13, 0.13, 0.45))), o.sleeve || [0.23, 0.51, 0.96]);
+        R.cube(mul(base, chain(T(0, 0, -0.2), S(0.12, 0.12, 0.12))), o.skin || [0.97, 0.79, 0.63]);
+        if (o.hold) { const k = o.holdLen || 0.55; R.cube(mul(base, chain(T(0, 0.05, -0.27 - k / 2), S(0.07, 0.07, k))), o.hold, 1, o.holdGlow || 0); if (o.holdHead) R.cube(mul(base, chain(T(0, 0.1, -0.27 - k), S(...o.holdHead))), o.holdHeadCol || o.hold, 1, o.holdGlow || 0); }
+      },
       /** world point → {x, y, z(depth), vis} in CSS pixels of the canvas */
       project(p) {
         const m = VP, x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
@@ -362,6 +371,21 @@ gl_FragColor=vec4(c,1.);}`;
 
   /** a ⛶ button that makes the game fill the screen. Inside a SanjivramOS window it also asks the desktop to make the
       window fullscreen (some browsers don't allow fullscreen from inside a frame). opts: { style: 'css', parent: element } */
+  /* first-person / third-person view, shared by every 3D game and remembered (V or the 👁 button switches) */
+  const view = { fp: (() => { try { return localStorage.getItem('sj3d.fp') === '1'; } catch { return false; } })(), subs: [],
+    set(v) { view.fp = !!v; try { localStorage.setItem('sj3d.fp', view.fp ? '1' : '0'); } catch {} for (const f of view.subs) try { f(view.fp); } catch {} },
+    toggle() { view.set(!view.fp); } };
+  addEventListener('keydown', e => { if (e.code === 'KeyV' && !e.repeat && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) view.toggle(); });
+  function viewButton(opts = {}) {
+    const b = document.createElement('button');
+    b.className = 'gl3d-view'; b.setAttribute('aria-label', 'Switch first-person / third-person view');
+    b.style.cssText = 'position:fixed;z-index:20;top:12px;left:50%;margin-left:194px;width:38px;height:38px;border-radius:10px;border:none;background:rgba(0,0,0,.45);color:#fff;font:19px/1 system-ui;cursor:pointer;backdrop-filter:blur(6px);' + (opts.style || '');
+    const icon = () => { b.textContent = view.fp ? '🎥' : '👁'; b.title = view.fp ? 'Third-person view (V)' : 'First-person view (V)'; };
+    b.onclick = e => { e.stopPropagation(); view.toggle(); };
+    b.addEventListener('pointerdown', e => e.stopPropagation());
+    view.subs.push(icon); icon(); (opts.parent || document.body).appendChild(b);
+    return b;
+  }
   function fullscreenButton(opts = {}) {
     const b = document.createElement('button');
     b.className = 'gl3d-fs'; b.title = 'Fullscreen (F11 also works)'; b.setAttribute('aria-label', 'Fullscreen');
@@ -383,5 +407,5 @@ gl_FragColor=vec4(c,1.);}`;
     icon(); (opts.parent || document.body).appendChild(b);
     return b;
   }
-  window.GL3D = { fullscreenButton, create, M, hex, dirOf, pushBox, pushCone, pushTerrain, tri, Input, Body, moveBody, rayBoxes, tone, noise, rng, noise2 };
+  window.GL3D = { view, viewButton, fullscreenButton, create, M, hex, dirOf, pushBox, pushCone, pushTerrain, tri, Input, Body, moveBody, rayBoxes, tone, noise, rng, noise2 };
 })();
