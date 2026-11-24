@@ -1211,4 +1211,5 @@ window.__lanternStep = (n, dt = 1 / 30, inputs) => { for (let i = 0; i < n; i++)
 window.__lanternApi = { get raiders() { return raiders; }, maybeRaid, rollWeather, FARMSPOTS, useRod, landFish, placeTrap, updTraps, inLake, LAKE, fireR, rayTarget, aim: () => { const f = aimDir(); return { eye: aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist], f }; }, collectAround, get animals() { return animals; }, spawnWildlife, fire, reload, WEAP, CHESTS, openChest, hurtAnimal, AN, DENS, get arrows() { return arrows; }, hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
 })();
 </script>
+<script>window.GL3D && GL3D.fullscreenButton();</script>
 </body></html>

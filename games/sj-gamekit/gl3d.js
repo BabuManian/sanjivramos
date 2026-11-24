@@ -360,5 +360,28 @@ gl_FragColor=vec4(c,1.);}`;
   /** smooth value noise for terrain */
   function noise2(seed) { const R = rng(seed), P = new Float32Array(256 * 256); for (let i = 0; i < P.length; i++) P[i] = R(); const at = (x, z) => P[((x & 255) << 8) | (z & 255)]; const sm = t => t * t * (3 - 2 * t); return (x, z) => { const xi = Math.floor(x), zi = Math.floor(z), fx = sm(x - xi), fz = sm(z - zi); const a = at(xi, zi), b = at(xi + 1, zi), c = at(xi, zi + 1), d = at(xi + 1, zi + 1); return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz; }; }
 
-  window.GL3D = { create, M, hex, dirOf, pushBox, pushCone, pushTerrain, tri, Input, Body, moveBody, rayBoxes, tone, noise, rng, noise2 };
+  /** a ⛶ button that makes the game fill the screen. Inside a SanjivramOS window it also asks the desktop to make the
+      window fullscreen (some browsers don't allow fullscreen from inside a frame). opts: { style: 'css', parent: element } */
+  function fullscreenButton(opts = {}) {
+    const b = document.createElement('button');
+    b.className = 'gl3d-fs'; b.title = 'Fullscreen (F11 also works)'; b.setAttribute('aria-label', 'Fullscreen');
+    b.style.cssText = 'position:fixed;z-index:20;top:12px;left:50%;margin-left:150px;width:38px;height:38px;border-radius:10px;border:none;background:rgba(0,0,0,.45);color:#fff;font:20px/1 system-ui;cursor:pointer;backdrop-filter:blur(6px);' + (opts.style || '');
+    const icon = () => { b.textContent = document.fullscreenElement || document.webkitFullscreenElement ? '🗗' : '⛶'; };
+    const embedded = (() => { try { return window.parent !== window; } catch { return true; } })();
+    b.onclick = async e => {
+      e.stopPropagation();
+      const el = document.documentElement;
+      try {
+        if (document.fullscreenElement || document.webkitFullscreenElement) await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        else if (el.requestFullscreen || el.webkitRequestFullscreen) await (el.requestFullscreen || el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' });
+        else throw new Error('no fullscreen');
+      } catch { if (embedded) window.parent.postMessage({ sjg: 1, type: 'fullscreen' }, location.origin); }
+      setTimeout(icon, 200);
+    };
+    b.addEventListener('pointerdown', e => e.stopPropagation());
+    document.addEventListener('fullscreenchange', icon); document.addEventListener('webkitfullscreenchange', icon);
+    icon(); (opts.parent || document.body).appendChild(b);
+    return b;
+  }
+  window.GL3D = { fullscreenButton, create, M, hex, dirOf, pushBox, pushCone, pushTerrain, tri, Input, Body, moveBody, rayBoxes, tone, noise, rng, noise2 };
 })();

@@ -20916,6 +20916,10 @@ Apps.register({
 addEventListener('message', e => {
   const m = e.data;
   if (!m || m.sjg !== 1 || e.origin !== location.origin) return;
+  if (m.type === 'fullscreen') {   // a game's ⛶ button when the browser won't go fullscreen from inside a frame
+    for (const w of WM.wins.values()) { const f = w.body && [...w.body.querySelectorAll('iframe')].find(fr => fr.contentWindow === e.source); if (f) { WM.fullscreen(w); break; } }
+    return;
+  }
   if (m.type === 'trophy') Toast.show(`${m.icon || '🏆'} Trophy unlocked`, `${m.title}: ${m.name}${m.desc ? ' — ' + m.desc : ''}`, 'gamepad', 5000);
   else if (m.type === 'best' && m.mode === 'main') Toast.show(`${m.title}`, `New best score: ${typeof m.value === 'number' ? (Math.round(m.value * 100) / 100).toLocaleString() : m.value}`, 'gamepad');
   WM.windowsOf('gamehub').forEach(w => w.body.dispatchEvent(new Event('sjg-update')));

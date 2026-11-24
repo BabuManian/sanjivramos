@@ -51,7 +51,7 @@ function checkData(d) {
     if (!L || typeof L.tiles !== 'string' || !(L.w >= 8 && L.w <= 200) || !(L.h >= 6 && L.h <= 60) || L.tiles.length !== L.w * L.h) throw new Error('A level is damaged.');
     if (!L.tiles.includes('P')) throw new Error('Every level needs a player start.');
   }
-  if (!['platformer', 'topdown'].includes(d.template)) throw new Error('Unknown game type.');
+  if (!['platformer', 'topdown', '3d'].includes(d.template)) throw new Error('Unknown game type.');
 }
 
 export async function makerApi(req, res, url) {

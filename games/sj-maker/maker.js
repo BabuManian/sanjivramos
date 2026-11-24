@@ -12,7 +12,8 @@ const kit = window.SJG ? SJG.init('maker', { vs: false, title: 'Game Maker', tro
   { id: 'levels5', name: 'World Builder', desc: 'Make a game with 5 levels', icon: '🗺️' },
 ] }) : null;
 const sfx = n => kit && kit.sfx(n);
-const ORDER = ['P', '#', '=', '-', 'I', 'B', 'G', 'C', 'K', 'D', 'H', 'X', 'N', 'S', 'L', 'E', 'F', 'Z', 'J', 'T', 'W'];
+const ORDER = ['P', '#', '=', '-', 'I', 'B', 'O', 'G', 'C', 'K', 'D', 'H', 'X', 'N', 'S', 'L', 'E', 'F', 'Z', 'J', 'T', 'W'];
+const E3 = window.MakerEngine3D;
 
 /* ---------------- drafts (this device) ---------------- */
 const DK = 'maker.drafts';
@@ -21,7 +22,7 @@ const saveDrafts = d => { try { localStorage.setItem(DK, JSON.stringify(d)); ret
 const uid = () => Math.random().toString(36).slice(2, 10);
 let draftId = null, game = null, li = 0, tool = 'pen', brush = '#', zoom = 1, undo = [], redo = [], dirty = false;
 function newDraft(template = 'platformer', example = true) {
-  const g = example ? E.exampleGame(template) : { v: 1, title: 'My game', template, settings: { ...E.DEFAULT_SETTINGS, ...(template === 'topdown' ? { stomp: false, theme: 3 } : {}) }, sprites: {}, levels: [E.blankLevel(40, template === 'topdown' ? 14 : 15, template)] };
+  const g = example ? (template === '3d' ? E3.example() : E.exampleGame(template)) : { v: 1, title: 'My game', template, settings: { ...E.DEFAULT_SETTINGS, ...(template === 'topdown' ? { stomp: false, theme: 3 } : {}) }, sprites: {}, levels: [E.blankLevel(40, template === 'topdown' ? 14 : 15, template)] };
   draftId = uid(); game = g; li = 0; undo = []; redo = []; persist(); renderEditor();
 }
 function openDraft(id) { const d = loadDrafts()[id]; if (!d) return; draftId = id; game = d.data; li = 0; undo = []; redo = []; renderEditor(); show('create'); }
@@ -100,6 +101,7 @@ function renderPalette() {
   for (const ch of ORDER) {
     const [name, group, help] = E.TILES[ch];
     if (game.template === 'topdown' && ch === '-') continue;
+    if (game.template !== '3d' && ch === 'O') continue;
     if (group !== grp) { grp = group; const h = document.createElement('h4'); h.textContent = group; p.appendChild(h); }
     const b = document.createElement('button'); b.className = 'pt' + (brush === ch ? ' on' : ''); b.title = help; b.dataset.ch = ch;
     const c = document.createElement('canvas'); c.width = c.height = 32; E.drawTile(c.getContext('2d'), ch, 0, 0, 32, game.sprites, 0);
@@ -244,10 +246,10 @@ addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 
 /* ---------------- settings panel ---------------- */
 function renderSettings() {
-  const s = game.settings, plat = game.template === 'platformer';
+  const s = game.settings, plat = game.template === 'platformer' || game.template === '3d';
   const seg = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   $('settings').innerHTML = `
-    <h4>Game type</h4>${`<div class="seg" data-key="template">${[['platformer', '🏃 Side view'], ['topdown', '🗺️ Top-down']].map(([v, l]) => `<button data-v="${v}" class="${game.template === v ? 'on' : ''}">${l}</button>`).join('')}</div>`}
+    <h4>Game type</h4>${`<div class="seg" data-key="template">${[['platformer', '🏃 Side view'], ['topdown', '🗺️ Top-down'], ['3d', '🧊 3D']].map(([v, l]) => `<button data-v="${v}" class="${game.template === v ? 'on' : ''}">${l}</button>`).join('')}</div>`}
     <h4>How to win a level</h4>${seg('win', [['goal', '🚩 Reach flag'], ['coins', '🪙 All coins'], ['enemies', '👾 Beat enemies']])}
     <h4>Player</h4>
     <div class="f"><label>Speed</label>${seg('speed', [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']])}</div>
@@ -330,8 +332,8 @@ const touchUI = matchMedia('(pointer:coarse)').matches;
 function play(gameData, ctx = {}) {
   // ctx: { published:{id,title}, test:true, race:{net,...} }
   $('play').hidden = false; $('endCard').hidden = true;
-  const td = gameData.template === 'topdown', shoot = gameData.settings && gameData.settings.shoot;
-  const lay = td ? { tcL: [14, 50], tcR: [110, 50], tcU: [62, 100], tcD: [62, 0], tcB: shoot && 'r' } : { tcL: [14, 24], tcR: [92, 24], tcA: 'r', tcB: shoot && 'r2' };
+  const td = gameData.template === 'topdown', d3 = gameData.template === '3d', shoot = !d3 && gameData.settings && gameData.settings.shoot;
+  const lay = d3 ? { tcL: [14, 50], tcR: [110, 50], tcU: [62, 100], tcD: [62, 0], tcA: 'r' } : td ? { tcL: [14, 50], tcR: [110, 50], tcU: [62, 100], tcD: [62, 0], tcB: shoot && 'r' } : { tcL: [14, 24], tcR: [92, 24], tcA: 'r', tcB: shoot && 'r2' };
   for (const id of ['tcL', 'tcR', 'tcU', 'tcD', 'tcA', 'tcB']) {
     const el = $(id), v = lay[id]; el.style.display = touchUI && v ? 'flex' : 'none';
     if (Array.isArray(v)) { el.style.left = v[0] + 'px'; el.style.bottom = (v[1] + 14) + 'px'; el.style.right = 'auto'; }
@@ -340,12 +342,13 @@ function play(gameData, ctx = {}) {
   }
   playCtx = ctx;
   if (runner) runner.stop();
-  runner = E.run($('pc'), gameData, {
+  $('pc').style.display = d3 ? 'none' : '';
+  runner = (d3 ? (o => E3.run($('play'), gameData, o)) : (o => E.run($('pc'), gameData, o)))({
     sfx, countdown: ctx.race ? 3 : 0, startLevel: ctx.startLevel || 0,
     hud: (l, r, b) => { $('hLeft').textContent = l; $('hRight').textContent = r; $('banner').textContent = b; },
     sign: txt => { $('sign').hidden = !txt; if (txt) $('sign').textContent = txt; },
     onWin: st => finished(true, st), onLose: st => finished(false, st),
-    onPos: ctx.race ? p => ctx.race.pos(p) : null,
+    onPos: ctx.race ? p => ctx.race.pos(p) : null, nogl: !!window.__makerNoGL,
     ghosts: ctx.race ? () => ctx.race.ghosts() : null,
   });
   if (ctx.test) kit && kit.unlock('first');
@@ -366,7 +369,7 @@ async function finished(won, st) {
   $('eBtns').innerHTML = ''; for (const [t, f] of btns) { const b = document.createElement('button'); b.textContent = t; b.onclick = f; $('eBtns').appendChild(b); }
   if (won) sfx('win');
   if (won && ctx.published && !ctx.mine) kit && kit.unlock('clear');
-  if (ctx.race) { ctx.race.finish(won ? st.ms : null); if (won) kit && kit.unlock('race'); }
+  if (ctx.race && !ctx.race.together) { ctx.race.finish(won ? st.ms : null); if (won) kit && kit.unlock('race'); }
   if (won && ctx.published && serverOk) {
     if (!me) { $('eBoard').innerHTML = `<p>Sign in to put your time on the leaderboard.</p>`; const b = document.createElement('button'); b.textContent = 'Sign in & submit'; b.onclick = async () => { if (await signIn()) submit(); }; $('eBoard').appendChild(b); }
     else submit();
@@ -385,7 +388,7 @@ const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp:
 addEventListener('keydown', e => {
   if ($('play').hidden || !runner) return;
   if (e.code === 'Escape') { stopPlay(); return; }
-  const top = runnerData && runnerData.template === 'topdown';
+  const top = runnerData && (runnerData.template === 'topdown' || runnerData.template === '3d');
   let k = KEYMAP[e.code]; if (!k) return; e.preventDefault();
   if (!top && (k === 'u' || e.code === 'Space') && !(runnerData.settings && runnerData.settings.shoot && e.code === 'Space')) k = 'a';
   if (e.repeat) return;
@@ -500,10 +503,12 @@ function newGameDialog() {
       <button class="gcard" data-new="platformer:1"><div class="th">🏃</div><div class="meta"><b>Side-view example</b><small>Jump, coins, enemies, 2 levels</small></div></button>
       <button class="gcard" data-new="topdown:1"><div class="th">🗺️</div><div class="meta"><b>Top-down example</b><small>Keys, doors, shooting</small></div></button>
       <button class="gcard" data-new="platformer:0"><div class="th">⬜</div><div class="meta"><b>Blank side view</b><small>Just ground</small></div></button>
+      <button class="gcard" data-new="3d:1"><div class="th">🧊</div><div class="meta"><b>3D example</b><small>Jump, keys, lava, a castle</small></div></button>
+      <button class="gcard" data-new="claude:1"><div class="th">🤖</div><div class="meta"><b>Ask Claude</b><small>Describe it, Claude builds it</small></div></button>
       <button class="gcard" data-new="topdown:0"><div class="th">🔲</div><div class="meta"><b>Blank top-down</b><small>Just walls</small></div></button>
     </div><div class="row"><span class="sp"></span><button id="nX">Cancel</button></div>`);
   $('nX').onclick = closeDialog;
-  $('dlgCard').querySelectorAll('[data-new]').forEach(b => b.onclick = e => { e.stopPropagation(); const [t, ex] = b.dataset.new.split(':'); closeDialog(); newDraft(t, ex === '1'); show('create'); });
+  $('dlgCard').querySelectorAll('[data-new]').forEach(b => b.onclick = e => { e.stopPropagation(); const [t, ex] = b.dataset.new.split(':'); closeDialog(); if (t === 'claude') { show('create'); claudeDialog('new'); return; } newDraft(t, ex === '1'); show('create'); });
 }
 
 /* ---------------- online races ---------------- */
@@ -513,22 +518,31 @@ $('raceJoin').onclick = () => race(null);
 async function race(pick) {
   if (!window.SJNet) return toast('Online races need the SanjivramOS server.');
   let net;
-  try { net = await SJNet.lobby({ game: 'maker', gameName: 'Game Maker race', max: 8, min: 2, settings: pick ? { gid: pick.gid, title: pick.title } : undefined, title: pick ? `Race: ${pick.title}` : 'Game Maker races' }); }
+  if (pick && pick.data && JSON.stringify(pick.data).length > 30000) return toast('This game is too big to send — publish it first, then host it from Play games.');
+  try { net = await SJNet.lobby({ game: 'maker', gameName: 'Game Maker', max: 8, min: 2, modes: ['Race', 'Together'], settings: pick ? (pick.gid ? { gid: pick.gid, title: pick.title } : { inline: 1, title: pick.title }) : undefined, title: pick ? `Online: ${pick.title}` : 'Game Maker — play online' }); }
   catch { return; }
-  const gid = net.room.settings && net.room.settings.gid;
-  if (!gid) { toast('That room has no game picked.'); net.leave(); return; }
-  let data; try { data = (await api('game/' + gid)).game; } catch (e) { toast(e.message); net.leave(); return; }
+  const st = net.room.settings || {}, together = /together/i.test(net.room.mode || '');
+  let data;
+  if (st.gid) { try { data = (await api('game/' + st.gid)).game; } catch (e) { toast(e.message); net.leave(); return; } }
+  else if (st.inline) {
+    // the host sends the game itself to everyone (works for unpublished drafts)
+    if (net.isHost && pick && pick.data) { const gd = pick.data; net.on('m', (d, from) => { if (d && d.need) net.send({ gd }, from); }); data = { id: null, title: pick.title, data: gd }; }
+    else data = await new Promise(res => { let n = 0; const h = d => { if (d && d.gd) { clearInterval(t); res({ id: null, title: st.title || 'Game', data: d.gd }); } }; net.on('m', h); const ask = () => { if (n++ > 12) { clearInterval(t); res(null); } else net.send({ need: 1 }); }; const t = setInterval(ask, 1200); ask(); });
+    if (!data) { toast('The host didn’t send the game. Try again.'); net.leave(); return; }
+  } else { toast('That room has no game picked.'); net.leave(); return; }
   const others = new Map(), results = new Map(), COLS = ['#f472b6', '#38bdf8', '#a3e635', '#fbbf24', '#c084fc', '#2dd4bf', '#fb7185', '#facc15'];
   let lastSend = 0, myDone = null;
   const name = id => { const m = net.room.members.find(x => x.id === id); return m ? m.display : '?'; };
+  const look = id => { const m = net.room.members.find(x => x.id === id); return m && m.look || null; };
   const raceCtx = {
     pos(p) {
       const now = performance.now(); if (now - lastSend < 90) return; lastSend = now;
-      if (net.isHost) { others.set(net.me.id, { ...p, name: net.me.display }); net.send({ ps: [...others].map(([id, v]) => [id, v.l, v.x, v.y, v.f]) }); }
-      else net.send({ p: [p.l, p.x, p.y, p.f] });
+      if (net.isHost) { others.set(net.me.id, { ...p, name: net.me.display }); net.send({ ps: [...others].map(([id, v]) => [id, v.l, v.x, v.y, v.f, v.z, v.d3 ? 1 : 0]) }); }
+      else net.send({ p: [p.l, p.x, p.y, p.f, p.z, p.d3 ? 1 : 0] });
     },
-    ghosts() { return [...others].filter(([id]) => id !== net.me.id).map(([id, v]) => ({ ...v, name: name(id) })); },
-    finish(ms) { myDone = ms; if (net.isHost) { results.set(net.me.id, ms); shareResults(); } else net.send({ done: ms }); },
+    ghosts() { return [...others].filter(([id]) => id !== net.me.id).map(([id, v]) => ({ ...v, name: name(id), look: look(id) })); },
+    together,
+    finish(ms) { if (together) return; myDone = ms; if (net.isHost) { results.set(net.me.id, ms); shareResults(); } else net.send({ done: ms }); },
     leave() { try { net.leave(); } catch {} },
   };
   const shareResults = () => { net.send({ res: [...results] }); showResults(); };
@@ -537,15 +551,114 @@ async function race(pick) {
     $('ghostList').innerHTML = '🏁 ' + rows.map(([id, ms], i) => `${i + 1}. ${esc(name(id))} ${ms == null ? 'DNF' : (ms / 1000).toFixed(2) + 's'}`).join('<br>');
   }
   net.on('m', (d, from) => {
-    if (net.isHost && d.p) others.set(from, { l: d.p[0], x: d.p[1], y: d.p[2], f: d.p[3] });
-    if (!net.isHost && d.ps) for (const [id, l, x, y, f] of d.ps) others.set(id, { l, x, y, f });
+    if (net.isHost && d.p) { const o = others.get(from); others.set(from, { l: d.p[0], x: d.p[1], y: d.p[2], f: d.p[3], z: d.p[4], d3: !!d.p[5], moving: o ? Math.hypot(o.x - d.p[1], (o.z || 0) - (d.p[4] || 0)) > 0.02 : false }); }
+    if (!net.isHost && d.ps) for (const [id, l, x, y, f, z, d3] of d.ps) { const o = others.get(id); others.set(id, { l, x, y, f, z, d3: !!d3, moving: o ? Math.hypot(o.x - x, (o.z || 0) - (z || 0)) > 0.02 : false }); }
     if (net.isHost && d.done !== undefined) { results.set(from, d.done); shareResults(); }
     if (!net.isHost && d.res) { results.clear(); for (const [id, ms] of d.res) results.set(id, ms); showResults(); }
   });
   net.on('peer-left', d => { if (d && d.id) others.delete(d.id); });
   startPlay(data.data, { published: { id: data.id, title: data.title }, race: raceCtx });
-  $('ghostList').textContent = `Racing ${net.players().length} players`;
+  $('ghostList').textContent = together ? `🌐 Playing together · ${net.players().length} players` : `Racing ${net.players().length} players`;
 }
+
+/* ---------------- Claude: describe a game or a change, Claude builds it ---------------- */
+const TILE_LIST = () => Object.entries(E.TILES).map(([c, [n, , h]]) => `${c} = ${n} (${h})`).join('\n');
+const CLAUDE_RULES = () => `You design levels for the SanjivramOS Game Maker, a kids' game creation tool. Each level is a grid of single characters:
+${TILE_LIST()}
+
+Game types:
+- "platformer": side view with gravity. Rows go top to bottom. The bottom 2 rows are mostly ground '#', with gaps of lava 'L' or spikes 'S' to jump over. '.' is air. Jumps must be possible: gaps up to 3 tiles wide, steps up to 2 tiles high. Use '-' ledges, 'J' springs and 'X' checkpoints.
+- "topdown": seen from above. Surround the level with walls '#'. '.' is floor. Use keys 'K' with locked doors 'D', enemies 'E'/'F', turrets 'Z', teleporters 'T' (always in pairs).
+- "3d": seen from above, played in 3D. '.' is floor you walk on, 'O' is a hole you fall into — surround the whole level with 'O' and use 'O' gaps (1-2 tiles) to jump across. '#' is a 1-high block you can jump onto, '=' is a tall wall, '-' a raised ledge, 'J' a spring, 'F' a moving lift, 'E' a spinning bar, 'Z' a laser fence, 'L' lava, 'K'/'D' keys and doors.
+
+Rules: every level has exactly one 'P' (player start) and, unless the win setting is "coins", one 'G' (goal flag) reachable from P. All rows in a level have exactly the same length. Width 20–60, height 10–20 (platformer height 12–16). Put coins 'C' along the route and a few hearts 'H'. Make it fun, fair and a little surprising. The first level should have a sign 'N' with a short friendly hint.
+Answer with ONLY JSON — no explanation, no code fences.`;
+const NEW_FORMAT = `{"title":"…","template":"platformer|topdown|3d","settings":{"win":"goal|coins","lives":1|3|5|0,"theme":0-7 (0 sunny,1 sunset,2 night,3 cave,4 space,5 candy,6 forest,7 snow),"speed":1|2|3,"jump":1|2|3,"doubleJump":true|false,"shoot":true|false,"timer":0|30|60|120},"levels":[{"rows":["…","…"],"signs":[{"x":0,"y":0,"text":"…"}]}]}`;
+async function askClaude(prompt, system, model) {
+  const r = await fetch(location.origin + '/linux-app/claude-ask', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, system, model }) });
+  const j = await r.json().catch(() => ({ error: 'Claude sent back something unexpected.' }));
+  if (!r.ok) throw new Error(j.error || 'Claude isn’t available right now.');
+  return j.text || '';
+}
+function parseJson(text) { const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a < 0 || b <= a) throw new Error('Claude didn’t send a game back. Try describing it differently.'); return JSON.parse(text.slice(a, b + 1)); }
+const TILE_OK = new Set(Object.keys(E.TILES));
+/** turn Claude's rows into a valid level (fixes sizes, unknown characters, missing start / goal) */
+function cleanLevel(lv, template, win) {
+  let rows = (Array.isArray(lv.rows) ? lv.rows : []).map(r => String(r)).filter(r => r.length).slice(0, 60);
+  if (rows.length < 6) throw new Error('A level came back too small.');
+  const fill = template === '3d' ? 'O' : template === 'topdown' ? '#' : '.';
+  const w = Math.max(8, Math.min(200, Math.max(...rows.map(r => r.length))));
+  rows = rows.map(r => [...r.slice(0, w).padEnd(w, fill)].map(c => TILE_OK.has(c) && (c !== 'O' || template === '3d') ? c : c === ' ' ? '.' : '.').join(''));
+  let tiles = rows.join(''); const h = rows.length;
+  const firstP = tiles.indexOf('P'); if (firstP < 0) { const spot = tiles.indexOf('.'); tiles = tiles.slice(0, spot) + 'P' + tiles.slice(spot + 1); } else tiles = tiles.slice(0, firstP + 1) + tiles.slice(firstP + 1).replace(/P/g, '.');
+  if (win !== 'coins' && !tiles.includes('G')) { const spot = tiles.lastIndexOf('.'); tiles = tiles.slice(0, spot) + 'G' + tiles.slice(spot + 1); }
+  const signs = {}; for (const sg of Array.isArray(lv.signs) ? lv.signs : []) { const i = (+sg.y) * w + (+sg.x); if (i >= 0 && i < tiles.length && tiles[i] === 'N' && sg.text) signs[i] = String(sg.text).slice(0, 200); }
+  // signs without text get a friendly default
+  [...tiles].forEach((c, i) => { if (c === 'N' && !signs[i]) signs[i] = 'Have fun!'; });
+  return { w, h, tiles, signs };
+}
+function cleanGame(j, forceTemplate) {
+  const template = forceTemplate || (['platformer', 'topdown', '3d'].includes(j.template) ? j.template : 'platformer');
+  const st = { ...E.DEFAULT_SETTINGS }, js = j.settings || {};
+  if (['goal', 'coins'].includes(js.win)) st.win = js.win;
+  for (const [k, ok] of [['lives', [0, 1, 3, 5]], ['speed', [1, 2, 3]], ['jump', [1, 2, 3]], ['timer', [0, 30, 60, 120]], ['enemySpeed', [1, 2, 3]]]) if (ok.includes(+js[k])) st[k] = +js[k];
+  if (+js.theme >= 0 && +js.theme < E.THEMES.length) st.theme = +js.theme;
+  for (const k of ['doubleJump', 'shoot']) if (typeof js[k] === 'boolean') st[k] = js[k];
+  if (template !== 'platformer') st.stomp = false;
+  const levels = (Array.isArray(j.levels) ? j.levels : []).slice(0, 10).map(lv => cleanLevel(lv, template, st.win));
+  if (!levels.length) throw new Error('Claude’s game had no levels.');
+  return { v: 1, title: String(j.title || 'Claude’s game').slice(0, 60), template, settings: st, sprites: {}, levels };
+}
+function levelRows(lv) { const rows = []; for (let y = 0; y < lv.h; y++) rows.push(lv.tiles.slice(y * lv.w, (y + 1) * lv.w)); return rows; }
+function claudeDialog(tab = 'new') {
+  const pref = (() => { try { return localStorage.getItem('maker.claudeModel') || 'sonnet'; } catch { return 'sonnet'; } })();
+  dialog(`<h2>🤖 Claude — your game-making helper</h2>
+    <div class="seg" id="cTabs">${[['new', '✨ Make a new game'], ['edit', '✏️ Change this level'], ['ideas', '💡 Ideas & help']].map(([k, l]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <textarea id="cAsk" rows="4" maxlength="1500" style="width:100%;margin-top:10px;font:inherit;padding:10px;border-radius:10px;box-sizing:border-box" placeholder=""></textarea>
+    <div class="row" id="cNewOpts" style="flex-wrap:wrap;gap:8px;margin-top:6px"><label>Type <select id="cType"><option value="">Claude picks</option><option value="platformer">🏃 Side view</option><option value="topdown">🗺️ Top-down</option><option value="3d">🧊 3D</option></select></label><label>Levels <select id="cLv"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+    <div class="row" style="gap:8px;margin-top:6px"><label>Claude <select id="cModel"><option value="sonnet" ${pref === 'sonnet' ? 'selected' : ''}>Smart (better levels)</option><option value="haiku" ${pref === 'haiku' ? 'selected' : ''}>Fast</option></select></label></div>
+    <div id="cOut" style="white-space:pre-wrap;max-height:40vh;overflow:auto;margin-top:10px;line-height:1.5"></div>
+    <div class="row"><span id="cStatus" style="opacity:.8"></span><span class="sp"></span><button id="cX">Close</button><button id="cGo" class="pri">Ask Claude</button></div>`);
+  const ask = $('cAsk'), tabs = $('cTabs');
+  const PH = { new: 'Describe your game… e.g. "A spooky castle with 3 levels, keys and doors, lots of lava and a secret room full of coins"', edit: 'What should change on this level? e.g. "make it harder with more spikes and a moving lift over a big gap"', ideas: 'Ask anything… e.g. "how can I make my level more fun?" or "give me 5 ideas for a 3D obby"' };
+  const setTab = t => { tab = t; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); ask.placeholder = PH[t]; $('cNewOpts').style.display = t === 'new' ? '' : 'none'; $('cGo').textContent = t === 'ideas' ? 'Ask Claude' : t === 'new' ? 'Build it' : 'Change it'; $('cOut').textContent = ''; };
+  tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (b) setTab(b.dataset.t); };
+  setTab(tab); setTimeout(() => ask.focus(), 50);
+  $('cX').onclick = closeDialog;
+  $('cGo').onclick = async () => {
+    const text = ask.value.trim(); if (!text) { ask.focus(); return; }
+    const model = $('cModel').value; try { localStorage.setItem('maker.claudeModel', model); } catch {}
+    $('cGo').disabled = true; $('cStatus').textContent = '🤖 Claude is thinking… (this can take up to a minute)'; $('cOut').textContent = '';
+    try {
+      if (tab === 'ideas') {
+        const ctxt = `The user is making a ${game.template === '3d' ? '3D' : game.template === 'topdown' ? 'top-down' : 'side-view'} game called "${game.title}" with ${game.levels.length} level(s). Current level:\n${levelRows(L()).join('\n')}\n\nTheir question: ${text}`;
+        $('cOut').textContent = await askClaude(ctxt, 'You are a friendly game-design helper inside the SanjivramOS Game Maker (a kids\' level editor). Tiles:\n' + TILE_LIST() + '\nAnswer briefly and concretely in plain text (no JSON, no markdown headings).', model);
+        $('cStatus').textContent = '';
+      } else if (tab === 'new') {
+        const t = $('cType').value, n = +$('cLv').value;
+        const j = parseJson(await askClaude(`Make a complete game: ${text}\nNumber of levels: ${n}.${t ? ` Game type: "${t}".` : ' Pick the best game type.'}\nReply in exactly this JSON shape:\n${NEW_FORMAT}`, CLAUDE_RULES(), model));
+        const g = cleanGame(j, t || null);
+        draftId = uid(); game = g; li = 0; undo = []; redo = []; persist(); renderEditor();
+        closeDialog(); toast(`🤖 Claude built “${g.title}” — ${g.levels.length} level${g.levels.length > 1 ? 's' : ''}. Press ▶ to play it!`); sfx('power');
+      } else {
+        const cur = L(), rows = levelRows(cur), signs = Object.entries(cur.signs || {}).map(([i, tx]) => ({ x: i % cur.w, y: Math.floor(i / cur.w), text: tx }));
+        const j = parseJson(await askClaude(`This is a "${game.template}" level (win: ${game.settings.win}):\n${JSON.stringify({ rows, signs })}\n\nChange it like this: ${text}\nKeep what already works unless asked. Reply in exactly this JSON shape: {"rows":["…"],"signs":[{"x":0,"y":0,"text":"…"}]}`, CLAUDE_RULES(), model));
+        const lv = cleanLevel(j, game.template, game.settings.win);
+        snapshot(); game.levels[li] = lv; persist(); renderLevels(); drawEditor();
+        closeDialog(); toast('🤖 Level changed — press ↶ to undo if you don’t like it.'); sfx('power');
+      }
+    } catch (e) { $('cStatus').textContent = '⚠️ ' + e.message; }
+    finally { const b = $('cGo'); if (b) b.disabled = false; }
+  };
+}
+
+$('aiBtn').onclick = () => claudeDialog(game && game.levels.length ? 'edit' : 'new');
+$('onlineBtn').onclick = () => { game.title = $('title').value || game.title; race({ data: JSON.parse(JSON.stringify(game)), title: game.title || 'My game' }); };
+$('fsPlay').onclick = async () => {
+  const el = document.documentElement;
+  try { if (document.fullscreenElement) await document.exitFullscreen(); else await el.requestFullscreen(); }
+  catch { if (window.parent !== window) window.parent.postMessage({ sjg: 1, type: 'fullscreen' }, location.origin); }
+};
 
 /* ---------------- start ---------------- */
 $('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
@@ -558,5 +671,5 @@ refreshMe().then(() => {
   if (q.get('join')) race(null);
 });
 if (q.get('view')) show(q.get('view'));
-window.__maker = () => ({ get game() { return game; }, get runner() { return runner; }, setCell, newDraft, startPlay, api, refreshMe, loadDrafts, get me() { return me; }, show, openGame });
+window.__maker = () => ({ cleanGame, cleanLevel, claudeDialog, race, get game() { return game; }, get runner() { return runner; }, setCell, newDraft, startPlay, api, refreshMe, loadDrafts, get me() { return me; }, show, openGame });
 })();

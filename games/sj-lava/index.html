@@ -225,4 +225,5 @@ renderBest(); requestAnimationFrame(frame);
 window.__lava = { newGame, step: (n, dt = 1 / 60, inp = {}) => { for (let i = 0; i < n; i++) step(dt, Object.assign({ mx: 0, mz: 0, jump: false, jumpHeld: false, lookX: 0, lookY: 0 }, typeof inp === 'function' ? inp(i) : inp)); return { y: P.y, lava, best, over, gems, chunks: W.chunks.size }; }, get W() { return W; }, floorPos, get state() { return { lava, best, over, shield, power, mode }; }, set mode(m) { mode = m; } };
 })();
 </script>
+<script>window.GL3D && GL3D.fullscreenButton();</script>
 </body></html>

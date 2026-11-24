@@ -27,6 +27,7 @@ const TILES = {
   'J': ['Spring', 'Fun', 'Big bounce (top-down: speed boost)'],
   'T': ['Teleporter', 'Fun', 'Jumps you to the next teleporter'],
   'W': ['Water', 'Fun', 'Swim slowly through it'],
+  'O': ['Hole', 'Danger', '3D: an empty gap you can fall into'],
 };
 const SOLID = new Set(['#', '=', 'I', 'B', 'D', 'Z']);
 const THEMES = [
@@ -67,6 +68,7 @@ function drawTile(g, ch, x, y, s, sprites, t = 0, opts = {}) {
   switch (ch) {
     case '#': r(0, 0, 1, 1, '#92400e'); r(0, 0, 1, .22, '#22c55e'); r(.1, .4, .15, .1, '#78350f'); r(.6, .65, .18, .1, '#78350f'); break;
     case '=': r(0, 0, 1, 1, '#b91c1c'); g.fillStyle = '#7f1d1d'; for (const [a, b, w] of [[0, .48, 1], [0, .98, 1], [.48, 0, .04], [.2, .5, .04], [.75, .5, .04]]) g.fillRect(x + a * s, y + b * s - (b > .9 ? .04 * s : 0), w * s, .04 * s + (w < .1 ? .46 * s : 0)); break;
+    case 'O': r(0, 0, 1, 1, '#05070d'); r(.08, .08, .84, .84, '#0f172a'); circ(.3, .35, .04, '#475569'); circ(.7, .6, .03, '#475569'); break;
     case '-': r(0, 0, 1, .25, '#a16207'); r(0, .25, 1, .06, '#713f12'); break;
     case 'I': r(0, 0, 1, 1, '#bae6fd'); r(0, 0, 1, .15, '#f0f9ff'); r(.15, .3, .3, .06, '#fff'); break;
     case 'B': r(.04, .04, .92, .92, '#d97706'); r(.04, .04, .92, .1, '#fbbf24'); g.strokeStyle = '#78350f'; g.lineWidth = s * .05; g.beginPath(); g.moveTo(x + .3 * s, y + .2 * s); g.lineTo(x + .5 * s, y + .5 * s); g.lineTo(x + .4 * s, y + .8 * s); g.stroke(); break;
@@ -116,14 +118,15 @@ function blankLevel(w = 40, h = 15, template = 'platformer') {
   for (let y = 0; y < h; y++) {
     let row = '';
     for (let x = 0; x < w; x++) {
-      if (template === 'topdown') row += (x === 0 || y === 0 || x === w - 1 || y === h - 1) ? '#' : '.';
+      if (template === '3d') row += (x === 0 || y === 0 || x === w - 1 || y === h - 1) ? 'O' : '.';
+      else if (template === 'topdown') row += (x === 0 || y === 0 || x === w - 1 || y === h - 1) ? '#' : '.';
       else row += y >= h - 2 ? '#' : '.';
     }
     rows.push(row);
   }
   const L = { w, h, tiles: rows.join(''), signs: {} };
   const set = (x, y, c) => { L.tiles = L.tiles.slice(0, y * w + x) + c + L.tiles.slice(y * w + x + 1); };
-  if (template === 'topdown') { set(2, 2, 'P'); set(w - 3, h - 3, 'G'); } else { set(2, h - 3, 'P'); set(w - 3, h - 3, 'G'); }
+  if (template === 'topdown' || template === '3d') { set(2, 2, 'P'); set(w - 3, h - 3, 'G'); } else { set(2, h - 3, 'P'); set(w - 3, h - 3, 'G'); }
   return L;
 }
 function fromRows(rows, signs = {}) { const w = Math.max(...rows.map(r => r.length)); return { w, h: rows.length, tiles: rows.map(r => r.padEnd(w, '.')).join(''), signs }; }
