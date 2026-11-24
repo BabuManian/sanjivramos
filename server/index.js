@@ -302,7 +302,8 @@ server.listen(PORT, '0.0.0.0', () => {
     } catch (e) { console.error('[https] off:', e.message); }
   }
   console.log(`SanjivramOS is running on http://localhost:${PORT}${PASSWORD ? ' (password protected)' : ''}`);
-  if (SHELL_ON) console.log('Phone shell and desktop: on (Terminal and Linux apps) — this phone and your own network only, never the tunnel');
+  if (SHELL_ON && TRUST_FORWARD) console.log('Shell: on for anyone with the site password (SANJIVRAM_TRUST_FORWARD)');
+  else if (SHELL_ON) console.log('Phone shell and desktop: on (Terminal and Linux apps) — this phone and your own network only, never the tunnel');
   if (process.env.CODESPACE_NAME) console.log(`Codespace address: https://${process.env.CODESPACE_NAME}-${PORT}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev'}/`);
 });
 const stop = () => { server.close(); process.exit(0); };

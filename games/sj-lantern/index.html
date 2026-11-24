@@ -226,7 +226,7 @@ function buildWorld() {
   // the Scrap Grinder: a rusty box with a hopper on top
   wall(a, 7.2, 0, -0.9, 8.8, 1.1, 0.7, '#57534e'); pushBox(a, 7.0, 1.1, -1.1, 9.0, 1.7, 0.9, '#78716c'); pushBox(a, 7.3, 1.7, -0.8, 8.7, 1.8, 0.6, '#292524'); pushBox(a, 8.8, 0.3, -0.4, 9.2, 0.7, 0.2, '#b45309'); SPOTS.grinder = [8, 0, -0.1];
   // the camp pile: a wooden pallet next to the workbench
-  pushBox(a, 1.6, 0, -6.2, 3.8, 0.18, -4.4, '#6b4a2b'); SPOTS.pile = [2.7, 0, -5.3];
+  pushBox(a, 0.2, 0, -7.0, 2.4, 0.18, -5.2, '#6b4a2b'); SPOTS.pile = [1.3, 0, -6.1];
   for (const [x, z, r] of [[-2.8, 1.8, 0.6], [2.6, 2.4, -0.5], [0.2, -3.1, 0.1]]) { pushBox(a, x - 1.1, 0, z - 0.3, x + 1.1, 0.5, z + 0.3, '#5b3a22'); }
   // ranger cabin (door on the -z side)
   { const { x, z } = LM.cabin, w = 4, d = 3.5, h = 3; const c = '#7c5a3a';
@@ -432,11 +432,11 @@ function usable() {
   if (near(SPOTS.beacon, 3)) out.push(S.stones.length > S.placed ? { label: `Set the Sunstone${S.stones.length - S.placed > 1 ? 's' : ''} in the Beacon (${S.placed}/4)`, run: placeStones } : { label: `The Beacon: ${S.placed}/4 Sunstones`, run: () => log(S.placed < 4 ? 'Find the Sunstones: ' + STONES.filter(s => !S.stones.includes(s)).map(s => STONE_NAMES[s]).join(', ') : 'The Beacon is lit.') });
   if (near(SPOTS.bench, 2.6)) out.push({ label: 'Craft at the workbench (C)', run: () => openPanel('craft') });
   if (near(SPOTS.tent, 3) && S.isNight && fireR() > 7) out.push({ label: 'Rest in the tent (heal while the fire burns)', run: () => { S.resting = !S.resting; log(S.resting ? '😴 Resting…' : 'You get up.'); } });
-  PAGES.forEach((pg, i) => { if (S.pages.includes(i)) return; const p = pagePos(i); if (Math.hypot(P.x - p[0], P.z - p[2]) < 2.2 && Math.abs(P.y - p[1]) < 2.5) out.push({ label: 'Read the journal page', run: () => takePage(i) }); });
-  for (const k of STONES) { if (S.stones.includes(k)) continue; const p = SPOTS[k]; if (Math.hypot(P.x - p[0], P.z - p[2]) < 2.2 && Math.abs(P.y - p[1]) < 2.5) out.push({ label: 'Take the Sunstone', run: () => { S.stones.push(k); log(`🔆 You found a Sunstone at ${STONE_NAMES[k]}! (${S.stones.length}/4)`); kit && kit.unlock('stone'); sfx('power'); save(); } }); }
+  PAGES.forEach((pg, i) => { if (S.pages.includes(i)) return; const p = pagePos(i); if (Math.hypot(P.x - p[0], P.z - p[2]) < 2.2 && Math.abs(P.y - p[1]) < 2.5) out.push({ top: true, label: 'Read the journal page', run: () => takePage(i) }); });
+  for (const k of STONES) { if (S.stones.includes(k)) continue; const p = SPOTS[k]; if (Math.hypot(P.x - p[0], P.z - p[2]) < 2.2 && Math.abs(P.y - p[1]) < 2.5) out.push({ top: true, label: 'Take the Sunstone', run: () => { S.stones.push(k); log(`🔆 You found a Sunstone at ${STONE_NAMES[k]}! (${S.stones.length}/4)`); kit && kit.unlock('stone'); sfx('power'); save(); } }); }
   for (const b of bushes) if (b.berries > 0 && Math.abs(b.x - P.x) < 2 && Math.abs(b.z - P.z) < 2) { out.push({ label: `Pick berries (${b.berries})`, run: () => { let n = 0; while (b.berries > 0) { b.berries--; if (give('berry', b.x, b.z)) n++; } S.berriesT[b.id] = 0; dirtyAt(b.x, b.z); if (n) log(`🍓 +${n} berries in your sack`); sfx('pop'); } }); break; }
   for (const s of scraps) if (!s.taken && Math.hypot(s.x - P.x, s.z - P.z) < 2) { out.push({ label: s.battery ? 'Open the old crate' : 'Search the junk pile', run: () => { s.taken = true; S.scrapsTaken.push(s.id); const got = [JUNK[Math.random() * JUNK.length | 0], JUNK[Math.random() * JUNK.length | 0]]; if (s.battery) got.push('battery', 'can', JUNK[Math.random() * JUNK.length | 0]); for (const g of got) dropItem(g, s.x, s.z, 1.3); log('📦 Things spill out: ' + got.map(g => ITEMS[g].i).join(' ') + ' — pick them up'); sfx('coin'); } }); break; }
-  return out[0] || null;
+  return out.find(o => o.top) || out[0] || null;
 }
 function pagePos(i) {
   const l = LM[PAGES[i].at];
@@ -698,8 +698,8 @@ function render(now) {
   // beds around camp
   for (let b = 0; b < S.beds; b++) { const [x, z] = BEDSPOTS[b], y = groundH(x, z); R.box(x - 0.6, y, z - 1.1, x + 0.6, y + 0.35, z + 1.1, '#6b4a2b'); R.box(x - 0.55, y + 0.35, z - 1.05, x + 0.55, y + 0.5, z + 1.05, ['#1d4ed8', '#be123c', '#15803d', '#7e22ce', '#b45309'][b]); R.box(x - 0.45, y + 0.5, z - 1.0, x + 0.45, y + 0.62, z - 0.55, '#f8fafc'); }
   // camp pile: logs stacked as the pile grows
-  for (let k = 0; k < Math.min(14, S.inv.wood); k++) R.cube(M.chain(M.T(2.7 - 0.7 + (k % 4) * 0.45, 0.35 + Math.floor(k / 4) * 0.3, -5.3), M.RX(Math.PI / 2), M.S(0.3, 1.5, 0.3)), '#7c4a1e');
-  for (let k = 0; k < Math.min(6, S.inv.stone); k++) R.box(3.9 + (k % 2) * 0.4, 0, -6.4 + (k >> 1) * 0.4, 4.2 + (k % 2) * 0.4, 0.3, -6.1 + (k >> 1) * 0.4, '#8b8f99');
+  for (let k = 0; k < Math.min(14, S.inv.wood); k++) R.cube(M.chain(M.T(1.3 - 0.7 + (k % 4) * 0.45, 0.35 + Math.floor(k / 4) * 0.3, -6.1), M.RX(Math.PI / 2), M.S(0.3, 1.5, 0.3)), '#7c4a1e');
+  for (let k = 0; k < Math.min(6, S.inv.stone); k++) R.box(2.6 + (k % 2) * 0.4, 0, -7.2 + (k >> 1) * 0.4, 2.9 + (k % 2) * 0.4, 0.3, -6.9 + (k >> 1) * 0.4, '#8b8f99');
   // grinder teeth spin while grinding
   { const g = SPOTS.grinder, sp = (S.grindT > 0 ? now * 0.03 : now * 0.002); for (let k = 0; k < 3; k++) R.cube(M.chain(M.T(g[0], 1.75, g[2]), M.RX(sp + k * 1.05), M.S(1.2, 0.08, 0.5)), '#a8a29e'); if (S.grindT > 0) for (let k = 0; k < 4; k++) R.glow([g[0] + (Math.random() - 0.5), 1.9 + Math.random() * 0.6, g[2] + (Math.random() - 0.5)], 0.2, [1, 0.7, 0.3], 0.9); }
   // the sack on your back grows as it fills
@@ -837,7 +837,7 @@ requestAnimationFrame(frame);
 // test hooks
 window.__lantern = () => ({ S, P: { x: P && P.x, y: P && P.y, z: P && P.z }, enemies: enemies.length, warden: !!warden, running, usable: running && usable() && usable().label });
 window.__lanternStep = (n, dt = 1 / 30, inputs) => { for (let i = 0; i < n; i++) { if (inputs) inputs(i); if (!paused) update(dt); } return window.__lantern(); };
-window.__lanternApi = { GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
+window.__lanternApi = { hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
 })();
 </script>
 </body></html>
