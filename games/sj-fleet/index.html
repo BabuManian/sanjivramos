@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fleet Strike</title>
+<style>
+html,body{margin:0;min-height:100%;background:#06202e;color:#e0f2fe;font:14px system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+#app{display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px;box-sizing:border-box}
+h1{margin:0;font-size:22px}
+.row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{border:none;background:#0e4a63;color:#fff;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:hover{background:#0f6383}button.on,button.pri{background:#f97316}
+button:disabled{opacity:.4;cursor:default}
+#status{min-height:22px;font-weight:600;text-align:center}
+#boards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+.bw{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bw h3{margin:0;font-size:14px;opacity:.85}
+.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:min(92vw,380px);background:#0b3a50;padding:4px;border-radius:10px}
+.c{aspect-ratio:1;background:#0c4a6e;border-radius:3px;position:relative;display:flex;align-items:center;justify-content:center;font-size:min(3.2vw,15px)}
+.c.ship{background:#64748b}
+.c.ship.sunk{background:#7f1d1d}
+.c.miss::after{content:'';width:28%;height:28%;border-radius:50%;background:#e0f2fe;opacity:.7}
+.c.hit{background:#ea580c}.c.hit::after{content:'✸';color:#fef08a}
+.c.sunk{background:#991b1b}
+#enemy .c:not(.miss):not(.hit):hover{background:#0369a1;cursor:crosshair}
+#enemy.wait .c{cursor:default!important}
+.prev{outline:2px solid #fde047}
+.fleet{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;font-size:12px;opacity:.85}
+.fleet span{padding:2px 6px;border-radius:6px;background:#0e4a63}.fleet span.dead{text-decoration:line-through;opacity:.5}
+#log{font-size:12px;opacity:.7;min-height:16px}
+</style></head><body>
+<div id="app">
+  <h1>⚓ Fleet Strike</h1>
+  <div class="row" id="modes"><button data-m="ai" class="on">vs Computer</button><button data-m="online">🌐 Online</button></div>
+  <div class="row" id="lv"><span style="opacity:.7">Admiral</span><button data-l="0">Rookie</button><button data-l="1" class="on">Captain</button><button data-l="2">Admiral</button><label style="margin-left:8px"><input type="checkbox" id="salvo"> Salvo (one shot per ship left)</label></div>
+  <div id="status"></div>
+  <div id="boards">
+    <div class="bw"><h3>Your fleet</h3><div class="grid" id="mine"></div><div class="fleet" id="myFleet"></div></div>
+    <div class="bw"><h3>Enemy waters</h3><div class="grid" id="enemy"></div><div class="fleet" id="enFleet"></div></div>
+  </div>
+  <div class="row" id="place"><button id="shuffle">🔀 Shuffle fleet</button><button id="rotate">↻ Rotate (R)</button><button class="pri" id="ready">Ready — start battle</button></div>
+  <div class="row"><button id="new">New game</button><span id="log"></span></div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('fleet', { vs: false, title: 'Fleet Strike', trophies: [
+  { id: 'win', name: 'Victory at Sea', desc: 'Sink the computer\'s fleet', icon: '⚓' },
+  { id: 'adm', name: 'Fleet Admiral', desc: 'Beat the Admiral', icon: '🎖️' },
+  { id: 'eff', name: 'Sharp Eye', desc: 'Win using 45 shots or fewer', icon: '🎯' },
+  { id: 'untouched', name: 'Untouchable', desc: 'Win while losing no ship', icon: '🛡️' },
+  { id: 'online', name: 'Naval Duel', desc: 'Win an online battle', icon: '🌐' },
+] }) : null;
+const sfx = n => kit && kit.sfx(n);
+const $ = id => document.getElementById(id), N = 10;
+const SHIPS = [['Carrier', 5], ['Battleship', 4], ['Cruiser', 3], ['Submarine', 3], ['Destroyer', 2]];
+let mode = 'ai', level = 1, salvo = false, phase = 'place', net = null, isTurn = true, horiz = true, dragShip = null;
+let my, en; // { ships:[{name,len,cells:[i],hits:0}], shots: Map i->'miss'|'hit'|'sunk' }
+let myShots = 0, shotsLeft = 1, pending = 0;
+
+function randomFleet() {
+  const ships = [], occ = new Set();
+  for (const [name, len] of SHIPS) {
+    for (let tries = 0; tries < 500; tries++) {
+      const h = Math.random() < .5, x = Math.floor(Math.random() * (h ? N - len + 1 : N)), y = Math.floor(Math.random() * (h ? N : N - len + 1));
+      const cells = Array.from({ length: len }, (_, k) => (y + (h ? 0 : k)) * N + x + (h ? k : 0));
+      if (cells.some(c => occ.has(c) || neighbours(c).some(n => occ.has(n)))) continue;
+      cells.forEach(c => occ.add(c)); ships.push({ name, len, cells, hits: 0 }); break;
+    }
+  }
+  return ships.length === SHIPS.length ? ships : randomFleet();
+}
+function neighbours(i) { const x = i % N, y = Math.floor(i / N), out = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((dx || dy) && nx >= 0 && ny >= 0 && nx < N && ny < N) out.push(ny * N + nx); } return out; }
+const side = ships => ({ ships, shots: new Map() });
+const alive = s => s.ships.filter(sh => sh.hits < sh.len).length;
+function fireAt(target, i) {
+  if (target.shots.has(i)) return null;
+  const sh = target.ships && target.ships.find(s => s.cells.includes(i));
+  if (!sh) { target.shots.set(i, 'miss'); return { r: 'miss' }; }
+  sh.hits++;
+  if (sh.hits >= sh.len) { sh.cells.forEach(c => target.shots.set(c, 'sunk')); return { r: 'sunk', name: sh.name, cells: sh.cells }; }
+  target.shots.set(i, 'hit'); return { r: 'hit' };
+}
+
+/* ---------------- AI: hunt (parity + probability) / target ---------------- */
+function aiPick(target) {
+  const open = i => !target.shots.has(i);
+  const hits = [...target.shots].filter(([, v]) => v === 'hit').map(([i]) => i);
+  if (level === 0 && Math.random() < .5) { const o = [...Array(N * N).keys()].filter(open); return o[Math.floor(Math.random() * o.length)]; }
+  if (hits.length) {
+    // extend lines of hits first
+    const cand = new Map();
+    for (const h of hits) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = h % N + dx, y = Math.floor(h / N) + dy; if (x < 0 || y < 0 || x >= N || y >= N) continue;
+      const i = y * N + x; if (!open(i)) continue;
+      const back = (h % N - dx >= 0 && h % N - dx < N && Math.floor(h / N) - dy >= 0 && Math.floor(h / N) - dy < N) ? (Math.floor(h / N) - dy) * N + h % N - dx : -1;
+      cand.set(i, (cand.get(i) || 0) + 1 + (back >= 0 && target.shots.get(back) === 'hit' ? 5 : 0));
+    }
+    if (cand.size) return [...cand].sort((a, b) => b[1] - a[1])[0][0];
+  }
+  // probability density of remaining ships
+  const remaining = SHIPS.map(s => s[1]).filter((_, k) => !target.sunkNames || !target.sunkNames.includes(SHIPS[k][0]));
+  const dens = new Float32Array(N * N);
+  for (const len of remaining) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) for (const h of [true, false]) {
+    if (h ? x + len > N : y + len > N) continue;
+    const cells = Array.from({ length: len }, (_, k) => (y + (h ? 0 : k)) * N + x + (h ? k : 0));
+    if (cells.some(c => target.shots.has(c) && target.shots.get(c) !== 'hit')) continue;
+    cells.forEach(c => { if (open(c)) dens[c]++; });
+  }
+  let best = -1, bv = -1;
+  for (let i = 0; i < N * N; i++) { if (!open(i)) continue; const v = dens[i] + (level === 2 && (i % N + Math.floor(i / N)) % 2 === 0 ? 2 : 0) + Math.random() * (level === 2 ? .2 : 3); if (v > bv) { bv = v; best = i; } }
+  return best;
+}
+
+/* ---------------- game flow ---------------- */
+function newGame() {
+  my = side(randomFleet()); my.sunkNames = [];
+  en = mode === 'ai' ? side(randomFleet()) : { ships: null, shots: new Map(), sunk: [] };
+  en.sunkNames = [];
+  phase = 'place'; myShots = 0; isTurn = true; pending = 0;
+  $('place').style.display = ''; $('log').textContent = '';
+  render();
+}
+function startBattle() {
+  if (mode === 'online') { phase = 'waiting'; net.send({ rdy: 1 }, net.isHost ? undefined : undefined); oppReadyCheck(); render(); return; }
+  phase = 'battle'; isTurn = true; shotsLeft = salvo ? alive(my) : 1; $('place').style.display = 'none'; render();
+}
+function playerShot(i) {
+  if (phase !== 'battle' || !isTurn || en.shots.has(i) || pending) return;
+  myShots++;
+  if (mode === 'online') { pending++; net.send({ shot: i }); render(); return; }
+  const r = fireAt(en, i); afterMyShot(i, r);
+}
+function afterMyShot(i, r) {
+  sfx(r.r === 'miss' ? 'click' : r.r === 'sunk' ? 'boom' : 'hit');
+  if (r.r === 'sunk') { en.sunkNames.push(r.name); if (mode === 'online') r.cells.forEach(c => en.shots.set(c, 'sunk')); $('log').textContent = `You sank their ${r.name}!`; }
+  else if (mode === 'online') en.shots.set(i, r.r);
+  if (en.sunkNames.length === SHIPS.length) return gameOver(true);
+  shotsLeft--;
+  if (shotsLeft <= 0) { isTurn = false; render(); if (mode === 'ai') setTimeout(aiTurn, 600); else net.send({ done: 1 }); }
+  else render();
+}
+function aiTurn() {
+  if (phase !== 'battle') return;
+  let n = salvo ? alive(en) : 1;
+  const step = () => {
+    const i = aiPick(my), r = fireAt(my, i);
+    sfx(r.r === 'miss' ? 'click' : r.r === 'sunk' ? 'boom' : 'hurt');
+    if (r.r === 'sunk') { my.sunkNames.push(r.name); $('log').textContent = `They sank your ${r.name}!`; }
+    render(true, i);
+    if (my.sunkNames.length === SHIPS.length) return gameOver(false);
+    if (--n > 0) setTimeout(step, 350); else { isTurn = true; shotsLeft = salvo ? alive(my) : 1; render(); }
+  };
+  step();
+}
+function gameOver(won) {
+  phase = 'over'; isTurn = false; render();
+  $('status').textContent = won ? `🎉 Victory! You sank the enemy fleet in ${myShots} shots.` : '💥 Your fleet was sunk.';
+  sfx(won ? 'win' : 'lose');
+  if (won && mode === 'ai') { kit && kit.unlock('win'); if (level === 2) kit && kit.unlock('adm'); if (myShots <= 45) kit && kit.unlock('eff'); if (!my.sunkNames.length) kit && kit.unlock('untouched'); kit && kit.score(myShots, 'shots'); }
+  if (won && mode === 'online') kit && kit.unlock('online');
+  if (mode === 'ai' && !won) en.ships.forEach(s => s.cells.forEach(c => { if (!en.shots.has(c)) en.shots.set(c, 'reveal'); }));
+  render();
+}
+
+/* ---------------- online: each side keeps its own fleet secret; shots are answered by the defender ---------------- */
+let oppReady = false, meReady = false, firstTurn = null;
+async function goOnline() {
+  if (!window.SJNet) { $('status').textContent = 'Online needs SanjivramOS'; return; }
+  try { net = await SJNet.lobby({ game: 'fleet', gameName: 'Fleet Strike', max: 2, min: 2, modes: ['Classic', 'Salvo'] }); } catch { setMode('ai'); return; }
+  mode = 'online'; salvo = net.room.mode === 'Salvo'; $('salvo').checked = salvo;
+  oppReady = false; meReady = false; newGame();
+  net.on('m', d => {
+    if (d.rdy) { oppReady = true; oppReadyCheck(); }
+    if (d.shot != null) { // they fire at me
+      const r = fireAt(my, d.shot);
+      if (!r) return;
+      if (r.r === 'sunk') my.sunkNames.push(r.name);
+      sfx(r.r === 'miss' ? 'click' : r.r === 'sunk' ? 'boom' : 'hurt');
+      net.send({ res: { i: d.shot, ...r, lost: my.sunkNames.length === SHIPS.length } });
+      if (r.r === 'sunk') $('log').textContent = `They sank your ${r.name}!`;
+      render(true, d.shot);
+      if (my.sunkNames.length === SHIPS.length) gameOver(false);
+    }
+    if (d.res) { pending--; const r = d.res; afterMyShot(r.i, r); }
+    if (d.done) { isTurn = true; shotsLeft = salvo ? alive(my) : 1; render(); }
+    if (d.again) { oppReady = false; meReady = false; newGame(); }
+  });
+  net.on('peer-left', () => { $('status').textContent = 'Your opponent left.'; phase = 'over'; });
+  render();
+}
+function oppReadyCheck() {
+  if (phase === 'waiting') meReady = true;
+  if (meReady && oppReady) { phase = 'battle'; isTurn = net.isHost; shotsLeft = salvo ? alive(my) : 1; $('place').style.display = 'none'; sfx('power'); }
+  render();
+}
+function setMode(m) {
+  if (net && m !== 'online') { try { net.leave(); } catch {} net = null; }
+  mode = m;
+  document.querySelectorAll('#modes [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('lv').style.visibility = m === 'ai' ? 'visible' : 'hidden';
+  if (m === 'online') { newGame(); phase = 'lobby'; $('status').textContent = 'Opening lobby…'; goOnline(); return; }
+  newGame();
+}
+
+/* ---------------- render ---------------- */
+function render(flash, flashI) {
+  const mine = $('mine'), enemy = $('enemy');
+  if (!mine.children.length) for (let i = 0; i < N * N; i++) { const a = document.createElement('div'); a.className = 'c'; a.dataset.i = i; mine.appendChild(a); const b = document.createElement('div'); b.className = 'c'; b.dataset.i = i; enemy.appendChild(b); }
+  const shipCells = new Map(); my.ships.forEach(s => s.cells.forEach(c => shipCells.set(c, s)));
+  [...mine.children].forEach((el, i) => {
+    const sh = shipCells.get(i), st = my.shots.get(i);
+    el.className = 'c' + (sh ? ' ship' : '') + (st === 'miss' ? ' miss' : st === 'hit' ? ' hit' : st === 'sunk' ? ' hit sunk' : '') + (flash && i === flashI ? ' prev' : '');
+  });
+  [...enemy.children].forEach((el, i) => {
+    const st = en.shots.get(i);
+    el.className = 'c' + (st === 'miss' ? ' miss' : st === 'hit' ? ' hit' : st === 'sunk' ? ' hit sunk' : st === 'reveal' ? ' ship' : '');
+  });
+  enemy.classList.toggle('wait', !(phase === 'battle' && isTurn));
+  $('myFleet').innerHTML = SHIPS.map(([n, l]) => `<span class="${my.sunkNames.includes(n) ? 'dead' : ''}">${n} ${'■'.repeat(l)}</span>`).join('');
+  $('enFleet').innerHTML = SHIPS.map(([n, l]) => `<span class="${en.sunkNames.includes(n) ? 'dead' : ''}">${n} ${'■'.repeat(l)}</span>`).join('');
+  if (phase === 'place') $('status').textContent = 'Arrange your fleet: drag ships to move them, tap a ship to rotate it, or Shuffle. Then press Ready.';
+  else if (phase === 'waiting') $('status').textContent = 'Waiting for your opponent to finish placing…';
+  else if (phase === 'battle') $('status').textContent = isTurn ? `🎯 Your turn — fire at enemy waters${salvo ? ` (${shotsLeft} shot${shotsLeft === 1 ? '' : 's'} left)` : ''}` : mode === 'ai' ? 'Enemy is firing…' : 'Opponent is aiming…';
+  $('new').textContent = mode === 'online' ? 'Rematch' : 'New game';
+  $('new').disabled = mode === 'online' && phase !== 'over';
+}
+
+/* ---------------- placement: tap = rotate, drag = move ---------------- */
+function fits(ship, cells) {
+  const others = new Set(); my.ships.forEach(s => { if (s !== ship) s.cells.forEach(c => { others.add(c); neighbours(c).forEach(n => others.add(n)); }); });
+  return cells.every(c => c >= 0 && c < N * N && !others.has(c));
+}
+function shipCellsAt(start, len, h) {
+  const x = start % N, y = Math.floor(start / N);
+  if (h ? x + len > N : y + len > N) return null;
+  return Array.from({ length: len }, (_, k) => (y + (h ? 0 : k)) * N + x + (h ? k : 0));
+}
+let drag = null;
+$('mine').addEventListener('pointerdown', e => {
+  if (phase !== 'place') return;
+  const el = e.target.closest('.c'); if (!el) return;
+  const i = +el.dataset.i, ship = my.ships.find(s => s.cells.includes(i)); if (!ship) return;
+  drag = { ship, off: ship.cells.indexOf(i), moved: false, orig: ship.cells.slice() };
+  try { $('mine').setPointerCapture(e.pointerId); } catch {}
+});
+$('mine').addEventListener('pointermove', e => {
+  if (!drag) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY); const c = el && el.closest('#mine .c'); if (!c) return;
+  const i = +c.dataset.i, h = drag.ship.cells.length < 2 || drag.ship.cells[1] - drag.ship.cells[0] === 1;
+  const start = h ? i - drag.off : i - drag.off * N;
+  const cells = shipCellsAt(start, drag.ship.len, h);
+  if (cells && (start % N === (h ? (i % N) - drag.off : i % N)) && fits(drag.ship, cells) && cells.join() !== drag.ship.cells.join()) { drag.ship.cells = cells; drag.moved = true; render(); }
+});
+$('mine').addEventListener('pointerup', () => {
+  if (!drag) return;
+  if (!drag.moved) { // rotate around first cell
+    const s = drag.ship, h = s.cells[1] - s.cells[0] === 1, cells = shipCellsAt(s.cells[0], s.len, !h);
+    if (cells && fits(s, cells)) { s.cells = cells; sfx('click'); } else sfx('hurt');
+    render();
+  }
+  drag = null;
+});
+$('enemy').addEventListener('click', e => { const el = e.target.closest('.c'); if (el) playerShot(+el.dataset.i); });
+$('shuffle').onclick = () => { if (phase === 'place') { my.ships = randomFleet(); render(); } };
+$('rotate').onclick = () => { if (phase !== 'place') return; for (const s of my.ships) { const h = s.cells[1] - s.cells[0] === 1, c = shipCellsAt(s.cells[0], s.len, !h); if (c && fits(s, c)) s.cells = c; } render(); };
+addEventListener('keydown', e => { if (e.key === 'r' || e.key === 'R') $('rotate').click(); });
+$('ready').onclick = () => { if (phase === 'place') startBattle(); };
+$('new').onclick = () => { if (mode === 'online') { net.send({ again: 1 }); oppReady = false; meReady = false; newGame(); return; } newGame(); };
+$('modes').onclick = e => { const b = e.target.closest('[data-m]'); if (b) setMode(b.dataset.m); };
+$('lv').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; level = +b.dataset.l; document.querySelectorAll('#lv [data-l]').forEach(x => x.classList.toggle('on', x === b)); };
+$('salvo').onchange = e => { if (mode === 'ai') { salvo = e.target.checked; if (phase !== 'place') newGame(); } else e.target.checked = salvo; };
+window.__fleet = () => ({ my, en, phase, isTurn, playerShot, aiPick, setMode, get net() { return net; }, myShots });
+const q = new URLSearchParams(location.search);
+newGame();
+if (q.get('join') || q.get('online')) setMode('online');
+})();
+</script>
+</body></html>

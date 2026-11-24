@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Present</title>
+<script src="../sj-officekit/kit.js"></script>
+<style>
+:root{--k-acc:#d2552b}
+#app{display:flex;flex-direction:column;height:100%}
+#home{flex:1;overflow:auto} #home.off{display:none}
+#ed{flex:1;display:none;flex-direction:column;min-height:0} #ed.on{display:flex}
+.main{flex:1;display:flex;min-height:0}
+.thumbs{width:180px;flex:none;overflow-y:auto;background:var(--k-panel);border-right:1px solid var(--k-line);padding:10px 8px 40px}
+.th{display:flex;gap:6px;align-items:flex-start;margin-bottom:10px;cursor:pointer}
+.th .n{width:16px;font-size:11px;color:var(--k-sub);text-align:right;padding-top:2px}
+.th .box{flex:1;aspect-ratio:16/9;position:relative;overflow:hidden;border-radius:4px;border:2px solid transparent;box-shadow:0 0 0 1px var(--k-line)}
+.th.on .box{border-color:var(--k-acc)}
+.th.drop .box{box-shadow:0 -3px 0 var(--k-acc)}
+.th .box>.slide{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none}
+.addsl{width:100%;margin-top:4px}
+.center{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--k-bg)}
+.stagewrap{flex:1;position:relative;overflow:hidden;min-height:0}
+.stage{position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:0 2px 14px rgba(0,0,0,.25)}
+.notes{height:74px;flex:none;border:none;border-top:1px solid var(--k-line);background:var(--k-panel);color:var(--k-text);font:13px/1.4 system-ui;padding:8px 12px;resize:vertical;outline:none}
+.slide{width:960px;height:540px;position:relative;overflow:hidden;background:#fff;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;color:#222}
+.el{position:absolute;box-sizing:border-box;line-height:1.2;word-wrap:break-word;overflow:visible}
+.el .tx{width:100%;height:100%;display:flex;flex-direction:column;outline:none;padding:6px 10px;box-sizing:border-box}
+.el .tx>*{margin:0} .el .tx p{margin:0 0 .25em} .el .tx ul,.el .tx ol{margin:0 0 .25em;padding-left:1.2em} .el .tx li{margin:0 0 .3em}
+.el.v-m .tx{justify-content:center} .el.v-b .tx{justify-content:flex-end}
+.el img{width:100%;height:100%;display:block;object-fit:fill;pointer-events:none;user-select:none}
+.el svg.shp{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ed .el{cursor:move} .ed .el.editing{cursor:text}
+.ed .el.empty .tx::before{content:attr(data-ph);color:rgba(127,127,127,.7)}
+.ed .el.sel{outline:1.5px solid #3b82f6;outline-offset:1px}
+.ed .el.ghost{outline:1px dashed rgba(127,127,127,.5)}
+.hd{position:absolute;width:12px;height:12px;background:#fff;border:1.5px solid #3b82f6;border-radius:50%;z-index:5;margin:-6px 0 0 -6px}
+.hd[data-h=nw],.hd[data-h=se]{cursor:nwse-resize} .hd[data-h=ne],.hd[data-h=sw]{cursor:nesw-resize} .hd[data-h=n],.hd[data-h=s]{cursor:ns-resize} .hd[data-h=e],.hd[data-h=w]{cursor:ew-resize}
+.guide{position:absolute;background:#ec4899;z-index:4;pointer-events:none}
+#show{position:fixed;inset:0;background:#000;z-index:80;display:none;cursor:none}
+#show.on{display:block}
+#show .slide{position:absolute;left:0;top:0;transform-origin:0 0}
+#show .slide.in-fade{animation:fadein .5s ease}
+#show .slide.in-push{animation:pushin .5s ease}
+#show .slide.in-zoom{animation:zoomin .45s ease}
+@keyframes fadein{from{opacity:0}} @keyframes pushin{from{translate:100% 0}} @keyframes zoomin{from{opacity:0;scale:.85}}
+#show .cnt{position:absolute;right:14px;bottom:10px;color:rgba(255,255,255,.5);font:13px system-ui}
+#show:hover{cursor:default}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:min(560px,84vw)}
+.theme-grid button{border:2px solid transparent;border-radius:8px;padding:0;cursor:pointer;aspect-ratio:16/9;overflow:hidden;position:relative;background:none}
+.theme-grid button.on{border-color:var(--k-acc)}
+.theme-grid span{position:absolute;left:8px;bottom:6px;font:600 12px system-ui;background:rgba(0,0,0,.45);color:#fff;padding:2px 6px;border-radius:4px}
+.lay-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(480px,84vw)}
+.lay-grid button{border:1px solid var(--k-line);border-radius:6px;background:var(--k-bg);cursor:pointer;padding:6px;font-size:12px}
+@media (max-width:700px){.thumbs{width:96px}.th .n{display:none}.notes{display:none}}
+@media print{
+  @page{size:13.333in 7.5in;margin:0}
+  body{background:#fff} #app{display:none!important}
+  #printout{display:block!important} #printout .slide{break-after:page;transform:scale(1.333);transform-origin:0 0;width:960px;height:540px}
+  #printout .pg{width:1280px;height:720px;overflow:hidden;break-after:page}
+}
+#printout{display:none}
+</style></head>
+<body><div id="app"><div id="home"></div><div id="ed">
+  <div class="k-bar">
+    <button class="k-mb" data-m="file">File</button><button class="k-mb" data-m="edit">Edit</button><button class="k-mb" data-m="insert">Insert</button><button class="k-mb" data-m="slide">Slide</button><button class="k-mb" data-m="arrange">Arrange</button>
+    <input class="k-title" id="title" spellcheck="false"><span class="k-status" id="status"></span>
+    <button class="k-btn pri" id="playBtn" title="Present (F5)">▶ Present</button>
+  </div>
+  <div class="k-tools">
+    <button class="k-tb" data-t="undo" title="Undo (Ctrl+Z)">↶</button><button class="k-tb" data-t="redo" title="Redo (Ctrl+Y)">↷</button><span class="k-vs"></span>
+    <button class="k-tb" data-t="newslide" title="New slide">＋▭</button><button class="k-tb" data-t="text" title="Text box">T</button><button class="k-tb" data-t="shape" title="Shape">◆</button><button class="k-tb" data-t="image" title="Picture">🖼</button><button class="k-tb" data-t="theme" title="Theme">🎨</button><span class="k-vs"></span>
+    <select id="font" title="Font"><option value="">Theme font</option><option>Arial</option><option>Calibri</option><option>Georgia</option><option>Trebuchet MS</option><option>Verdana</option><option>Times New Roman</option><option>Courier New</option><option>Impact</option><option>Comic Sans MS</option></select>
+    <select id="fs" title="Font size"><option value="">Size</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option><option>28</option><option>32</option><option>36</option><option>40</option><option>44</option><option>54</option><option>60</option><option>72</option><option>96</option></select>
+    <button class="k-tb" data-x="bold" title="Bold"><b>B</b></button><button class="k-tb" data-x="italic" title="Italic"><i>I</i></button><button class="k-tb" data-x="underline" title="Underline"><u>U</u></button>
+    <span class="k-col k-tb" title="Text colour"><b>A</b><i id="fcI" style="background:#d2552b"></i><input type="color" id="fc" value="#d2552b"></span>
+    <button class="k-tb" data-x="insertUnorderedList" title="Bullets">•≡</button><button class="k-tb" data-x="insertOrderedList" title="Numbering">1≡</button>
+    <button class="k-tb" data-al="left" title="Align left">⫷</button><button class="k-tb" data-al="center" title="Centre">≡</button><button class="k-tb" data-al="right" title="Align right">⫸</button>
+    <span class="k-vs"></span>
+    <span class="k-col k-tb" title="Fill colour"><span>🪣</span><i id="fillI" style="background:#4f7fd9"></i><input type="color" id="fill" value="#4f7fd9"></span>
+    <span class="k-col k-tb" title="Outline colour"><span>▢</span><i id="lnI" style="background:#1f2937"></i><input type="color" id="ln" value="#1f2937"></span>
+    <button class="k-tb" data-t="front" title="Bring to front">⇡</button><button class="k-tb" data-t="back" title="Send to back">⇣</button><button class="k-tb" data-t="del" title="Delete">🗑</button>
+  </div>
+  <div class="main"><div class="thumbs" id="thumbs"></div><div class="center"><div class="stagewrap" id="sw"><div class="stage" id="stage"></div></div><textarea class="notes" id="notes" placeholder="Speaker notes — only you see these"></textarea></div></div>
+</div></div>
+<div id="show"><div class="cnt"></div></div>
+<div id="printout"></div>
+<script>
+'use strict';
+const { $, $$, h, esc, x } = Kit;
+const lib = new Kit.Library('present');
+const W = 960, H = 540;
+const stage = $('#stage'), sw = $('#sw'), status = $('#status');
+let deck = null, docId = null, cur = 0, selId = null, editingEl = null, undoS = [], redoS = [], saveT = 0, scale = 1, clipEl = null;
+
+// ---------- themes ----------
+const THEMES = [
+  { id: 'clean', name: 'Clean', bg: '#ffffff', title: '#1f2937', text: '#374151', accent: '#d2552b', font: 'Calibri' },
+  { id: 'midnight', name: 'Midnight', bg: '#0f172a', bg2: '#1e293b', title: '#f8fafc', text: '#cbd5e1', accent: '#38bdf8', font: 'Trebuchet MS' },
+  { id: 'ocean', name: 'Ocean', bg: '#0e7490', bg2: '#1e3a8a', title: '#ffffff', text: '#e0f2fe', accent: '#fde047', font: 'Verdana' },
+  { id: 'sunset', name: 'Sunset', bg: '#f97316', bg2: '#db2777', title: '#ffffff', text: '#fff7ed', accent: '#fef08a', font: 'Trebuchet MS' },
+  { id: 'forest', name: 'Forest', bg: '#f0fdf4', title: '#14532d', text: '#166534', accent: '#16a34a', font: 'Georgia' },
+  { id: 'paper', name: 'Paper', bg: '#faf7f0', title: '#3f2d20', text: '#5b4636', accent: '#b45309', font: 'Georgia' },
+  { id: 'violet', name: 'Violet', bg: '#2e1065', bg2: '#6d28d9', title: '#ffffff', text: '#ede9fe', accent: '#f0abfc', font: 'Calibri' },
+  { id: 'bold', name: 'Bold', bg: '#fde047', title: '#111827', text: '#1f2937', accent: '#dc2626', font: 'Impact' },
+  { id: 'slate', name: 'Slate', bg: '#e2e8f0', title: '#0f172a', text: '#334155', accent: '#2563eb', font: 'Arial' },
+  { id: 'mono', name: 'Mono', bg: '#111111', title: '#ffffff', text: '#d4d4d4', accent: '#ffffff', font: 'Courier New' }
+];
+const theme = () => THEMES.find(t => t.id === (deck && deck.theme)) || THEMES[0];
+const bgCss = (sl, t = theme()) => sl.bg ? sl.bg : t.bg2 ? `linear-gradient(135deg,${t.bg},${t.bg2})` : t.bg;
+
+// ---------- layouts ----------
+const uid = Kit.uid;
+const TXT = (role, x0, y0, w, h0, html, o = {}) => ({ id: uid(), type: 'text', role, x: x0, y: y0, w, h: h0, html, ...o });
+const LAYOUTS = {
+  title: { name: 'Title slide', els: () => [TXT('title', 80, 170, 800, 110, '', { fs: 54, bold: true, align: 'center', valign: 'b', ph: 'Click to add title' }), TXT('sub', 80, 290, 800, 70, '', { fs: 26, align: 'center', ph: 'Click to add subtitle' })] },
+  content: { name: 'Title and content', els: () => [TXT('title', 50, 28, 860, 80, '', { fs: 40, bold: true, valign: 'm', ph: 'Click to add title' }), TXT('body', 50, 120, 860, 380, '', { fs: 26, ph: 'Click to add text', list: true })] },
+  section: { name: 'Section header', els: () => [TXT('title', 80, 200, 800, 100, '', { fs: 48, bold: true, valign: 'b', ph: 'Section title' }), TXT('sub', 80, 310, 800, 60, '', { fs: 24, ph: 'Section description' })] },
+  two: { name: 'Two content', els: () => [TXT('title', 50, 28, 860, 80, '', { fs: 40, bold: true, valign: 'm', ph: 'Click to add title' }), TXT('body', 50, 120, 420, 380, '', { fs: 24, ph: 'Click to add text', list: true }), TXT('body', 490, 120, 420, 380, '', { fs: 24, ph: 'Click to add text', list: true })] },
+  titleonly: { name: 'Title only', els: () => [TXT('title', 50, 28, 860, 80, '', { fs: 40, bold: true, valign: 'm', ph: 'Click to add title' })] },
+  quote: { name: 'Big quote', els: () => [TXT('title', 100, 130, 760, 220, '', { fs: 40, italic: true, align: 'center', valign: 'm', ph: '“Add a memorable quote”' }), TXT('sub', 100, 370, 760, 50, '', { fs: 22, align: 'center', ph: '— Who said it' })] },
+  blank: { name: 'Blank', els: () => [] }
+};
+const newSlide = (layout = 'content') => ({ id: uid(), layout, els: LAYOUTS[layout].els(), notes: '', transition: 'fade' });
+const P = s => `<p>${s}</p>`, UL = (...a) => `<ul>${a.map(s => `<li>${s}</li>`).join('')}</ul>`;
+const fillSlide = (layout, vals) => { const s = newSlide(layout); s.els.forEach((e, i) => { if (vals[i] != null) e.html = vals[i]; }); return s; };
+const TEMPLATES = [
+  { name: 'Blank presentation', theme: 'clean', slides: () => [newSlide('title')] },
+  { name: 'Pitch deck', theme: 'midnight', slides: () => [fillSlide('title', [P('Your Big Idea'), P('A one-line pitch that explains it')]), fillSlide('content', [P('The problem'), UL('Who has it', 'Why it hurts', 'What they do today')]), fillSlide('content', [P('Our solution'), UL('What it is', 'How it works', 'Why now')]), fillSlide('two', [P('Market'), UL('Who buys', 'How many', 'How much'), UL('Competitors', 'Why we win')]), fillSlide('section', [P('Thank you'), P('you@example.com')])] },
+  { name: 'School project', theme: 'forest', slides: () => [fillSlide('title', [P('Project Title'), P('Your Name · Class · Date')]), fillSlide('content', [P('What I studied'), UL('The question', 'Why it matters')]), fillSlide('content', [P('What I found'), UL('Finding one', 'Finding two', 'Finding three')]), fillSlide('quote', [P('“The important thing is not to stop questioning.”'), P('— Albert Einstein')]), fillSlide('content', [P('Conclusion'), UL('What it means', 'What I would do next')])] },
+  { name: 'Photo story', theme: 'mono', slides: () => [fillSlide('title', [P('A Story in Pictures'), P('Add your photos with Insert → Picture')]), fillSlide('titleonly', [P('Chapter one')]), fillSlide('section', [P('The end')])] },
+  { name: 'Sunset talk', theme: 'sunset', slides: () => [fillSlide('title', [P('Talk Title'), P('Speaker name')]), fillSlide('content', [P('Agenda'), UL('Part one', 'Part two', 'Questions')])] }
+];
+TEMPLATES.forEach(t => { const th = THEMES.find(x => x.id === t.theme); t.preview = `<div style="position:absolute;inset:0;background:${th.bg2 ? `linear-gradient(135deg,${th.bg},${th.bg2})` : th.bg};display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:${th.font};color:${th.title};padding:6px;text-align:center"><b style="font-size:12px">${esc(t.name === 'Blank presentation' ? '' : t.name)}</b><span style="width:40%;height:3px;background:${th.accent};margin-top:5px;border-radius:2px;${t.name === 'Blank presentation' ? 'display:none' : ''}"></span></div>`; });
+
+// ---------- home ----------
+const showHome = () => { flush(); deck = null; $('#ed').classList.remove('on'); $('#home').classList.remove('off'); refreshHome(); document.title = 'Present'; };
+const refreshHome = Kit.home({ el: $('#home'), title: 'Present', accent: '#d2552b', lib, templates: TEMPLATES, importLabel: 'Open a file…',
+  onNew: t => { docId = uid(); openDeck({ name: t.name === 'Blank presentation' ? 'Untitled presentation' : t.name, theme: t.theme, slides: t.slides() }, true); },
+  onOpen: id => { const d = lib.load(id); if (d) { docId = id; openDeck(d); } else Kit.toast('That file is gone'); },
+  onImport: () => importFile() });
+$('#home').style.setProperty('--tp-ar', String(16 / 9));
+const openDeck = (d, isNew) => {
+  deck = d; if (!deck.slides.length) deck.slides.push(newSlide('title')); cur = 0; selId = null; undoS = []; redoS = [];
+  $('#title').value = deck.name; $('#home').classList.add('off'); $('#ed').classList.add('on'); document.title = deck.name + ' — Present';
+  renderAll(); if (isNew) save(); status.textContent = 'Saved';
+};
+const save = () => { if (!deck) return; deck.name = $('#title').value.trim() || 'Untitled presentation'; lib.save(docId, deck.name, deck); status.textContent = 'Saved'; clearTimeout(saveT); saveT = 0; };
+const flush = () => { if (editingEl) stopEdit(); if (saveT) save(); };
+const changed = () => { status.textContent = 'Saving…'; clearTimeout(saveT); saveT = setTimeout(save, 600); };
+$('#title').oninput = () => { document.title = $('#title').value + ' — Present'; changed(); };
+addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+const snap = () => { undoS.push(JSON.stringify(deck)); if (undoS.length > 80) undoS.shift(); redoS = []; };
+const undoRedo = (from, to) => { if (editingEl) stopEdit(); if (!from.length) return; to.push(JSON.stringify(deck)); const d = JSON.parse(from.pop()); deck.slides = d.slides; deck.theme = d.theme; cur = Math.min(cur, deck.slides.length - 1); selId = null; renderAll(); changed(); };
+const slide = () => deck.slides[cur];
+const elById = id => slide().els.find(e => e.id === id);
+
+// ---------- rendering ----------
+const shapeSvg = (e, t) => {
+  const f = e.fill || t.accent, l = e.line || 'none', lw = e.line ? (e.lw || 2) : 0, w = e.w, hh = e.h;
+  const pathOf = { rect: `<rect x="0" y="0" width="${w}" height="${hh}"/>`, roundRect: `<rect x="0" y="0" width="${w}" height="${hh}" rx="${Math.min(w, hh) * 0.16}"/>`, ellipse: `<ellipse cx="${w / 2}" cy="${hh / 2}" rx="${w / 2}" ry="${hh / 2}"/>`, triangle: `<polygon points="${w / 2},0 ${w},${hh} 0,${hh}"/>`, rightArrow: `<polygon points="0,${hh * .25} ${w * .6},${hh * .25} ${w * .6},0 ${w},${hh / 2} ${w * .6},${hh} ${w * .6},${hh * .75} 0,${hh * .75}"/>`, star5: `<polygon points="${[...Array(10)].map((_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? .4 : 1; return `${w / 2 + Math.cos(a) * w / 2 * r},${hh / 2 + Math.sin(a) * hh / 2 * r}`; }).join(' ')}"/>`, line: `<line x1="0" y1="${hh / 2}" x2="${w}" y2="${hh / 2}" stroke-width="${e.lw || 4}" stroke="${e.line || f}"/>`, diamond: `<polygon points="${w / 2},0 ${w},${hh / 2} ${w / 2},${hh} 0,${hh / 2}"/>` };
+  return `<svg class="shp" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none"><g fill="${e.shape === 'line' ? 'none' : f}" stroke="${l}" stroke-width="${lw}" vector-effect="non-scaling-stroke">${pathOf[e.shape] || pathOf.rect}</g></svg>`;
+};
+const textStyle = (e, t) => `font-size:${e.fs || 24}px;color:${e.color || (e.role === 'title' ? t.title : t.text)};font-family:'${(e.font || t.font).replace(/'/g, '')}',Calibri,Arial,sans-serif;text-align:${e.align || 'left'};${e.bold ? 'font-weight:700;' : ''}${e.italic ? 'font-style:italic;' : ''}${e.underline ? 'text-decoration:underline;' : ''}`;
+const elHtml = (e, t, edit) => {
+  const cls = `el v-${e.valign || 't'}${edit && e.type === 'text' && !stripHtml(e.html) ? ' empty' : ''}${edit && e.type === 'text' && !e.fill && !e.line ? ' ghost' : ''}`;
+  const box = `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;${e.rot ? `transform:rotate(${e.rot}deg);` : ''}`;
+  if (e.type === 'image') return `<div class="${cls}" data-id="${e.id}" style="${box}"><img src="${e.src}" alt="" draggable="false"></div>`;
+  const inner = e.type === 'shape' ? shapeSvg(e, t) : (e.fill || e.line ? `<div style="position:absolute;inset:0;background:${e.fill || 'transparent'};${e.line ? `border:${e.lw || 2}px solid ${e.line};` : ''}"></div>` : '');
+  const txt = e.type === 'text' || (e.type === 'shape' && e.html) ? `<div class="tx" data-ph="${esc(e.ph || '')}" style="${textStyle(e, t)};position:relative${e.type === 'shape' ? ';justify-content:center;text-align:' + (e.align || 'center') + ';color:' + (e.color || '#fff') : ''}">${e.html || ''}</div>` : '';
+  return `<div class="${cls}" data-id="${e.id}" style="${box}">${inner}${txt}</div>`;
+};
+const stripHtml = s => String(s || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+const slideHtml = (sl, edit) => { const t = theme(); return `<div class="slide" style="background:${bgCss(sl, t)}">${sl.els.map(e => elHtml(e, t, edit)).join('')}</div>`; };
+const renderStage = () => {
+  stage.innerHTML = slideHtml(slide(), true); stage.firstElementChild.classList.add('ed');
+  fit(); drawHandles(); $('#notes').value = slide().notes || '';
+};
+const fit = () => { const pw = sw.clientWidth - 40, ph = sw.clientHeight - 40; scale = Math.max(0.1, Math.min(pw / W, ph / H)); stage.style.transform = `scale(${scale})`; stage.style.left = (sw.clientWidth - W * scale) / 2 + 'px'; stage.style.top = (sw.clientHeight - H * scale) / 2 + 'px'; };
+new ResizeObserver(() => deck && fit()).observe(sw);
+const renderThumbs = () => {
+  const box = $('#thumbs'); const tw = box.clientWidth - (innerWidth <= 700 ? 16 : 40);
+  box.innerHTML = deck.slides.map((s, i) => `<div class="th${i === cur ? ' on' : ''}" data-i="${i}" draggable="true"><span class="n">${i + 1}</span><div class="box">${slideHtml(s, false)}</div></div>`).join('') + '<button class="k-btn addsl" id="addsl">＋ New slide</button>';
+  $$('.th .slide', box).forEach(el => el.style.transform = `scale(${(el.parentNode.clientWidth || tw) / W})`);
+  $$('.th', box).forEach(t => {
+    const i = +t.dataset.i;
+    t.onclick = () => { if (editingEl) stopEdit(); cur = i; selId = null; renderStage(); markThumb(); };
+    t.oncontextmenu = e => { e.preventDefault(); cur = i; renderStage(); markThumb(); Kit.menu(t, slideMenu()); };
+    t.ondragstart = e => { e.dataTransfer.setData('text/x-slide', String(i)); e.dataTransfer.effectAllowed = 'move'; };
+    t.ondragover = e => { if ([...e.dataTransfer.types].includes('text/x-slide')) { e.preventDefault(); t.classList.add('drop'); } };
+    t.ondragleave = () => t.classList.remove('drop');
+    t.ondrop = e => { e.preventDefault(); t.classList.remove('drop'); const from = +e.dataTransfer.getData('text/x-slide'); if (isNaN(from) || from === i) return; snap(); const [s] = deck.slides.splice(from, 1); deck.slides.splice(from < i ? i - 1 : i, 0, s); cur = deck.slides.indexOf(s); renderAll(); changed(); };
+  });
+  $('#addsl').onclick = e => addSlideMenu(e.currentTarget);
+};
+const markThumb = () => $$('.th').forEach(t => t.classList.toggle('on', +t.dataset.i === cur));
+let thumbT = 0; const refreshThumb = () => { clearTimeout(thumbT); thumbT = setTimeout(() => { const t = $(`.th[data-i="${cur}"] .box`); if (!t) return renderThumbs(); t.innerHTML = slideHtml(slide(), false); t.firstElementChild.style.transform = `scale(${t.clientWidth / W})`; }, 150); };
+const renderAll = () => { renderStage(); renderThumbs(); syncTools(); };
+
+// ---------- selection, drag, resize ----------
+const drawHandles = () => {
+  $$('.hd,.guide', stage).forEach(n => n.remove()); $$('.el.sel', stage).forEach(n => n.classList.remove('sel'));
+  const e = selId && elById(selId); if (!e) return syncTools();
+  const node = $(`.el[data-id="${e.id}"]`, stage); if (!node) return; node.classList.add('sel');
+  if (editingEl) return syncTools();
+  const sl = stage.firstElementChild;
+  [['nw', 0, 0], ['n', .5, 0], ['ne', 1, 0], ['e', 1, .5], ['se', 1, 1], ['s', .5, 1], ['sw', 0, 1], ['w', 0, .5]].forEach(([k, fx, fy]) => { const d = h(`<div class="hd" data-h="${k}"></div>`); d.style.left = e.x + e.w * fx + 'px'; d.style.top = e.y + e.h * fy + 'px'; d.style.transform = `scale(${1 / scale})`; sl.appendChild(d); });
+  syncTools();
+};
+const toStage = ev => { const r = stage.getBoundingClientRect(); return { x: (ev.clientX - r.left) / scale, y: (ev.clientY - r.top) / scale }; };
+let act = null;
+stage.addEventListener('pointerdown', ev => {
+  if (ev.button !== 0) return;
+  const hd = ev.target.closest('.hd'), node = ev.target.closest('.el');
+  if (editingEl && node && node.dataset.id === editingEl) return;    // clicking inside the text being edited
+  if (editingEl) stopEdit();
+  if (hd) { const e = elById(selId); act = { mode: 'resize', h: hd.dataset.h, e, start: toStage(ev), orig: { ...e } }; snap(); stage.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
+  if (!node) { selId = null; drawHandles(); return; }
+  const e = elById(node.dataset.id); const wasSel = selId === e.id; selId = e.id; drawHandles();
+  act = { mode: 'move', e, start: toStage(ev), orig: { ...e }, moved: false, wasSel }; stage.setPointerCapture(ev.pointerId); ev.preventDefault();
+});
+stage.addEventListener('pointermove', ev => {
+  if (!act) return; const p = toStage(ev), dx = p.x - act.start.x, dy = p.y - act.start.y, e = act.e, o = act.orig;
+  if (act.mode === 'move') {
+    if (!act.moved && Math.hypot(dx, dy) < 3) return; if (!act.moved) { snap(); act.moved = true; }
+    let nx = o.x + dx, ny = o.y + dy; $$('.guide', stage).forEach(g => g.remove());
+    // snap to slide centre and edges
+    const sl = stage.firstElementChild, snaps = [[W / 2 - e.w / 2, 'v', W / 2], [0, 'v', 0], [W - e.w, 'v', W]], snapsY = [[H / 2 - e.h / 2, 'h', H / 2], [0, 'h', 0], [H - e.h, 'h', H]];
+    for (const [v, , g] of snaps) if (Math.abs(nx - v) < 6 / scale) { nx = v; sl.appendChild(h(`<div class="guide" style="left:${g}px;top:0;width:${1 / scale}px;height:${H}px"></div>`)); break; }
+    for (const [v, , g] of snapsY) if (Math.abs(ny - v) < 6 / scale) { ny = v; sl.appendChild(h(`<div class="guide" style="top:${g}px;left:0;height:${1 / scale}px;width:${W}px"></div>`)); break; }
+    e.x = Math.round(nx); e.y = Math.round(ny);
+  } else {
+    const k = act.h; let { x: X, y: Y, w: Ww, h: Hh } = o;
+    if (k.includes('e')) Ww = Math.max(20, o.w + dx); if (k.includes('s')) Hh = Math.max(16, o.h + dy);
+    if (k.includes('w')) { Ww = Math.max(20, o.w - dx); X = o.x + o.w - Ww; } if (k.includes('n')) { Hh = Math.max(16, o.h - dy); Y = o.y + o.h - Hh; }
+    if (e.type === 'image' && k.length === 2 && !ev.shiftKey) { const ar = o.w / o.h; if (Ww / Hh > ar) Ww = Hh * ar; else Hh = Ww / ar; if (k.includes('w')) X = o.x + o.w - Ww; if (k.includes('n')) Y = o.y + o.h - Hh; }
+    Object.assign(e, { x: Math.round(X), y: Math.round(Y), w: Math.round(Ww), h: Math.round(Hh) });
+  }
+  const node = $(`.el[data-id="${e.id}"]`, stage); node.style.left = e.x + 'px'; node.style.top = e.y + 'px'; node.style.width = e.w + 'px'; node.style.height = e.h + 'px';
+  if (e.type === 'shape') { const svg = $('svg', node); if (svg) svg.outerHTML = shapeSvg(e, theme()); }
+  $$('.hd', stage).forEach(n => n.remove());
+});
+stage.addEventListener('pointerup', ev => {
+  if (!act) return; const a = act; act = null; $$('.guide', stage).forEach(g => g.remove());
+  if (a.mode === 'move' && !a.moved && a.wasSel && (a.e.type === 'text' || a.e.type === 'shape')) { startEdit(a.e.id, ev); return; }
+  drawHandles(); if (a.moved || a.mode === 'resize') { changed(); refreshThumb(); }
+});
+stage.addEventListener('dblclick', ev => { const node = ev.target.closest('.el'); if (node && !editingEl) { const e = elById(node.dataset.id); if (e.type === 'text' || e.type === 'shape') startEdit(e.id, ev); } });
+
+// ---------- text editing ----------
+const startEdit = (id, ev) => {
+  const e = elById(id); if (!e) return; selId = id; editingEl = id; snap();
+  const node = $(`.el[data-id="${id}"]`, stage); let tx = $('.tx', node);
+  if (!tx) { node.insertAdjacentHTML('beforeend', `<div class="tx" style="${textStyle({ ...e, align: e.align || 'center', color: e.color || '#fff' }, theme())};position:relative;justify-content:center"></div>`); tx = $('.tx', node); }
+  node.classList.add('editing'); node.classList.remove('empty');
+  if (!stripHtml(e.html) && !/<img/.test(e.html || '')) tx.innerHTML = e.list ? '<ul><li><br></li></ul>' : '<p><br></p>';
+  tx.contentEditable = 'true'; tx.focus(); $$('.hd', stage).forEach(n => n.remove());
+  const r = document.caretRangeFromPoint && ev && ev.clientX ? document.caretRangeFromPoint(ev.clientX, ev.clientY) : null;
+  const s = getSelection(); s.removeAllRanges();
+  if (r && tx.contains(r.startContainer) && stripHtml(e.html)) s.addRange(r); else { const rr = document.createRange(); rr.selectNodeContents(tx); rr.collapse(!stripHtml(e.html)); if (!stripHtml(e.html)) { const first = tx.querySelector('li,p') || tx; rr.setStart(first, 0); rr.collapse(true); } s.addRange(rr); }
+  tx.oninput = () => { e.html = cleanHtml(tx.innerHTML); changed(); refreshThumb(); };
+  syncTools();
+};
+const cleanHtml = s => { const t = stripHtml(s); return t || /<img/.test(s) ? s.replace(/<p><br><\/p>$/, '') : ''; };
+const stopEdit = () => {
+  const id = editingEl; editingEl = null; const e = elById(id); const node = $(`.el[data-id="${id}"]`, stage);
+  if (e && node) { const tx = $('.tx', node); if (tx) { e.html = cleanHtml(tx.innerHTML); tx.contentEditable = 'false'; } }
+  if (e && e.type === 'text' && !e.html && !e.ph) { slide().els = slide().els.filter(x => x !== e); selId = null; }
+  getSelection().removeAllRanges(); renderStage(); refreshThumb(); changed();
+};
+// apply a text command to the whole box when not editing
+const textCmd = (c, v) => {
+  const e = selId && elById(selId); if (!e || (e.type !== 'text' && e.type !== 'shape')) return Kit.toast('Select a text box first');
+  if (editingEl) { document.execCommand('styleWithCSS', false, c === 'foreColor'); document.execCommand(c, false, v); const tx = $(`.el[data-id="${editingEl}"] .tx`, stage); e.html = cleanHtml(tx.innerHTML); changed(); refreshThumb(); syncTools(); return; }
+  snap();
+  if (c === 'bold' || c === 'italic' || c === 'underline') { e[c] = !e[c]; e.html = (e.html || '').replace(new RegExp(`</?${c[0]}>`, 'g'), ''); }
+  else if (c === 'foreColor') { e.color = v; e.html = (e.html || '').replace(/ ?color:[^;"]+;?/g, ''); }
+  else if (c === 'insertUnorderedList' || c === 'insertOrderedList') { const tag = c === 'insertUnorderedList' ? 'ul' : 'ol'; const d = document.createElement('div'); d.innerHTML = e.html || ''; const items = [...d.querySelectorAll('li')].length ? [...d.querySelectorAll('li')].map(l => l.innerHTML) : [...d.children].length ? [...d.children].map(c2 => c2.innerHTML) : [d.innerHTML]; const already = d.firstElementChild && d.firstElementChild.tagName.toLowerCase() === tag; e.html = already ? items.map(i => `<p>${i}</p>`).join('') : `<${tag}>${items.map(i => `<li>${i}</li>`).join('')}</${tag}>`; }
+  renderStage(); refreshThumb(); changed();
+};
+const setProp = (patch, needText) => { const e = selId && elById(selId); if (!e) return Kit.toast('Select something on the slide first'); if (needText && e.type === 'image') return; snap(); Object.assign(e, patch); if (patch.fs || patch.font) e.html = (e.html || '').replace(/ ?font-(size|family):[^;"]+;?/g, ''); if (editingEl) { const id = editingEl; editingEl = null; renderStage(); startEdit(id); } else renderStage(); refreshThumb(); changed(); };
+
+// ---------- toolbar ----------
+$$('.k-tools button').forEach(b => b.addEventListener('mousedown', ev => ev.preventDefault()));
+$$('[data-x]').forEach(b => b.onclick = () => textCmd(b.dataset.x));
+$$('[data-al]').forEach(b => b.onclick = () => { if (editingEl) { document.execCommand({ left: 'justifyLeft', center: 'justifyCenter', right: 'justifyRight' }[b.dataset.al]); const e = elById(editingEl); e.html = cleanHtml($(`.el[data-id="${editingEl}"] .tx`, stage).innerHTML); changed(); return; } setProp({ align: b.dataset.al }, true); });
+$('#fs').onchange = ev => { if (ev.target.value) setProp({ fs: +ev.target.value }, true); };
+$('#font').onchange = ev => setProp({ font: ev.target.value || null }, true);
+$('#fc').oninput = ev => { $('#fcI').style.background = ev.target.value; textCmd('foreColor', ev.target.value); };
+$('#fill').oninput = ev => { $('#fillI').style.background = ev.target.value; const e = selId && elById(selId); if (!e) { snap(); slide().bg = ev.target.value; renderStage(); refreshThumb(); changed(); return; } setProp({ fill: ev.target.value }); };
+$('#ln').oninput = ev => { $('#lnI').style.background = ev.target.value; setProp({ line: ev.target.value, lw: (elById(selId) || {}).lw || 2 }); };
+const syncTools = () => {
+  const e = selId && elById(selId); $('#fs').value = e && e.fs ? String(e.fs) : ''; $('#font').value = e && e.font || '';
+  ['bold', 'italic', 'underline'].forEach(c => $(`[data-x="${c}"]`).classList.toggle('on', !!(editingEl ? document.queryCommandState(c) : e && e[c])));
+  $$('[data-al]').forEach(b => b.classList.toggle('on', !!e && (e.align || 'left') === b.dataset.al));
+};
+document.addEventListener('selectionchange', () => { if (editingEl) syncTools(); });
+const TOOLS = {
+  undo: () => undoRedo(undoS, redoS), redo: () => undoRedo(redoS, undoS),
+  newslide: () => addSlideMenu($('[data-t=newslide]')), text: () => addEl({ type: 'text', x: 280, y: 220, w: 400, h: 80, html: '', fs: 28, ph: 'Type here' }, true),
+  shape: () => Kit.menu($('[data-t=shape]'), [['rect', 'Rectangle'], ['roundRect', 'Rounded rectangle'], ['ellipse', 'Oval'], ['triangle', 'Triangle'], ['diamond', 'Diamond'], ['rightArrow', 'Arrow'], ['star5', 'Star'], ['line', 'Line']].map(([s, l]) => ({ label: l, act: () => addEl({ type: 'shape', shape: s, x: 380, y: 190, w: s === 'line' ? 240 : 200, h: s === 'line' ? 20 : 160, html: '' }) }))),
+  image: () => insertImage(), theme: () => themeDlg(),
+  front: () => { const e = elById(selId); if (!e) return; snap(); slide().els = slide().els.filter(x => x !== e).concat(e); renderStage(); refreshThumb(); changed(); },
+  back: () => { const e = elById(selId); if (!e) return; snap(); slide().els = [e].concat(slide().els.filter(x => x !== e)); renderStage(); refreshThumb(); changed(); },
+  del: () => delEl()
+};
+$$('[data-t]').forEach(b => b.onclick = () => TOOLS[b.dataset.t]());
+const addEl = (e, edit) => { if (editingEl) stopEdit(); snap(); e.id = uid(); slide().els.push(e); selId = e.id; renderStage(); refreshThumb(); changed(); if (edit) startEdit(e.id); };
+const delEl = () => { const e = selId && elById(selId); if (!e) return; snap(); slide().els = slide().els.filter(x => x !== e); selId = null; editingEl = null; renderStage(); refreshThumb(); changed(); };
+const insertImage = async () => {
+  const f = await Kit.pick('image/*'); if (!f) return; let url = await Kit.readAs(f, 'readAsDataURL'); const s = await Kit.imgSize(url);
+  if (f.size > 1.5e6 || s.w > 1920) { const c = document.createElement('canvas'), k = Math.min(1, 1920 / s.w); c.width = s.w * k; c.height = s.h * k; const im = new Image(); await new Promise(r => { im.onload = r; im.src = url; }); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); url = c.toDataURL('image/jpeg', 0.85); }
+  const k = Math.min(1, 700 / s.w, 420 / s.h), w = Math.round(s.w * k), hh = Math.round(s.h * k);
+  addEl({ type: 'image', src: url, x: Math.round((W - w) / 2), y: Math.round((H - hh) / 2), w, h: hh });
+};
+const addSlideMenu = anchor => Kit.menu(anchor, Object.entries(LAYOUTS).map(([k, l]) => ({ label: l.name, act: () => { if (editingEl) stopEdit(); snap(); deck.slides.splice(cur + 1, 0, newSlide(k)); cur++; selId = null; renderAll(); changed(); } })));
+const themeDlg = () => {
+  const d = h(`<div class="k-modal"><div class="k-dlg"><h3>Theme</h3><div class="theme-grid">${THEMES.map(t => `<button data-th="${t.id}" class="${t.id === theme().id ? 'on' : ''}" style="background:${t.bg2 ? `linear-gradient(135deg,${t.bg},${t.bg2})` : t.bg}"><div style="position:absolute;left:10px;top:10px;font:700 15px '${t.font}';color:${t.title}">Aa</div><div style="position:absolute;left:10px;top:34px;width:40%;height:3px;background:${t.accent}"></div><span>${esc(t.name)}</span></button>`).join('')}</div><p style="margin-top:12px">Tip: with nothing selected, the 🪣 fill colour changes this slide’s background.</p><div class="k-btns"><button class="k-btn" data-clr>Reset backgrounds</button><button class="k-btn pri" data-c>Done</button></div></div></div>`);
+  document.body.appendChild(d);
+  $$('[data-th]', d).forEach(b => b.onclick = () => { snap(); deck.theme = b.dataset.th; $$('[data-th]', d).forEach(x => x.classList.toggle('on', x === b)); renderAll(); changed(); });
+  $('[data-clr]', d).onclick = () => { snap(); deck.slides.forEach(s => delete s.bg); renderAll(); changed(); };
+  $('[data-c]', d).onclick = () => d.remove(); d.onmousedown = ev => { if (ev.target === d) d.remove(); };
+};
+$('#notes').oninput = () => { slide().notes = $('#notes').value; changed(); };
+
+// ---------- menus ----------
+const slideMenu = () => [
+  { label: 'New slide…', act: () => addSlideMenu($('#addsl') || $('[data-m=slide]')) },
+  { label: 'Duplicate slide', hint: 'Ctrl+Shift+D', act: dupSlide },
+  { label: 'Delete slide', disabled: deck.slides.length < 2, act: delSlide },
+  { label: 'Move up', disabled: cur === 0, act: () => moveSlide(-1) }, { label: 'Move down', disabled: cur === deck.slides.length - 1, act: () => moveSlide(1) }, '-',
+  ...[['fade', 'Fade'], ['push', 'Push'], ['zoom', 'Zoom'], ['none', 'None']].map(([k, l]) => ({ label: 'Transition: ' + l, checked: (slide().transition || 'fade') === k, act: () => { slide().transition = k; changed(); } })), '-',
+  { label: 'Change layout…', act: async () => { const v = await Kit.dialog('Layout', [{ id: 'l', label: 'Layout', type: 'select', value: slide().layout || 'content', options: Object.entries(LAYOUTS).map(([k, l]) => [k, l.name]) }], { ok: 'Apply' }); if (!v) return; snap(); const old = slide().els.filter(e => e.type === 'text' && e.role); const fresh = LAYOUTS[v.l].els(); fresh.forEach(f => { const m = old.find(o => o.role === f.role && !o.used); if (m) { f.html = m.html; m.used = true; } }); slide().els = fresh.concat(slide().els.filter(e => !(e.type === 'text' && e.role))); slide().layout = v.l; renderAll(); changed(); } },
+  { label: 'Background colour…', act: async () => { const v = await Kit.dialog('Slide background', [{ id: 'c', label: 'Colour', type: 'color', value: /^#/.test(slide().bg || '') ? slide().bg : '#ffffff' }, { id: 'all', label: 'Apply to', type: 'select', value: 'one', options: [['one', 'This slide'], ['all', 'All slides']] }], { ok: 'Apply' }); if (!v) return; snap(); (v.all === 'all' ? deck.slides : [slide()]).forEach(s => s.bg = v.c); renderAll(); changed(); } }
+];
+const dupSlide = () => { if (editingEl) stopEdit(); snap(); const c = JSON.parse(JSON.stringify(slide())); c.id = uid(); c.els.forEach(e => e.id = uid()); deck.slides.splice(cur + 1, 0, c); cur++; renderAll(); changed(); };
+const delSlide = () => { if (deck.slides.length < 2) return; if (editingEl) stopEdit(); snap(); deck.slides.splice(cur, 1); cur = Math.min(cur, deck.slides.length - 1); selId = null; renderAll(); changed(); };
+const moveSlide = d => { const j = cur + d; if (j < 0 || j >= deck.slides.length) return; snap(); const [s] = deck.slides.splice(cur, 1); deck.slides.splice(j, 0, s); cur = j; renderAll(); changed(); };
+const MENUS = {
+  file: () => [
+    { label: 'New presentation', act: () => { flush(); docId = uid(); openDeck({ name: 'Untitled presentation', theme: deck.theme, slides: [newSlide('title')] }, true); } },
+    { label: 'Open…', act: showHome }, { label: 'Open a file from this device…', act: importFile }, '-',
+    { label: 'Save as PowerPoint (.pptx)', hint: 'Ctrl+S', act: exportPptx },
+    { label: 'Save as PDF / Print', hint: 'Ctrl+P', act: printDeck },
+    { label: 'Save this slide as a picture (.png)', act: slidePng }, '-',
+    { label: 'Close', act: showHome }
+  ],
+  edit: () => [{ label: 'Undo', hint: 'Ctrl+Z', act: TOOLS.undo }, { label: 'Redo', hint: 'Ctrl+Y', act: TOOLS.redo }, '-', { label: 'Copy', hint: 'Ctrl+C', act: copyEl }, { label: 'Paste', hint: 'Ctrl+V', act: pasteEl }, { label: 'Duplicate', hint: 'Ctrl+D', act: () => { copyEl(); pasteEl(); } }, { label: 'Delete', hint: 'Del', act: delEl }],
+  insert: () => [{ label: 'Text box', act: TOOLS.text }, { label: 'Picture…', act: insertImage }, { label: 'Shape…', act: TOOLS.shape }, { label: 'New slide…', act: () => addSlideMenu($('[data-m=insert]')) }],
+  slide: slideMenu,
+  arrange: () => [{ label: 'Bring to front', act: TOOLS.front }, { label: 'Send to back', act: TOOLS.back }, '-', { label: 'Centre on slide', act: () => { const e = elById(selId); if (!e) return; setProp({ x: Math.round((W - e.w) / 2), y: Math.round((H - e.h) / 2) }); } }, { label: 'Align top / middle / bottom of box…', act: async () => { const v = await Kit.dialog('Text position in box', [{ id: 'v', label: 'Position', type: 'select', value: (elById(selId) || {}).valign || 't', options: [['t', 'Top'], ['m', 'Middle'], ['b', 'Bottom']] }]); if (v) setProp({ valign: v.v }, true); } }, { label: 'Outline width…', act: async () => { const v = await Kit.dialog('Outline width', [{ id: 'w', label: 'Pixels (0 = none)', type: 'number', value: (elById(selId) || {}).lw || 2, min: 0, max: 30 }]); if (v) setProp(+v.w ? { lw: +v.w, line: (elById(selId) || {}).line || '#1f2937' } : { line: null, lw: null }); } }, { label: 'Remove fill', act: () => setProp({ fill: null }) }]
+};
+$$('[data-m]').forEach(b => { b.onmousedown = ev => ev.preventDefault(); b.onclick = () => Kit.menu(b, MENUS[b.dataset.m]()); });
+const copyEl = () => { const e = selId && elById(selId); if (e) { clipEl = JSON.parse(JSON.stringify(e)); Kit.toast('Copied', 900); } };
+const pasteEl = () => { if (!clipEl) return; const e = JSON.parse(JSON.stringify(clipEl)); e.x += 20; e.y += 20; clipEl.x += 20; clipEl.y += 20; addEl(e); };
+
+// ---------- keys ----------
+document.addEventListener('keydown', ev => {
+  if (!deck || $('.k-modal')) return;
+  if ($('#show').classList.contains('on')) return showKey(ev);
+  const c = ev.ctrlKey || ev.metaKey, k = ev.key.toLowerCase(), inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (ev.key === 'F5') { ev.preventDefault(); return play(ev.shiftKey ? cur : 0); }
+  if (c && k === 's') { ev.preventDefault(); save(); return exportPptx(); }
+  if (c && k === 'p') { ev.preventDefault(); return printDeck(); }
+  if (editingEl) { if (ev.key === 'Escape') { ev.preventDefault(); stopEdit(); } return; }
+  if (inField) return;
+  if (c && k === 'z') { ev.preventDefault(); return ev.shiftKey ? TOOLS.redo() : TOOLS.undo(); }
+  if (c && k === 'y') { ev.preventDefault(); return TOOLS.redo(); }
+  if (c && k === 'c') { if (selId) { ev.preventDefault(); copyEl(); } return; }
+  if (c && k === 'v') { if (clipEl) { ev.preventDefault(); pasteEl(); } return; }
+  if (c && k === 'd') { ev.preventDefault(); return ev.shiftKey ? dupSlide() : (copyEl(), pasteEl()); }
+  if (c && k === 'm') { ev.preventDefault(); return addSlideMenu($('[data-t=newslide]')); }
+  if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); return selId ? delEl() : delSlide(); }
+  if (ev.key === 'Escape') { selId = null; return drawHandles(); }
+  if (ev.key === 'Enter' && selId) { ev.preventDefault(); return startEdit(selId); }
+  if (/^Arrow/.test(ev.key)) {
+    ev.preventDefault(); const e = selId && elById(selId), d = ev.shiftKey ? 10 : 1;
+    if (!e) { if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') { if (cur < deck.slides.length - 1) { cur++; renderStage(); markThumb(); } } else if (cur > 0) { cur--; renderStage(); markThumb(); } return; }
+    snap(); if (ev.key === 'ArrowLeft') e.x -= d; if (ev.key === 'ArrowRight') e.x += d; if (ev.key === 'ArrowUp') e.y -= d; if (ev.key === 'ArrowDown') e.y += d; renderStage(); refreshThumb(); changed();
+  }
+});
+
+// ---------- slideshow ----------
+const show = $('#show'); let showI = 0;
+const showRender = dir => {
+  const sl = deck.slides[showI]; $$('.slide', show).forEach(n => n.remove());
+  const n = h(slideHtml(sl, false)); const k = Math.min(innerWidth / W, innerHeight / H); n.style.transform = `scale(${k})`; n.style.left = (innerWidth - W * k) / 2 + 'px'; n.style.top = (innerHeight - H * k) / 2 + 'px';
+  if (dir && sl.transition !== 'none') n.classList.add('in-' + (sl.transition || 'fade'));
+  show.prepend(n); $('.cnt', show).textContent = `${showI + 1} / ${deck.slides.length}`;
+};
+const play = from => { if (editingEl) stopEdit(); showI = from || 0; show.classList.add('on'); showRender(); (document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen().catch(() => {}) : 0); };
+const endShow = () => { show.classList.remove('on'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); cur = showI; renderAll(); };
+const go = d => { const n = showI + d; if (n < 0) return; if (n >= deck.slides.length) { if (showI === deck.slides.length) return endShow(); showI = deck.slides.length; $$('.slide', show).forEach(x => x.remove()); $('.cnt', show).textContent = 'End of slide show — click to exit'; return; } showI = n; showRender(d > 0); };
+const showKey = ev => { const k = ev.key; if (['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter', 'n'].includes(k)) { ev.preventDefault(); go(1); } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p'].includes(k)) { ev.preventDefault(); if (showI === deck.slides.length) { showI--; showRender(); } else go(-1); } else if (k === 'Escape') { ev.preventDefault(); endShow(); } else if (k === 'Home') { showI = 0; showRender(); } else if (k === 'End') { showI = deck.slides.length - 1; showRender(); } };
+show.addEventListener('click', ev => { if (showI >= deck.slides.length) return endShow(); go(ev.clientX < innerWidth * 0.25 ? -1 : 1); });
+let tx0 = null; show.addEventListener('touchstart', ev => { tx0 = ev.touches[0].clientX; }, { passive: true }); show.addEventListener('touchend', ev => { if (tx0 == null) return; const d = ev.changedTouches[0].clientX - tx0; tx0 = null; if (Math.abs(d) > 50) { ev.preventDefault(); go(d < 0 ? 1 : -1); } }, { passive: false });
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && show.classList.contains('on')) { /* keep showing until Esc/click; nothing to do */ } });
+addEventListener('resize', () => { if (show.classList.contains('on') && showI < deck.slides.length) showRender(); });
+$('#playBtn').onclick = () => play(0);
+
+// ---------- print / png ----------
+const printDeck = () => { if (editingEl) stopEdit(); $('#printout').innerHTML = deck.slides.map(s => `<div class="pg">${slideHtml(s, false)}</div>`).join(''); setTimeout(() => print(), 50); };
+const slidePng = async () => {
+  const c = document.createElement('canvas'); c.width = 1920; c.height = 1080; const g = c.getContext('2d'); g.scale(2, 2);
+  const html = slideHtml(slide(), false).replace(/<img src="([^"]+)"/g, (m, s) => `<img src="${s}"`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${[...document.styleSheets].map(s => { try { return [...s.cssRules].map(r => r.cssText).filter(t => /\.slide|\.el|\.tx|svg\.shp/.test(t)).join('\n'); } catch { return ''; } }).join('\n')}</style>${html.replace(/<br>/g, '<br/>').replace(/<img([^>]*?)>/g, '<img$1/>')}</div></foreignObject></svg>`;
+  const img = new Image(); img.onload = () => { g.drawImage(img, 0, 0); c.toBlob(b => Kit.download(b, Kit.safeName(deck.name) + ` - slide ${cur + 1}.png`)); }; img.onerror = () => Kit.toast('Couldn’t make a picture of this slide'); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+};
+
+// ---------- PPTX export ----------
+const hex = c => { if (!c) return null; c = String(c).trim(); let m = /^#([0-9a-f]{6})$/i.exec(c); if (m) return m[1].toUpperCase(); m = /^#([0-9a-f]{3})$/i.exec(c); if (m) return m[1].split('').map(v => v + v).join('').toUpperCase(); m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c); if (m) return [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('').toUpperCase(); return null; };
+const EMU = 12700; // 1 slide px = 1pt
+async function exportPptx() {
+  if (editingEl) stopEdit(); status.textContent = 'Making .pptx…'; const t = theme();
+  const NS = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const media = []; let mediaN = 0;
+  const fillXml = c => c ? `<a:solidFill><a:srgbClr val="${hex(c) || '000000'}"/></a:solidFill>` : '<a:noFill/>';
+  const bgXml = sl => { const b = sl.bg || (t.bg2 ? null : t.bg); if (b && /^#/.test(b)) return `<p:bg><p:bgPr>${fillXml(b)}<a:effectLst/></p:bgPr></p:bg>`; const g = /linear-gradient\([^,]+,\s*(#[0-9a-f]{3,6})\s*,\s*(#[0-9a-f]{3,6})/i.exec(sl.bg || '') || (t.bg2 && [0, t.bg, t.bg2]); if (g) return `<p:bg><p:bgPr><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:srgbClr val="${hex(g[1])}"/></a:gs><a:gs pos="100000"><a:srgbClr val="${hex(g[2])}"/></a:gs></a:gsLst><a:lin ang="2700000" scaled="0"/></a:gradFill><a:effectLst/></p:bgPr></p:bg>`; return ''; };
+  const runsOf = (node, st, links) => {
+    let o = '';
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) { const txt = c.nodeValue.replace(/\s+/g, ' '); if (txt) o += `<a:r><a:rPr lang="en-US" sz="${Math.round(st.fs * 100)}"${st.b ? ' b="1"' : ''}${st.i ? ' i="1"' : ''}${st.u ? ' u="sng"' : ''} dirty="0"><a:solidFill><a:srgbClr val="${hex(st.color) || '000000'}"/></a:solidFill><a:latin typeface="${x(st.font)}"/><a:cs typeface="${x(st.font)}"/></a:rPr><a:t>${x(txt)}</a:t></a:r>`; }
+      else if (c.nodeType === 1) {
+        if (c.tagName === 'BR') { o += `<a:br><a:rPr lang="en-US" sz="${Math.round(st.fs * 100)}"/></a:br>`; continue; }
+        const s = { ...st }, cs = c.style || {}; const tg = c.tagName;
+        if (tg === 'B' || tg === 'STRONG') s.b = true; if (tg === 'I' || tg === 'EM') s.i = true; if (tg === 'U') s.u = true;
+        if (tg === 'FONT' && c.color) s.color = c.color; if (cs.color) s.color = cs.color; if (cs.fontWeight === 'bold' || +cs.fontWeight >= 600) s.b = true; if (cs.fontStyle === 'italic') s.i = true; if (/underline/.test(cs.textDecoration || '')) s.u = true;
+        if (cs.fontSize) { const px = parseFloat(cs.fontSize); if (px) s.fs = /pt/.test(cs.fontSize) ? px * 4 / 3 : px; } if (cs.fontFamily) s.font = cs.fontFamily.split(',')[0].replace(/["']/g, '');
+        o += runsOf(c, s, links);
+      }
+    }
+    return o;
+  };
+  const parasOf = (html, st, algn) => {
+    const d = document.createElement('div'); d.innerHTML = html || ''; const out = [];
+    const para = (node, bullet, lvl) => { const al = (node.style && node.style.textAlign) || algn; const a = { left: 'l', center: 'ctr', right: 'r', justify: 'just' }[al] || 'l'; const bu = bullet === 'ul' ? `<a:buFont typeface="Arial"/><a:buChar char="•"/>` : bullet === 'ol' ? '<a:buFont typeface="+mj-lt"/><a:buAutoNum type="arabicPeriod"/>' : '<a:buNone/>'; const ind = bullet ? ` marL="${Math.round((lvl + 1) * 0.36 * 914400 / 1.2)}" indent="-${Math.round(0.3 * 914400)}"` : ' marL="0" indent="0"'; out.push(`<a:p><a:pPr algn="${a}"${ind}>${bu}</a:pPr>${runsOf(node, st)}<a:endParaRPr lang="en-US" sz="${Math.round(st.fs * 100)}" dirty="0"/></a:p>`); };
+    const walk = (n, lvl) => { for (const c of [...n.childNodes]) { if (c.nodeType === 1 && (c.tagName === 'UL' || c.tagName === 'OL')) { for (const li of [...c.children]) { const sub = [...li.querySelectorAll(':scope>ul,:scope>ol')]; const cl = li.cloneNode(true); cl.querySelectorAll(':scope>ul,:scope>ol').forEach(z => z.remove()); para(cl, c.tagName.toLowerCase(), lvl); sub.forEach(s => walk({ childNodes: [s] }, lvl + 1)); } } else if (c.nodeType === 1 && /^(P|DIV|H[1-6])$/.test(c.tagName)) para(c, null, 0); else if (c.nodeType === 3 && !c.nodeValue.trim()) continue; else { const w = document.createElement('span'); w.appendChild(c.cloneNode(true)); para(w, null, 0); } } };
+    walk(d, 0); if (!out.length) out.push(`<a:p><a:endParaRPr lang="en-US" sz="${Math.round(st.fs * 100)}" dirty="0"/></a:p>`);
+    return out.join('');
+  };
+  const xfrm = e => `<a:xfrm${e.rot ? ` rot="${Math.round(e.rot * 60000)}"` : ''}><a:off x="${Math.round(e.x * EMU)}" y="${Math.round(e.y * EMU)}"/><a:ext cx="${Math.max(1, Math.round(e.w * EMU))}" cy="${Math.max(1, Math.round(e.h * EMU))}"/></a:xfrm>`;
+  const slidesXml = [], slideRels = [];
+  for (const [si, sl] of deck.slides.entries()) {
+    let id = 2, shapes = ''; const rels = [`<Relationship Id="rId1" Type="${R}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>`];
+    for (const e of sl.els) {
+      const nm = `${e.type === 'image' ? 'Picture' : e.type === 'shape' ? 'Shape' : e.role === 'title' ? 'Title' : 'TextBox'} ${id}`;
+      if (e.type === 'image') {
+        const d = await Kit.officeImage(e.src); if (!d) continue; mediaN++; const name = `image${mediaN}.${d.ext}`; media.push([`ppt/media/${name}`, d.data]); const rid = 'rId' + (rels.length + 1); rels.push(`<Relationship Id="${rid}" Type="${R}/image" Target="../media/${name}"/>`);
+        shapes += `<p:pic><p:nvPicPr><p:cNvPr id="${id++}" name="${nm}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(e)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+        continue;
+      }
+      const isShape = e.type === 'shape', st = { fs: e.fs || (isShape ? 20 : 24), color: e.color || (isShape ? '#ffffff' : e.role === 'title' ? t.title : t.text), font: e.font || t.font, b: !!e.bold, i: !!e.italic, u: !!e.underline };
+      const prst = isShape ? ({ rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', triangle: 'triangle', rightArrow: 'rightArrow', star5: 'star5', line: 'line', diamond: 'diamond' }[e.shape] || 'rect') : 'rect';
+      const fill = isShape ? (e.shape === 'line' ? '<a:noFill/>' : fillXml(e.fill || t.accent)) : fillXml(e.fill);
+      const ln = (e.line || (isShape && e.shape === 'line')) ? `<a:ln w="${Math.round((e.lw || (e.shape === 'line' ? 4 : 2)) * EMU)}">${fillXml(e.line || e.fill || t.accent)}</a:ln>` : '<a:ln><a:noFill/></a:ln>';
+      const hasText = !!stripHtml(e.html) || e.type === 'text';
+      const anchor = { t: 't', m: 'ctr', b: 'b' }[e.valign || (isShape ? 'm' : 't')];
+      const body = hasText ? `<p:txBody><a:bodyPr wrap="square" lIns="${10 * EMU}" tIns="${6 * EMU}" rIns="${10 * EMU}" bIns="${6 * EMU}" rtlCol="0" anchor="${anchor}"><a:noAutofit/></a:bodyPr><a:lstStyle/>${parasOf(e.html, st, e.align || (isShape ? 'center' : 'left'))}</p:txBody>` : '';
+      shapes += `<p:sp><p:nvSpPr><p:cNvPr id="${id++}" name="${nm}"/><p:cNvSpPr${e.type === 'text' ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(e)}<a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom>${fill}${ln}</p:spPr>${body}</p:sp>`;
+    }
+    const tr = { fade: '<p:transition spd="med"><p:fade/></p:transition>', push: '<p:transition spd="med"><p:push dir="l"/></p:transition>', zoom: '<p:transition spd="med"><p:zoom/></p:transition>' }[sl.transition || 'fade'] || '';
+    slidesXml.push(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld ${NS}><p:cSld>${bgXml(sl)}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapes}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${tr}</p:sld>`);
+    slideRels.push(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`);
+  }
+  const font = x(t.font);
+  const themeXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="${x(t.name)}"><a:themeElements><a:clrScheme name="${x(t.name)}"><a:dk1><a:srgbClr val="${hex(t.title)}"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="${hex(t.text)}"/></a:dk2><a:lt2><a:srgbClr val="${hex(t.bg)}"/></a:lt2><a:accent1><a:srgbClr val="${hex(t.accent)}"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="SJ"><a:majorFont><a:latin typeface="${font}"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="${font}"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="SJ"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>`;
+  const spTreeEmpty = '<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree>';
+  const lvl = '<a:lvl1pPr marL="0" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl1pPr>';
+  const master = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster ${NS}><p:cSld><p:bg><p:bgPr>${fillXml(t.bg)}<a:effectLst/></p:bgPr></p:bg>${spTreeEmpty}</p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${lvl}</p:titleStyle><p:bodyStyle>${lvl}</p:bodyStyle><p:otherStyle>${lvl}</p:otherStyle></p:txStyles></p:sldMaster>`;
+  const layout = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout ${NS} type="blank" preserve="1"><p:cSld name="Blank">${spTreeEmpty}</p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
+  const pres = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation ${NS} saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>${deck.slides.map((s, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 3}"/>`).join('')}</p:sldIdLst><p:sldSz cx="12192000" cy="6858000"/><p:notesSz cx="6858000" cy="9144000"/><p:defaultTextStyle>${lvl}</p:defaultTextStyle></p:presentation>`;
+  const presRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rId2" Type="${R}/theme" Target="theme/theme1.xml"/>${deck.slides.map((s, i) => `<Relationship Id="rId${i + 3}" Type="${R}/slide" Target="slides/slide${i + 1}.xml"/>`).join('')}</Relationships>`;
+  const masterRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="${R}/theme" Target="../theme/theme1.xml"/></Relationships>`;
+  const layoutRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>`;
+  const types = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="gif" ContentType="image/gif"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>${deck.slides.map((s, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join('')}</Types>`;
+  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="ppt/presentation.xml"/></Relationships>`;
+  const blob = await Kit.zip([['[Content_Types].xml', types], ['_rels/.rels', rootRels], ['ppt/presentation.xml', pres], ['ppt/_rels/presentation.xml.rels', presRels], ['ppt/slideMasters/slideMaster1.xml', master], ['ppt/slideMasters/_rels/slideMaster1.xml.rels', masterRels], ['ppt/slideLayouts/slideLayout1.xml', layout], ['ppt/slideLayouts/_rels/slideLayout1.xml.rels', layoutRels], ['ppt/theme/theme1.xml', themeXml], ...slidesXml.map((s, i) => [`ppt/slides/slide${i + 1}.xml`, s]), ...slideRels.map((s, i) => [`ppt/slides/_rels/slide${i + 1}.xml.rels`, s]), ...media], 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+  window.__lastPptx = blob; status.textContent = 'Saved';
+  Kit.download(blob, Kit.safeName(deck.name) + '.pptx');
+}
+
+// ---------- PPTX import ----------
+const pptxToDeck = async (buf, name) => {
+  const files = await Kit.unzip(buf), A = Kit.attr, kid = Kit.kid, kids = Kit.kids, all = Kit.all;
+  if (!files.has('ppt/presentation.xml')) throw new Error('No presentation inside — is it really a .pptx?');
+  const pres = Kit.xml(files.get('ppt/presentation.xml')), prels = Kit.rels(files, 'ppt/_rels/presentation.xml.rels');
+  const sz = all(pres, 'sldSz')[0], cx = +A(sz, 'cx') || 12192000, cy = +A(sz, 'cy') || 6858000, k = W / cx, ky = H / cy;
+  // theme colours
+  const clr = {}; const themeRel = Object.values(prels).find(r => /theme$/.test(r.type));
+  if (themeRel) { const tf = files.get(Kit.resolve('ppt/presentation.xml', themeRel.target)); if (tf) { const cs = all(Kit.xml(tf), 'clrScheme')[0]; if (cs) for (const c of cs.children) { const v = kid(c, 'srgbClr'), s = kid(c, 'sysClr'); clr[c.localName] = A(v, 'val') || A(s, 'lastClr'); } } }
+  const MAP = { bg1: 'lt1', tx1: 'dk1', bg2: 'lt2', tx2: 'dk2' };
+  const colorOf = el => { if (!el) return null; const s = kid(el, 'srgbClr'), sc = kid(el, 'schemeClr'), sy = kid(el, 'sysClr'); let v = s ? A(s, 'val') : sc ? clr[MAP[A(sc, 'val')] || A(sc, 'val')] : sy ? A(sy, 'lastClr') : null; if (!v) return null; const mod = s || sc; const lm = kid(mod, 'lumMod'), lo = kid(mod, 'lumOff'); if (lm || lo) { let [r, g, b] = [0, 2, 4].map(i => parseInt(v.substr(i, 2), 16)); const m = lm ? +A(lm, 'val') / 1e5 : 1, o = lo ? +A(lo, 'val') / 1e5 : 0; [r, g, b] = [r, g, b].map(c => Math.round(Kit.clamp(c * m + 255 * o, 0, 255))); v = [r, g, b].map(c => c.toString(16).padStart(2, '0')).join(''); } return '#' + v.toLowerCase(); };
+  const bgOf = doc => { const bg = all(doc, 'bg')[0]; if (!bg) return null; const pr = kid(bg, 'bgPr'); if (pr) { const sf = kid(pr, 'solidFill'); if (sf) return colorOf(sf); const gf = kid(pr, 'gradFill'); if (gf) { const gs = all(gf, 'gs'); if (gs.length >= 2) return `linear-gradient(135deg,${colorOf(gs[0])},${colorOf(gs[gs.length - 1])})`; } } const ref = kid(bg, 'bgRef'); if (ref) return colorOf(ref); return null; };
+  const phMap = doc => { const m = {}; if (!doc) return m; for (const sp of all(doc, 'sp')) { const ph = all(kid(sp, 'nvSpPr'), 'ph')[0]; const xf = all(kid(sp, 'spPr'), 'xfrm')[0]; if (ph && xf) { const key = A(ph, 'type') || 'body'; const v = { xf, sp }; m['t:' + key] = m['t:' + key] || v; if (A(ph, 'idx')) m['i:' + A(ph, 'idx')] = v; } } return m; };
+  const slides = [];
+  for (const sid of all(pres, 'sldId')) {
+    const rel = prels[Kit.rid(sid)]; if (!rel) continue; const path = Kit.resolve('ppt/presentation.xml', rel.target); const f = files.get(path); if (!f) continue;
+    const doc = Kit.xml(f), srels = Kit.rels(files, path.replace(/slides\/(slide\d+\.xml)$/, 'slides/_rels/$1.rels'));
+    const layRel = Object.values(srels).find(r => /slideLayout$/.test(r.type)), layPath = layRel && Kit.resolve(path, layRel.target), layDoc = layPath && files.get(layPath) ? Kit.xml(files.get(layPath)) : null;
+    const lrels = layPath ? Kit.rels(files, layPath.replace(/slideLayouts\/(slideLayout\d+\.xml)$/, 'slideLayouts/_rels/$1.rels')) : {}; const mRel = Object.values(lrels).find(r => /slideMaster$/.test(r.type)); const mPath = mRel && Kit.resolve(layPath, mRel.target); const mDoc = mPath && files.get(mPath) ? Kit.xml(files.get(mPath)) : null;
+    const lph = phMap(layDoc), mph = phMap(mDoc);
+    const sl = { id: uid(), layout: 'blank', els: [], notes: '', transition: 'fade', bg: bgOf(doc) || bgOf(layDoc) || bgOf(mDoc) || '#ffffff' };
+    const imgUrl = (rels, base, rid) => { const r = rels[rid]; if (!r) return null; const p = Kit.resolve(base, r.target), d = files.get(p); return d ? `data:${Kit.mimeOf(p)};base64,${Kit.b64(d)}` : null; };
+    const walk = (tree, g) => {
+      for (const n of tree.children) {
+        const ln = n.localName;
+        if (ln === 'grpSp') { const xf = all(kid(n, 'grpSpPr'), 'xfrm')[0]; let ng = g; if (xf) { const off = kid(xf, 'off'), ext = kid(xf, 'ext'), co = kid(xf, 'chOff'), ce = kid(xf, 'chExt'); const sx = ce && +A(ce, 'cx') ? +A(ext, 'cx') / +A(ce, 'cx') : 1, sy = ce && +A(ce, 'cy') ? +A(ext, 'cy') / +A(ce, 'cy') : 1; ng = { ox: g.ox + (+A(off, 'x') - (co ? +A(co, 'x') : 0) * sx) * g.sx, oy: g.oy + (+A(off, 'y') - (co ? +A(co, 'y') : 0) * sy) * g.sy, sx: g.sx * sx, sy: g.sy * sy }; } walk(n, ng); continue; }
+        if (ln !== 'sp' && ln !== 'pic' && ln !== 'cxnSp') continue;
+        const spPr = kid(n, 'spPr'); let xf = all(spPr, 'xfrm')[0]; const ph = all(n.firstElementChild, 'ph')[0];
+        let phSp = null; if (!xf && ph) { const key = A(ph, 'type') || 'body', idx = A(ph, 'idx'); const hit = (idx && lph['i:' + idx]) || lph['t:' + key] || (idx && mph['i:' + idx]) || mph['t:' + key] || (key === 'ctrTitle' && (lph['t:title'] || mph['t:title'])) || (key === 'subTitle' && (lph['t:body'] || mph['t:body'])); if (hit) { xf = hit.xf; phSp = hit.sp; } }
+        if (!xf) continue; const off = kid(xf, 'off'), ext = kid(xf, 'ext');
+        const box = { x: Math.round((g.ox + +A(off, 'x') * g.sx) * k), y: Math.round((g.oy + +A(off, 'y') * g.sy) * ky), w: Math.round(+A(ext, 'cx') * g.sx * k), h: Math.round(+A(ext, 'cy') * g.sy * ky) }; const rot = +A(xf, 'rot') || 0; if (rot) box.rot = Math.round(rot / 60000);
+        if (ln === 'pic') { const blip = all(n, 'blip')[0]; const url = blip && imgUrl(srels, path, A(blip, 'embed')); if (url) sl.els.push({ id: uid(), type: 'image', src: url, ...box }); continue; }
+        const geom = A(kid(spPr, 'prstGeom'), 'prst') || 'rect'; const sf = kid(spPr, 'solidFill'), noFill = kid(spPr, 'noFill'), lnEl = kid(spPr, 'ln');
+        const fill = sf ? colorOf(sf) : null, line = lnEl && !kid(lnEl, 'noFill') ? colorOf(kid(lnEl, 'solidFill')) : null;
+        const styleFill = !sf && !noFill && all(kid(n, 'style'), 'fillRef')[0] ? colorOf(all(kid(n, 'style'), 'fillRef')[0]) : null;
+        const tb = kid(n, 'txBody'); let html = '', fs0 = null, color0 = null, align0 = null, bold0 = false;
+        const isTitle = ph && /title/i.test(A(ph, 'type') || '');
+        const phDefSz = (() => { const lv = phSp && all(kid(phSp, 'txBody'), 'defRPr')[0]; return lv && A(lv, 'sz') ? +A(lv, 'sz') / 100 : isTitle ? 40 : ph ? 24 : 18; })();
+        if (tb) {
+          let list = null;
+          for (const p of kids(tb, 'p')) {
+            const pPr = kid(p, 'pPr'), algn = A(pPr, 'algn'), al = { ctr: 'center', r: 'right', just: 'justify' }[algn];
+            const bullet = pPr && (kid(pPr, 'buChar') ? 'ul' : kid(pPr, 'buAutoNum') ? 'ol' : null) || (!kid(pPr, 'buNone') && ph && !isTitle && (A(ph, 'type') || 'body') === 'body' && !/subTitle/.test(A(ph, 'type') || '') ? 'ul' : null);
+            let inner = '';
+            for (const r of p.children) {
+              if (r.localName === 'br') { inner += '<br>'; continue; }
+              if (r.localName !== 'r' && r.localName !== 'fld') continue;
+              const rp = kid(r, 'rPr'), t = kid(r, 't'); if (!t) continue; let s = esc(t.textContent), css = '';
+              const szv = rp && A(rp, 'sz'); if (szv) { const px = +szv / 100; if (fs0 == null) fs0 = px; else if (px !== fs0) css += `font-size:${px}px;`; }
+              const c = rp && colorOf(kid(rp, 'solidFill')); if (c) { if (color0 == null) color0 = c; else if (c !== color0) css += `color:${c};`; }
+              if (rp && A(rp, 'b') === '1') { if (!inner && !html) bold0 = true; s = bold0 ? s : `<b>${s}</b>`; } else if (bold0 && rp) s = `<span style="font-weight:400">${s}</span>`;
+              if (rp && A(rp, 'i') === '1') s = `<i>${s}</i>`; if (rp && A(rp, 'u') && A(rp, 'u') !== 'none') s = `<u>${s}</u>`;
+              inner += css ? `<span style="${css}">${s}</span>` : s;
+            }
+            if (align0 == null && al) align0 = al;
+            if (bullet && inner) { if (list !== bullet) { if (list) html += `</${list}>`; html += `<${bullet}>`; list = bullet; } html += `<li>${inner}</li>`; }
+            else { if (list) { html += `</${list}>`; list = null; } html += `<p${al && al !== align0 ? ` style="text-align:${al}"` : ''}>${inner || '<br>'}</p>`; }
+          }
+          if (list) html += `</${list}>`;
+          html = html.replace(/(<p><br><\/p>)+$/, '');
+        }
+        const anchor = A(kid(tb, 'bodyPr'), 'anchor'); const valign = anchor === 'ctr' ? 'm' : anchor === 'b' ? 'b' : isTitle ? 'm' : 't';
+        const base = { id: uid(), ...box, html: stripHtml(html) || /<img/.test(html) ? html : '', fs: fs0 || phDefSz, color: color0 || (fill ? null : null), align: align0 || undefined, valign, bold: bold0 || undefined, role: isTitle ? 'title' : undefined };
+        if (geom !== 'rect' || ((fill || styleFill) && ln === 'sp' && !ph)) {
+          const map = { rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', triangle: 'triangle', rightArrow: 'rightArrow', star5: 'star5', line: 'line', diamond: 'diamond', straightConnector1: 'line' };
+          if (map[geom] || fill || styleFill) { sl.els.push({ ...base, type: 'shape', shape: map[geom] || 'rect', fill: fill || styleFill || '#4f7fd9', line: line || undefined, color: color0 || '#ffffff', align: align0 || 'center' }); continue; }
+        }
+        if (!base.html && !fill && !line) continue;
+        sl.els.push({ ...base, type: 'text', fill: fill || undefined, line: line || undefined, color: color0 || (/^#(f|e|d)/i.test(sl.bg || '') || !/^#/.test(sl.bg || '#fff') ? '#222222' : '#ffffff') });
+      }
+    };
+    const tree = all(doc, 'spTree')[0]; if (tree) walk(tree, { ox: 0, oy: 0, sx: 1, sy: 1 });
+    // speaker notes
+    const nRel = Object.values(srels).find(r => /notesSlide$/.test(r.type)); if (nRel) { const nf = files.get(Kit.resolve(path, nRel.target)); if (nf) { const nd = Kit.xml(nf); sl.notes = all(nd, 'sp').filter(sp => (A(all(sp, 'ph')[0], 'type') || 'body') === 'body').map(sp => all(sp, 'p').map(p => all(p, 't').map(t => t.textContent).join('')).join('\n')).join('\n').trim(); } }
+    const tr = all(doc, 'transition')[0]; if (tr) { const c = tr.firstElementChild && tr.firstElementChild.localName; sl.transition = c === 'push' || c === 'cover' || c === 'pull' ? 'push' : c === 'zoom' ? 'zoom' : 'fade'; } else sl.transition = 'none';
+    slides.push(sl);
+  }
+  if (!slides.length) throw new Error('No slides found');
+  return { name, theme: 'clean', slides };
+};
+async function importFile() {
+  const f = await Kit.pick('.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation'); if (!f) return;
+  try { if (/\.ppt$/i.test(f.name)) throw new Error('Old .ppt files aren’t supported. Save it as .pptx first.'); const d = await pptxToDeck(await Kit.readAs(f, 'readAsArrayBuffer'), f.name.replace(/\.[^.]+$/, '')); docId = uid(); openDeck(d, true); Kit.toast(`Opened ${f.name} — ${d.slides.length} slides`); }
+  catch (e) { console.error(e); Kit.toast('Couldn’t open that file: ' + e.message, 4000); }
+}
+window.__present = { exportPptx, pptxToDeck, openDeck, get deck() { return deck; }, startEdit, stopEdit, play, endShow, go, get showI() { return showI; } };
+</script></body></html>

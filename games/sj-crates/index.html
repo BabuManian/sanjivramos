@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crate Shift</title>
+<style>
+html,body{margin:0;height:100%;background:#1c1917;color:#f5f5f4;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+header{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+header b{color:#fff}
+button,select{font:inherit;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;background:#44403c;color:#f5f5f4}
+button:disabled{opacity:.4;cursor:default}
+canvas{display:block;touch-action:none;border-radius:8px}
+#win{display:none;position:fixed;inset:0;background:rgba(28,25,23,.85);align-items:center;justify-content:center;flex-direction:column;gap:12px;text-align:center}
+#win.on{display:flex}
+#win button{background:#f59e0b;color:#1c1917;font-weight:700;padding:10px 18px}
+p{margin:0;opacity:.7;text-align:center}
+</style></head><body>
+<header>
+  <select id="lvl" aria-label="Level"></select>
+  <span>Moves <b id="moves">0</b></span><span id="bestl"></span>
+  <button id="undo" title="Undo (Z)">↶ Undo</button>
+  <button id="reset" title="Restart (R)">↺ Restart</button>
+</header>
+<canvas id="cv" aria-label="Crate Shift board"></canvas>
+<p>Push every crate onto a ✦ target. Arrows/WASD, swipe, or tap a square next to you. You can push but never pull.</p>
+<div id="win"><h2 style="margin:0">Level solved!</h2><div id="ws"></div><button id="next">Next level</button></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("crates", { vs: { mode: 'time', levelKey: 'sj-crates-unlocked', levels: 12 }, title: "Crate Shift", lower: false, trophies: [{"id": "l10", "name": "Warehouse Worker", "desc": "Unlock level 10", "icon": "📦"}, {"id": "all", "name": "Box Master", "desc": "Unlock all 40 levels", "icon": "🏆"}] });</script>
+<script>
+(() => {
+  const LEVELS = 40;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  let L, player, boxes, moves, history, unlocked = 1, bests = {}, cur = 1, TS = 48;
+  try { unlocked = +localStorage.getItem('sj-crates-unlocked') || 1; bests = JSON.parse(localStorage.getItem('sj-crates-best') || '{}'); } catch {}
+  const save = () => { window.SJG && (SJG.score(unlocked, 'levels'), unlocked >= 10 && SJG.unlock('l10'), unlocked >= 40 && SJG.unlock('all')); try { localStorage.setItem('sj-crates-unlocked', String(unlocked)); localStorage.setItem('sj-crates-best', JSON.stringify(bests)); } catch {} };
+
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  // Builds level n: a random room, crates start on the targets, then the player walks around
+  // *pulling* crates. Every pull is a push played backwards, so the result is always solvable.
+  function generate(n) {
+    const rand = rng(n * 7919 + 13), R = k => rand() * k | 0;
+    const w = 7 + Math.min(4, n / 5 | 0), h = 7 + Math.min(3, n / 7 | 0), nb = Math.min(6, 2 + (n / 5 | 0) + (n % 5 > 2 ? 1 : 0));
+    let bestLvl = null, bestScore = -1;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const wall = Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => x === 0 || y === 0 || x === w - 1 || y === h - 1));
+      const inner = (w - 2) * (h - 2);
+      for (let i = 0; i < inner * (0.1 + rand() * 0.12); i++) wall[1 + R(h - 2)][1 + R(w - 2)] = true;
+      const floors = [];
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (!wall[y][x]) floors.push([x, y]);
+      if (floors.length < nb * 3 + 6) continue;
+      // Keep only the biggest connected area.
+      const start = floors[R(floors.length)], seen = new Set([start + '']), q = [start];
+      while (q.length) { const [x, y] = q.pop(); for (const [dx, dy] of DIRS) { const k = [x + dx, y + dy] + ''; if (!wall[y + dy][x + dx] && !seen.has(k)) { seen.add(k); q.push([x + dx, y + dy]); } } }
+      if (seen.size < nb * 3 + 6) continue;
+      for (const [x, y] of floors) if (!seen.has([x, y] + '')) wall[y][x] = true;
+      const open = [...seen].map(s => s.split(',').map(Number));
+      const pick = () => open.splice(R(open.length), 1)[0];
+      const goals = []; for (let i = 0; i < nb; i++) goals.push(pick());
+      let bx = goals.map(g => g.slice()), p = pick();
+      const boxAt = (x, y) => bx.findIndex(b => b[0] === x && b[1] === y);
+      let pulls = 0;
+      const steps = 120 + n * 25;
+      let lastDir = -1;
+      for (let s = 0; s < steps; s++) {
+        let d = R(4); if (rand() < 0.55 && lastDir >= 0) d = lastDir; // keep walking straight sometimes = longer pulls
+        const [dx, dy] = DIRS[d], nx = p[0] + dx, ny = p[1] + dy;
+        if (wall[ny][nx] || boxAt(nx, ny) >= 0) { lastDir = -1; continue; }
+        const bi = boxAt(p[0] - dx, p[1] - dy);
+        if (bi >= 0 && rand() < 0.7) { bx[bi] = [p[0], p[1]]; pulls++; }
+        p = [nx, ny]; lastDir = d;
+      }
+      const off = bx.filter(b => !goals.some(g => g[0] === b[0] && g[1] === b[1])).length;
+      if (off < Math.min(nb, 2)) continue;
+      const spread = bx.reduce((a, b, i) => a + Math.abs(b[0] - goals[i][0]) + Math.abs(b[1] - goals[i][1]), 0);
+      const score = off * 20 + spread * 2 + Math.min(pulls, 60);
+      if (score > bestScore) { bestScore = score; bestLvl = { w, h, wall, goals, boxes: bx, player: p }; }
+    }
+    return bestLvl;
+  }
+
+  function load(n) {
+    cur = n; L = generate(n);
+    player = L.player.slice(); boxes = L.boxes.map(b => b.slice()); moves = 0; history = [];
+    $('lvl').value = n; $('win').classList.remove('on');
+    hud(); fit(); draw();
+  }
+  function hud() {
+    $('moves').textContent = moves;
+    $('bestl').textContent = bests[cur] ? `Best ${bests[cur]}` : '';
+    $('undo').disabled = !history.length;
+  }
+  const boxAt = (x, y) => boxes.findIndex(b => b[0] === x && b[1] === y);
+  const onGoal = b => L.goals.some(g => g[0] === b[0] && g[1] === b[1]);
+  function move(dx, dy) {
+    if ($('win').classList.contains('on')) return;
+    const nx = player[0] + dx, ny = player[1] + dy;
+    if (L.wall[ny][nx]) return;
+    const bi = boxAt(nx, ny);
+    if (bi >= 0) {
+      const bx = nx + dx, by = ny + dy;
+      if (L.wall[by][bx] || boxAt(bx, by) >= 0) return;
+      history.push({ p: player.slice(), b: boxes.map(b => b.slice()) });
+      boxes[bi] = [bx, by];
+    } else history.push({ p: player.slice(), b: null });
+    player = [nx, ny]; moves++; hud(); draw();
+    if (boxes.every(onGoal)) solved();
+  }
+  function undo() {
+    const h = history.pop(); if (!h) return;
+    player = h.p; if (h.b) boxes = h.b; moves--; hud(); draw();
+  }
+  function solved() {
+    if (!bests[cur] || moves < bests[cur]) bests[cur] = moves;
+    if (cur >= unlocked) unlocked = Math.min(LEVELS, cur + 1);
+    save(); fillSelect();
+    $('ws').textContent = `${moves} moves` + (bests[cur] === moves ? ' — your best!' : ` (best ${bests[cur]})`);
+    $('next').textContent = cur < LEVELS ? 'Next level' : 'All levels done! Back to 1';
+    setTimeout(() => $('win').classList.add('on'), 250);
+  }
+  function draw() {
+    cv.width = L.w * TS; cv.height = L.h * TS;
+    ctx.fillStyle = '#1c1917'; ctx.fillRect(0, 0, cv.width, cv.height);
+    for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
+      const px = x * TS, py = y * TS;
+      if (L.wall[y][x]) {
+        // Only draw walls next to the floor.
+        let edge = false; for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) { const yy = y + oy, xx = x + ox; if (yy >= 0 && xx >= 0 && yy < L.h && xx < L.w && !L.wall[yy][xx]) edge = true; }
+        if (!edge) continue;
+        ctx.fillStyle = '#57534e'; ctx.fillRect(px, py, TS, TS);
+        ctx.fillStyle = '#78716c'; ctx.fillRect(px + 2, py + 2, TS / 2 - 3, TS / 2 - 3); ctx.fillRect(px + TS / 2 + 1, py + TS / 2 + 1, TS / 2 - 3, TS / 2 - 3);
+      } else {
+        ctx.fillStyle = (x + y) % 2 ? '#d6d3d1' : '#e7e5e4'; ctx.fillRect(px, py, TS, TS);
+      }
+    }
+    for (const [x, y] of L.goals) {
+      ctx.fillStyle = '#f59e0b'; ctx.font = `bold ${TS * 0.5}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✦', x * TS + TS / 2, y * TS + TS / 2);
+    }
+    for (const b of boxes) {
+      const px = b[0] * TS, py = b[1] * TS, g = onGoal(b), m = TS * 0.1;
+      ctx.fillStyle = g ? '#16a34a' : '#b45309'; ctx.fillRect(px + m, py + m, TS - 2 * m, TS - 2 * m);
+      ctx.strokeStyle = g ? '#bbf7d0' : '#fcd34d'; ctx.lineWidth = TS * 0.06;
+      ctx.strokeRect(px + m * 1.8, py + m * 1.8, TS - 3.6 * m, TS - 3.6 * m);
+      ctx.beginPath(); ctx.moveTo(px + m * 1.8, py + m * 1.8); ctx.lineTo(px + TS - m * 1.8, py + TS - m * 1.8); ctx.moveTo(px + TS - m * 1.8, py + m * 1.8); ctx.lineTo(px + m * 1.8, py + TS - m * 1.8); ctx.stroke();
+    }
+    const cx = player[0] * TS + TS / 2, cy = player[1] * TS + TS / 2;
+    ctx.fillStyle = '#2563eb'; ctx.beginPath(); ctx.arc(cx, cy, TS * 0.34, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx - TS * 0.12, cy - TS * 0.06, TS * 0.07, 0, 7); ctx.arc(cx + TS * 0.12, cy - TS * 0.06, TS * 0.07, 0, 7); ctx.fill();
+  }
+  function fit() {
+    if (!L) return;
+    const availW = innerWidth - 20, availH = innerHeight - 140;
+    TS = Math.max(20, Math.min(64, Math.floor(Math.min(availW / L.w, availH / L.h))));
+  }
+  function fillSelect() {
+    $('lvl').innerHTML = '';
+    for (let i = 1; i <= LEVELS; i++) {
+      const o = document.createElement('option'); o.value = i; o.disabled = i > unlocked;
+      o.textContent = `Level ${i}` + (bests[i] ? ' ✓' : i > unlocked ? ' 🔒' : ''); $('lvl').appendChild(o);
+    }
+    $('lvl').value = cur;
+  }
+  const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
+  addEventListener('keydown', e => {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (KEYS[k]) { e.preventDefault(); move(...KEYS[k]); }
+    else if (k === 'z' || (k === 'Backspace')) { e.preventDefault(); undo(); }
+    else if (k === 'r') load(cur);
+    else if (k === 'Enter' && $('win').classList.contains('on')) $('next').click();
+  });
+  let sx = 0, sy = 0;
+  cv.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; });
+  cv.addEventListener('pointerup', e => {
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 24) { Math.abs(dx) > Math.abs(dy) ? move(Math.sign(dx), 0) : move(0, Math.sign(dy)); return; }
+    const r = cv.getBoundingClientRect(), tx = Math.floor((e.clientX - r.left) / r.width * L.w), ty = Math.floor((e.clientY - r.top) / r.height * L.h);
+    const ddx = tx - player[0], ddy = ty - player[1];
+    if (Math.abs(ddx) + Math.abs(ddy) === 1) move(ddx, ddy);
+    else if (ddx || ddy) Math.abs(ddx) > Math.abs(ddy) ? move(Math.sign(ddx), 0) : move(0, Math.sign(ddy));
+  });
+  $('undo').onclick = undo;
+  $('reset').onclick = () => load(cur);
+  $('lvl').onchange = () => load(+$('lvl').value);
+  $('next').onclick = () => load(cur < LEVELS ? cur + 1 : 1);
+  addEventListener('resize', () => { fit(); draw(); });
+  fillSelect();
+  load(Math.min(unlocked, LEVELS));
+})();
+</script>
+</body></html>

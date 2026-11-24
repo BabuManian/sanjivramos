@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paint</title>
+<style>
+html,body{margin:0;height:100%;background:#1f2937;color:#f9fafb;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;background:#111827;border-bottom:1px solid #374151}
+button{background:#374151;color:#f9fafb;border:none;border-radius:8px;padding:7px 11px;font:inherit;cursor:pointer}
+button.on{background:#2563eb}
+button:disabled{opacity:.4;cursor:default}
+input[type=color]{width:38px;height:32px;border:none;background:none;padding:0;cursor:pointer}
+input[type=range]{width:110px}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid #111827;cursor:pointer;padding:0}
+#wrap{flex:1;min-height:0;position:relative;overflow:hidden;background:#e5e7eb}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;background:#fff}
+</style></head><body>
+<div class="bar">
+  <button id="pen" class="on" title="Brush (B)">Brush</button>
+  <button id="era" title="Eraser (E)">Eraser</button>
+  <input id="col" type="color" value="#2563eb" title="Colour">
+  <span id="sws"></span>
+  <label>Size <input id="sz" type="range" min="1" max="60" value="6"></label>
+  <button id="undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+  <button id="clear" title="Clear">Clear</button>
+  <button id="save" title="Save as PNG">Save PNG</button>
+</div>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(() => {
+  const cv = document.getElementById('cv'), g = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const COLORS = ['#111827', '#ef4444', '#f59e0b', '#22c55e', '#2563eb', '#a855f7', '#ec4899', '#ffffff'];
+  const undoStack = [];
+  let drawing = false, last = null, tool = 'pen';
+
+  function fit() {
+    // Keep the drawing when the window changes size: copy it onto the new canvas.
+    const w = cv.parentElement.clientWidth, h = cv.parentElement.clientHeight, dpr = devicePixelRatio || 1;
+    let snap = null;
+    if (cv.width) { snap = document.createElement('canvas'); snap.width = cv.width; snap.height = cv.height; snap.getContext('2d').drawImage(cv, 0, 0); }
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+    if (snap) g.drawImage(snap, 0, 0);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+  }
+  const snapshot = () => { undoStack.push(g.getImageData(0, 0, cv.width, cv.height)); if (undoStack.length > 25) undoStack.shift(); $('undo').disabled = false; };
+  const undo = () => { const img = undoStack.pop(); if (img) g.putImageData(img, 0, 0); $('undo').disabled = !undoStack.length; };
+  const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };
+  const dpr = () => devicePixelRatio || 1;
+
+  function setTool(t) { tool = t; $('pen').classList.toggle('on', t === 'pen'); $('era').classList.toggle('on', t === 'era'); }
+  function stroke(p) {
+    g.strokeStyle = tool === 'era' ? '#ffffff' : $('col').value;
+    g.lineWidth = $('sz').value * dpr();
+    g.beginPath(); g.moveTo(last.x, last.y); g.lineTo(p.x, p.y); g.stroke();
+    last = p;
+  }
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch {}
+    snapshot(); drawing = true; last = pos(e);
+    // A single click leaves a dot.
+    g.fillStyle = tool === 'era' ? '#ffffff' : $('col').value;
+    g.beginPath(); g.arc(last.x, last.y, $('sz').value * dpr() / 2, 0, Math.PI * 2); g.fill();
+  });
+  cv.addEventListener('pointermove', e => { if (drawing) stroke(pos(e)); });
+  const end = () => { drawing = false; last = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+
+  $('pen').addEventListener('click', () => setTool('pen'));
+  $('era').addEventListener('click', () => setTool('era'));
+  $('col').addEventListener('input', () => setTool('pen'));
+  $('undo').addEventListener('click', undo);
+  $('clear').addEventListener('click', () => { snapshot(); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); });
+  $('save').addEventListener('click', () => {
+    const a = document.createElement('a'); a.download = 'painting.png'; a.href = cv.toDataURL('image/png'); a.click();
+  });
+  const sws = $('sws');
+  COLORS.forEach(c => {
+    const b = document.createElement('button'); b.className = 'sw'; b.style.background = c; b.title = c;
+    b.addEventListener('click', () => { $('col').value = c; setTool('pen'); });
+    sws.appendChild(b);
+  });
+  addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+    else if (e.key === 'b' && !e.ctrlKey) setTool('pen');
+    else if (e.key === 'e' && !e.ctrlKey) setTool('era');
+  });
+  addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body></html>

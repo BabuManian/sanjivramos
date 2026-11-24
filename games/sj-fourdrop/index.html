@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Four Drop</title>
+<style>
+html,body{margin:0;height:100%;background:#0b1530;color:#e0e7ff;font:15px system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+#app{height:100%;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px;box-sizing:border-box}
+h1{margin:0;font-size:22px}
+.row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{border:none;background:#1e3a8a;color:#fff;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:hover{background:#1d4ed8}button.on{background:#f59e0b;color:#111}
+button:disabled{opacity:.4;cursor:default}
+#status{min-height:22px;font-weight:600;text-align:center}
+#score{opacity:.8;font-size:13px}
+#board{position:relative;background:#1d4ed8;border-radius:16px;padding:8px;display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:min(94vw,calc((100vh - 220px) * 7 / 6),560px);box-sizing:border-box;box-shadow:0 10px 30px rgba(0,0,0,.4),inset 0 -6px 0 rgba(0,0,0,.2)}
+.cell{aspect-ratio:1;border-radius:50%;background:#0b1530;box-shadow:inset 0 4px 8px rgba(0,0,0,.6);position:relative;overflow:hidden}
+.disc{position:absolute;inset:6%;border-radius:50%}
+.disc.r{background:radial-gradient(circle at 35% 30%,#fca5a5,#dc2626 60%,#991b1b)}
+.disc.y{background:radial-gradient(circle at 35% 30%,#fef08a,#eab308 60%,#a16207)}
+.disc.drop{animation:drop .35s cubic-bezier(.4,0,.8,1.4)}
+@keyframes drop{from{transform:translateY(var(--from))}}
+.disc.win{box-shadow:0 0 0 4px #fff,0 0 18px #fff;animation:pulse .8s infinite alternate}
+@keyframes pulse{to{transform:scale(.88)}}
+.col-hover{position:absolute;top:-4px;height:6px;border-radius:3px;background:#f8fafc;opacity:.0;transition:opacity .1s}
+#hover{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;width:min(94vw,calc((100vh - 220px) * 7 / 6),560px);padding:0 8px;box-sizing:border-box;height:30px}
+#hover div{display:flex;justify-content:center;align-items:center}
+#hover .ghost{width:70%;aspect-ratio:1;border-radius:50%;opacity:.55;max-height:28px;max-width:28px}
+</style></head><body>
+<div id="app">
+  <h1>🔴 Four Drop 🟡</h1>
+  <div class="row" id="modes"><button data-m="ai" class="on">vs Computer</button><button data-m="local">2 players</button><button data-m="online">🌐 Online</button></div>
+  <div class="row" id="lv"><span style="opacity:.7">Level</span><button data-l="1">Easy</button><button data-l="3" class="on">Medium</button><button data-l="5">Hard</button><button data-l="8">Expert</button></div>
+  <div id="status"></div>
+  <div id="hover"></div>
+  <div id="board"></div>
+  <div class="row"><button id="new">New game</button><button id="undo">Undo</button><span id="score"></span></div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('fourdrop', { vs: false, title: 'Four Drop', trophies: [
+  { id: 'win', name: 'Four in a Row', desc: 'Beat the computer', icon: '🔴' },
+  { id: 'hard', name: 'Strategist', desc: 'Beat the Hard computer', icon: '🧠' },
+  { id: 'expert', name: 'Grandmaster', desc: 'Beat the Expert computer', icon: '👑' },
+  { id: 'online', name: 'Connected', desc: 'Win an online game', icon: '🌐' },
+  { id: 'quick', name: 'Speedy', desc: 'Win in 4 moves', icon: '⚡' },
+] }) : null;
+const sfx = n => kit && kit.sfx(n);
+const $ = id => document.getElementById(id), W = 7, H = 6;
+let board, turn, over, winLine, moves, mode = 'ai', level = 3, score = { r: 0, y: 0, d: 0 }, net = null, myColor = 'r', starter = 'y', lastDrop = -1, thinking = false;
+
+function reset() { board = Array(W * H).fill(null); starter = starter === 'r' ? 'y' : 'r'; turn = mode === 'ai' ? 'r' : starter; over = false; winLine = null; moves = []; lastDrop = -1; }
+const rowFor = (b, c) => { for (let r = H - 1; r >= 0; r--) if (!b[r * W + c]) return r; return -1; };
+function lineAt(b, i) {
+  const p = b[i]; if (!p) return null;
+  const r = Math.floor(i / W), c = i % W;
+  for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    const cells = [i];
+    for (const s of [1, -1]) for (let k = 1; k < 4; k++) { const rr = r + dr * k * s, cc = c + dc * k * s; if (rr < 0 || rr >= H || cc < 0 || cc >= W || b[rr * W + cc] !== p) break; cells.push(rr * W + cc); }
+    if (cells.length >= 4) return cells;
+  }
+  return null;
+}
+function drop(c, who) {
+  if (over || who !== turn) return false;
+  const r = rowFor(board, c); if (r < 0) return false;
+  const i = r * W + c; board[i] = who; moves.push(i); lastDrop = i; sfx('pop');
+  const ln = lineAt(board, i);
+  if (ln) { over = true; winLine = ln; score[who]++; onWin(who); }
+  else if (board.every(Boolean)) { over = true; score.d++; }
+  else turn = who === 'r' ? 'y' : 'r';
+  render();
+  return true;
+}
+function onWin(who) {
+  const mine = mode === 'ai' ? who === 'r' : mode === 'online' ? who === myColor : true;
+  sfx(mine ? 'win' : 'lose');
+  if (mode === 'ai' && who === 'r') {
+    kit && kit.unlock('win'); if (level >= 5) kit && kit.unlock('hard'); if (level >= 8) kit && kit.unlock('expert');
+    if (moves.filter(i => board[i] === 'r').length <= 4) kit && kit.unlock('quick');
+    kit && kit.score(score.r, 'wins-' + level);
+  }
+  if (mode === 'online' && who === myColor) kit && kit.unlock('online');
+}
+
+/* ---------------- AI: negamax + alpha-beta ---------------- */
+const ORDER = [3, 2, 4, 1, 5, 0, 6];
+function evalWindow(a, me, op) {
+  let m = 0, o = 0; for (const v of a) { if (v === me) m++; else if (v === op) o++; }
+  if (m && o) return 0;
+  return m === 3 ? 5 : m === 2 ? 2 : o === 3 ? -5 : o === 2 ? -2 : 0;
+}
+function heur(b, me) {
+  const op = me === 'r' ? 'y' : 'r'; let s = 0;
+  for (let r = 0; r < H; r++) s += (b[r * W + 3] === me ? 3 : b[r * W + 3] === op ? -3 : 0);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    const er = r + dr * 3, ec = c + dc * 3; if (er < 0 || er >= H || ec < 0 || ec >= W) continue;
+    s += evalWindow([0, 1, 2, 3].map(k => b[(r + dr * k) * W + c + dc * k]), me, op);
+  }
+  return s;
+}
+function negamax(b, depth, alpha, beta, me, nodes) {
+  nodes.n++;
+  const op = me === 'r' ? 'y' : 'r';
+  if (depth === 0) return heur(b, me);
+  let any = false, best = -1e9;
+  for (const c of ORDER) {
+    const r = rowFor(b, c); if (r < 0) continue; any = true;
+    const i = r * W + c; b[i] = me;
+    let v;
+    if (lineAt(b, i)) v = 100000 + depth;
+    else v = -negamax(b, depth - 1, -beta, -alpha, op, nodes);
+    b[i] = null;
+    if (v > best) best = v;
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) break;
+  }
+  return any ? best : 0;
+}
+function bestMove(b, me, depth) {
+  const op = me === 'r' ? 'y' : 'r';
+  // easy: sometimes random
+  if (depth <= 1 && Math.random() < .35) { const ok = ORDER.filter(c => rowFor(b, c) >= 0); return ok[Math.floor(Math.random() * ok.length)]; }
+  let best = null, bv = -1e9; const nodes = { n: 0 };
+  for (const c of ORDER) {
+    const r = rowFor(b, c); if (r < 0) continue;
+    const i = r * W + c; b[i] = me;
+    const v = lineAt(b, i) ? 1e6 : -negamax(b, depth - 1, -1e9, 1e9, op, nodes);
+    b[i] = null;
+    if (v > bv + (depth <= 3 ? Math.random() * 3 : 0)) { bv = v; best = c; }
+  }
+  return best;
+}
+function aiTurn() {
+  if (mode !== 'ai' || over || turn !== 'y') return;
+  thinking = true; render();
+  setTimeout(() => { const c = bestMove(board.slice(), 'y', level); thinking = false; drop(c, 'y'); }, 280);
+}
+
+/* ---------------- online: host is red & referee ---------------- */
+const broadcast = () => net && net.isHost && net.send({ st: { board, turn, over, winLine, score, lastDrop, moves } });
+async function goOnline() {
+  if (!window.SJNet) { $('status').textContent = 'Online needs SanjivramOS'; return; }
+  try { net = await SJNet.lobby({ game: 'fourdrop', gameName: 'Four Drop', max: 2, min: 2 }); } catch { setMode('ai'); return; }
+  mode = 'online'; myColor = net.isHost ? 'r' : 'y'; score = { r: 0, y: 0, d: 0 }; starter = 'y'; reset();
+  net.on('m', (d, from) => {
+    if (net.isHost && d.mv != null) { if (turn === 'y') drop(+d.mv, 'y'); broadcast(); }
+    if (net.isHost && d.hi) broadcast();
+    if (net.isHost && d.again && over) { reset(); render(); broadcast(); }
+    if (!net.isHost && d.st) { const was = over, prevLast = lastDrop; ({ board, turn, over, winLine, score, lastDrop, moves } = d.st); if (lastDrop !== prevLast && lastDrop >= 0) sfx('pop'); if (over && !was && winLine) onWin(board[winLine[0]]); render(); }
+  });
+  net.on('host', () => { myColor = net.isHost ? 'r' : 'y'; render(); });
+  net.on('peer-left', () => { $('status').textContent = 'Your opponent left.'; });
+  if (!net.isHost) net.send({ hi: 1 }); else broadcast();
+  render();
+}
+function setMode(m) {
+  if (net && m !== 'online') { try { net.leave(); } catch {} net = null; }
+  mode = m; score = { r: 0, y: 0, d: 0 }; starter = 'y';
+  document.querySelectorAll('#modes [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('lv').style.visibility = m === 'ai' ? 'visible' : 'hidden';
+  reset(); render();
+  if (m === 'online') { over = true; $('status').textContent = 'Opening lobby…'; goOnline(); }
+}
+
+/* ---------------- UI ---------------- */
+const canPlay = () => !over && !thinking && (mode === 'local' || (mode === 'ai' && turn === 'r') || (mode === 'online' && turn === myColor));
+let hoverCol = -1;
+function render() {
+  const b = $('board');
+  if (!b.children.length) for (let i = 0; i < W * H; i++) { const d = document.createElement('div'); d.className = 'cell'; d.dataset.c = i % W; b.appendChild(d); }
+  [...b.children].forEach((cell, i) => {
+    const v = board[i], has = cell.firstChild;
+    if (!v) { if (has) cell.innerHTML = ''; return; }
+    if (!has || has.dataset.v !== v) {
+      cell.innerHTML = `<div class="disc ${v}${i === lastDrop ? ' drop' : ''}" data-v="${v}" style="--from:${-(Math.floor(i / W) + 1) * 110}%"></div>`;
+    }
+    cell.firstChild.classList.toggle('win', !!(winLine && winLine.includes(i)));
+  });
+  $('hover').innerHTML = Array.from({ length: W }, (_, c) => `<div>${c === hoverCol && canPlay() && rowFor(board, c) >= 0 ? `<span class="ghost disc ${turn}" style="position:static;display:block;width:28px;height:28px"></span>` : ''}</div>`).join('');
+  const name = p => mode === 'ai' ? (p === 'r' ? 'You' : 'Computer') : mode === 'online' ? (p === myColor ? 'You' : 'Opponent') : (p === 'r' ? 'Red' : 'Yellow');
+  const dot = p => p === 'r' ? '🔴' : '🟡';
+  $('status').textContent = mode === 'online' && !net ? $('status').textContent :
+    over ? (winLine ? `${dot(board[winLine[0]])} ${name(board[winLine[0]])} win${name(board[winLine[0]]) === 'You' ? '' : 's'}!` : 'Draw — the board is full.') :
+    thinking ? '🟡 Computer is thinking…' : `${dot(turn)} ${name(turn)}${name(turn) === 'You' ? 'r' : "'s"} turn`;
+  $('score').textContent = `🔴 ${score.r} · 🟡 ${score.y} · draws ${score.d}` + (mode === 'online' && net && net.room ? ` · room ${net.room.code}` : '');
+  $('undo').disabled = mode === 'online' || !moves.length || thinking;
+  $('new').disabled = mode === 'online' && net && !over;
+}
+$('board').addEventListener('click', e => {
+  const cell = e.target.closest('.cell'); if (!cell || !canPlay()) return;
+  const c = +cell.dataset.c;
+  if (mode === 'online' && !net.isHost) { if (rowFor(board, c) >= 0) net.send({ mv: c }); return; }
+  if (drop(c, turn)) { if (mode === 'online') broadcast(); aiTurn(); }
+});
+$('board').addEventListener('mousemove', e => { const cell = e.target.closest('.cell'); const c = cell ? +cell.dataset.c : -1; if (c !== hoverCol) { hoverCol = c; render(); } });
+$('board').addEventListener('mouseleave', () => { hoverCol = -1; render(); });
+addEventListener('keydown', e => { const n = +e.key; if (n >= 1 && n <= 7) { const cell = $('board').children[n - 1]; cell && cell.click(); } });
+$('modes').onclick = e => { const b = e.target.closest('[data-m]'); if (b) setMode(b.dataset.m); };
+$('lv').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; level = +b.dataset.l; document.querySelectorAll('#lv [data-l]').forEach(x => x.classList.toggle('on', x === b)); try { localStorage.setItem('fourdrop.lv', level); } catch {} };
+$('new').onclick = () => { if (mode === 'online') { if (net.isHost) { reset(); render(); broadcast(); } else net.send({ again: 1 }); return; } reset(); render(); if (turn === 'y') aiTurn(); };
+$('undo').onclick = () => {
+  if (thinking || !moves.length) return;
+  const n = mode === 'ai' ? (turn === 'r' && !over ? 2 : board[moves[moves.length - 1]] === 'y' ? 2 : 1) : 1;
+  for (let k = 0; k < n && moves.length; k++) { const i = moves.pop(); if (over && winLine) score[board[i]]--; board[i] = null; over = false; winLine = null; }
+  turn = mode === 'ai' ? 'r' : (moves.length ? (board[moves[moves.length - 1]] === 'r' ? 'y' : 'r') : starter); lastDrop = -1; render();
+};
+try { const l = +localStorage.getItem('fourdrop.lv'); if (l) { level = l; document.querySelectorAll('#lv [data-l]').forEach(x => x.classList.toggle('on', +x.dataset.l === l)); } } catch {}
+window.__fourdrop = () => ({ board, turn, over, winLine, mode, drop, bestMove, setMode, score, get net() { return net; } });
+const q = new URLSearchParams(location.search);
+starter = 'y'; reset(); render();
+if (q.get('join') || q.get('online')) setMode('online');
+})();
+</script>
+</body></html>

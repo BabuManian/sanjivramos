@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hex Conquest</title>
+<style>
+html,body{margin:0;height:100%;background:#0b1320;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden;user-select:none}
+#app{height:100%;display:flex;flex-direction:column}
+#bar{display:flex;gap:10px;align-items:center;padding:6px 10px;background:#111c2e;flex-wrap:wrap}
+#bar .sp{flex:1}
+#players{display:flex;gap:8px;flex-wrap:wrap}
+#players span{padding:2px 8px;border-radius:999px;background:#0006;font-size:12px}
+#players span.cur{outline:2px solid #fff}
+#players span.dead{opacity:.35;text-decoration:line-through}
+#stage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
+canvas{max-width:100%;max-height:100%;display:block;touch-action:none}
+#ctl{display:flex;gap:8px;align-items:center;padding:8px 10px;background:#111c2e;flex-wrap:wrap}
+#msg{flex:1;min-width:160px;opacity:.85}
+button{border:none;border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer;background:#2563eb;color:#fff}
+button.alt{background:#1e293b;color:#e2e8f0}
+button:disabled{opacity:.4;cursor:default}
+#menu{position:absolute;inset:0;background:rgba(5,10,20,.85);display:flex;align-items:center;justify-content:center}
+#menu[hidden]{display:none}
+.card{background:#111c2e;border:1px solid #334155;border-radius:14px;padding:18px 22px;max-width:440px;width:calc(100% - 40px)}
+.card h1{margin:0 0 4px}.card p{opacity:.75;margin:0 0 10px}
+.row{display:flex;gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap}.row label{min-width:90px;opacity:.8}
+select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px;font:inherit}
+.hint{font-size:12px;opacity:.6}
+</style></head><body>
+<div id="app">
+  <div id="bar"><b>⬢ Hex Conquest</b><span id="players"></span><span class="sp"></span><span>Turn <b id="turn">1</b></span><button class="alt" id="mute">🔊</button><button class="alt" id="menuBtn">Menu</button></div>
+  <div id="stage"><canvas id="c" width="960" height="620"></canvas>
+    <div id="menu"><div class="card">
+      <h1>⬢ Hex Conquest</h1><p id="mtext">Grow your empire across a hex map. Place reinforcements, attack neighbours and take every capital.</p>
+      <div class="row"><label>Rivals</label><select id="nai"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
+      <div class="row"><label>Map size</label><select id="size"><option value="s">Small</option><option value="m" selected>Medium</option><option value="l">Large</option></select></div>
+      <div class="row"><label>CPU skill</label><select id="skill"><option value="0">Relaxed</option><option value="1" selected>Normal</option><option value="2">Ruthless</option></select></div>
+      <div class="row"><button id="start">Start conquest</button><button class="alt" id="daily">Daily map</button></div>
+      <p class="hint">1. Reinforce: tap your tiles to place new troops. 2. Attack: tap one of your tiles, then a neighbour. 3. Move: shift troops once between your tiles. Cities (🏰) give extra troops and defend better.</p>
+    </div></div>
+  </div>
+  <div id="ctl"><span id="msg">—</span><button class="alt" id="all">Place all</button><button id="next">Next phase ▶</button></div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>
+(() => {
+  const cv = document.getElementById('c'), g = cv.getContext('2d'), $ = id => document.getElementById(id);
+  const kit = window.SJG ? SJG.init('hex', { vs: { mode: 'time' }, title: 'Hex Conquest', trophies: [
+    { id: 'win', name: 'Conqueror', desc: 'Win a game', icon: '👑' },
+    { id: 'win3', name: 'Emperor', desc: 'Beat 3 ruthless rivals', icon: '🏛️' },
+    { id: 'fast', name: 'Blitzkrieg', desc: 'Win within 15 turns', icon: '⚡' },
+    { id: 'capital', name: 'Decapitation', desc: 'Capture a rival capital', icon: '🏰' },
+    { id: 'underdog', name: 'Against the Odds', desc: 'Win an attack with fewer troops than the defender', icon: '🎲' },
+    { id: 'big', name: 'Grand Army', desc: 'Have 50 troops on one tile', icon: '🪖' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  const COLORS = ['#3b82f6', '#ef4444', '#eab308', '#22c55e'], NAMES = ['You', 'Crimson', 'Amber', 'Verdant'];
+  const NEUTRAL = '#475569';
+  let tiles, cols, rows, R, players, cur, phase, pool, selA, turn, cfg = {}, moved, rnd = Math.random, busy = false, over = false;
+
+  /* ---------- map ---------- */
+  function gen(size, seed) {
+    rnd = seed ? SJG.rng(seed) : Math.random;
+    [cols, rows] = { s: [9, 7], m: [12, 9], l: [15, 11] }[size];
+    R = Math.min(960 / (cols * 1.73 + 1), 620 / (rows * 1.5 + .5)) / 1.0;
+    tiles = [];
+    const cx = cols / 2, cy = rows / 2, n1 = rnd() * 6, n2 = rnd() * 6;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const d = Math.hypot((c - cx) / cx, (r - cy) / cy), noise = Math.sin(c * 1.3 + n1) * Math.cos(r * 1.7 + n2) * .25;
+      const land = d + noise < 1.05 && rnd() > .08;
+      tiles.push({ c, r, i: tiles.length, land, owner: -1, troops: land ? 1 + (rnd() * 3 | 0) : 0, city: false, capital: -1 });
+    }
+    // keep the largest connected island
+    const land = tiles.filter(t => t.land), seen = new Set(); let best = [];
+    for (const t of land) { if (seen.has(t.i)) continue; const comp = [], st = [t]; seen.add(t.i); while (st.length) { const x = st.pop(); comp.push(x); for (const n of nbrs(x)) if (!seen.has(n.i)) { seen.add(n.i); st.push(n); } } if (comp.length > best.length) best = comp; }
+    const keep = new Set(best.map(t => t.i)); tiles.forEach(t => { if (!keep.has(t.i)) { t.land = false; t.troops = 0; } });
+    const L = tiles.filter(t => t.land);
+    for (const t of L) if (rnd() < .1) { t.city = true; t.troops += 2; }
+    return L;
+  }
+  function nbrs(t) {
+    const odd = t.r & 1, d = odd ? [[1, 0], [-1, 0], [0, -1], [1, -1], [0, 1], [1, 1]] : [[1, 0], [-1, 0], [-1, -1], [0, -1], [-1, 1], [0, 1]];
+    return d.map(([dc, dr]) => { const c = t.c + dc, r = t.r + dr; return c >= 0 && c < cols && r >= 0 && r < rows ? tiles[r * cols + c] : null; }).filter(n => n && n.land);
+  }
+  const center = t => ({ x: R * 1.732 * (t.c + .5 * (t.r & 1)) + R * 1.0, y: R * 1.5 * t.r + R });
+
+  function newGame(daily) {
+    const nai = +$('nai').value; cfg = { size: $('size').value, skill: +$('skill').value, nai, daily };
+    const L = gen(cfg.size, daily ? SJG.daySeed() : 0);
+    players = Array.from({ length: nai + 1 }, (_, i) => ({ i, name: NAMES[i], col: COLORS[i], ai: i > 0, alive: true }));
+    // capitals spread apart
+    const caps = [];
+    for (let p = 0; p <= nai; p++) {
+      let best = null, bd = -1;
+      for (const t of L) { if (caps.includes(t)) continue; const d = caps.length ? Math.min(...caps.map(c => Math.hypot(c.c - t.c, c.r - t.r))) : Math.hypot(t.c - 1, t.r - 1) * -1 + 100; const s = d + rnd() * .5; if (s > bd) { bd = s; best = t; } }
+      caps.push(best); best.owner = p; best.capital = p; best.city = true; best.troops = 6;
+      for (const n of nbrs(best)) if (n.owner === -1) { n.owner = p; n.troops = 3; }
+    }
+    turn = 1; cur = 0; over = false; selA = null;
+    cv.width = Math.ceil(R * 1.732 * (cols + .5) + R * 2); cv.height = Math.ceil(R * 1.5 * rows + R * 1.2);
+    $('menu').hidden = true; sfx('click');
+    beginTurn();
+  }
+  const owned = p => tiles.filter(t => t.land && t.owner === p);
+  function income(p) { const o = owned(p); return 3 + Math.floor(o.length / 3) + o.filter(t => t.city).length * 2; }
+
+  function beginTurn() {
+    const p = players[cur];
+    if (!p.alive) return endTurn();
+    phase = 'place'; pool = income(cur); moved = false; selA = null;
+    hud();
+    if (p.ai) { busy = true; setTimeout(() => aiTurn(p), 450); }
+  }
+  function hud() {
+    $('players').innerHTML = players.map(p => `<span class="${p.i === cur ? 'cur' : ''} ${p.alive ? '' : 'dead'}" style="color:${p.col}">● ${p.name} ${owned(p.i).length}</span>`).join('');
+    $('turn').textContent = turn;
+    const p = players[cur], mine = !p.ai && !over;
+    $('next').disabled = !mine || (phase === 'place' && pool > 0);
+    $('all').hidden = !(mine && phase === 'place');
+    $('next').textContent = phase === 'place' ? 'Attack ▶' : phase === 'attack' ? 'Move ▶' : 'End turn ✔';
+    $('msg').textContent = over ? '' : p.ai ? `${p.name} is thinking…` : phase === 'place' ? `Place ${pool} troop${pool === 1 ? '' : 's'} on your tiles.` : phase === 'attack' ? (selA ? 'Pick a neighbouring tile to attack (tap your tile again to cancel).' : 'Tap one of your tiles with 2+ troops, then a neighbour.') : (moved ? 'Moved. End your turn.' : selA ? 'Pick a connected tile of yours to move troops to.' : 'Optional: move troops from one tile to another connected tile.');
+    draw();
+  }
+
+  /* ---------- actions ---------- */
+  function place(t, n = 1) { if (t.owner !== cur || pool <= 0) return; const k = Math.min(n, pool); t.troops += k; pool -= k; if (t.troops >= 50 && !players[cur].ai) kit && kit.unlock('big'); }
+  function attack(a, d) {
+    if (a.owner !== cur || d.owner === cur || a.troops < 2 || !nbrs(a).includes(d)) return false;
+    let at = a.troops - 1, df = d.troops;
+    const startAt = at, startDf = df, p = d.city ? .45 : .53;
+    while (at > 0 && df > 0) { if (Math.random() < p) df--; else at--; }
+    const victim = d.owner;
+    if (df <= 0) {
+      d.owner = cur; d.troops = Math.max(1, at); a.troops = 1;
+      sfx('coin');
+      if (!players[cur].ai) { if (startAt < startDf) kit && kit.unlock('underdog'); if (d.capital >= 0 && d.capital !== cur) kit && kit.unlock('capital'); }
+      if (d.capital >= 0 && d.capital !== cur) { d.capital = -1; }
+      if (victim >= 0 && !owned(victim).length) { players[victim].alive = false; sfx('win'); }
+    } else { a.troops = 1 + at; d.troops = df; sfx('hurt'); }
+    fx.push({ t: d, life: .6, win: df <= 0 });
+    checkOver();
+    return df <= 0;
+  }
+  function connected(a, b) { const seen = new Set([a.i]), st = [a]; while (st.length) { const x = st.pop(); if (x === b) return true; for (const n of nbrs(x)) if (n.owner === a.owner && !seen.has(n.i)) { seen.add(n.i); st.push(n); } } return false; }
+  function move(a, b, n) { if (moved || a.owner !== cur || b.owner !== cur || a === b || !connected(a, b)) return false; n = Math.min(n, a.troops - 1); if (n <= 0) return false; a.troops -= n; b.troops += n; moved = true; sfx('click'); return true; }
+  function checkOver() {
+    const alive = players.filter(p => p.alive);
+    if (!players[0].alive) { over = true; finish(false); }
+    else if (alive.length === 1) { over = true; finish(true); }
+  }
+  function finish(won) {
+    if (won) { kit && kit.unlock('win'); if (cfg.nai === 3 && cfg.skill === 2) kit && kit.unlock('win3'); if (turn <= 15) kit && kit.unlock('fast'); kit && kit.score(turn, 'turns-' + cfg.size); kit && kit.stat('wins'); sfx('win'); }
+    else sfx('lose');
+    setTimeout(() => { $('mtext').textContent = won ? `🏆 Victory in ${turn} turns!` : `Your empire has fallen on turn ${turn}.`; $('menu').hidden = false; }, 900);
+  }
+  function nextPhase() {
+    if (players[cur].ai || over) return;
+    if (phase === 'place') { if (pool > 0) return; phase = 'attack'; }
+    else if (phase === 'attack') phase = 'move';
+    else return endTurn();
+    selA = null; hud();
+  }
+  function endTurn() {
+    if (over) return;
+    selA = null;
+    do { cur = (cur + 1) % players.length; if (cur === 0) turn++; } while (!players[cur].alive);
+    busy = false;
+    beginTurn();
+  }
+
+  /* ---------- AI ---------- */
+  function aiTurn(p) {
+    const sk = cfg.skill;
+    const mine = () => owned(p.i);
+    const border = t => nbrs(t).some(n => n.owner !== p.i);
+    const threat = t => nbrs(t).filter(n => n.owner !== p.i && n.owner >= 0).reduce((s, n) => s + n.troops, 0);
+    // place: favour border tiles next to weak targets / threats
+    const steps = [];
+    while (pool > 0) {
+      const b = mine().filter(border);
+      const score = t => { const weak = Math.max(0, ...nbrs(t).filter(n => n.owner !== p.i).map(n => t.troops - n.troops + (n.city ? 3 : 0) + (n.capital >= 0 ? 4 : 0))); return threat(t) * (sk ? 1 : .3) - t.troops * .4 + weak * .2 + (t.capital === p.i ? 3 : 0) + Math.random() * (3 - sk); };
+      const t = b.sort((x, y) => score(y) - score(x))[0] || mine()[0];
+      if (!t) break;
+      const n = Math.min(pool, 1 + (Math.random() * 3 | 0)); place(t, n); steps.push(t);
+    }
+    hud();
+    // attacks
+    let guard = 0;
+    const doAttacks = () => {
+      if (over || guard++ > 40) return doMove();
+      const opts = [];
+      for (const a of mine()) if (a.troops >= 2) for (const d of nbrs(a)) if (d.owner !== p.i) {
+        const ratio = (a.troops - 1) / (d.troops + (d.city ? 1 : 0));
+        let v = ratio + (d.owner === 0 && sk === 2 ? .3 : 0) + (d.capital >= 0 ? .6 : 0) + (d.city ? .3 : 0) + (d.owner === -1 ? .2 : 0);
+        if (ratio >= [1.6, 1.25, 1.1][sk]) opts.push({ a, d, v });
+      }
+      if (!opts.length) return doMove();
+      opts.sort((x, y) => y.v - x.v);
+      const o = opts[0]; selA = o.a; draw();
+      setTimeout(() => { attack(o.a, o.d); selA = null; hud(); if (!over) setTimeout(doAttacks, 260); }, 220);
+    };
+    const doMove = () => {
+      if (over) return;
+      // pull troops from an interior tile to the most threatened border
+      const inner = mine().filter(t => !border(t) && t.troops > 1).sort((a, b) => b.troops - a.troops)[0];
+      const front = mine().filter(border).sort((a, b) => threat(b) - threat(a))[0];
+      if (inner && front && connected(inner, front)) move(inner, front, inner.troops - 1);
+      setTimeout(() => { if (!over) endTurn(); }, 300);
+    };
+    phase = 'attack';
+    setTimeout(doAttacks, 400);
+  }
+
+  /* ---------- input ---------- */
+  const hexAt = (x, y) => { let best = null, bd = 1e9; for (const t of tiles) { if (!t.land) continue; const c = center(t), d = Math.hypot(c.x - x, c.y - y); if (d < bd) { bd = d; best = t; } } return bd < R ? best : null; };
+  cv.addEventListener('pointerdown', e => {
+    if (over || players[cur].ai || busy && players[cur].ai) return;
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * cv.width / r.width, y = (e.clientY - r.top) * cv.height / r.height;
+    const t = hexAt(x, y); if (!t) return;
+    if (phase === 'place') { if (t.owner === cur) { place(t, e.shiftKey ? 5 : 1); sfx('click'); } }
+    else if (phase === 'attack') {
+      if (t.owner === cur) { selA = selA === t || t.troops < 2 ? null : t; }
+      else if (selA && nbrs(selA).includes(t)) { const won = attack(selA, t); selA = won && t.troops >= 2 ? t : selA.troops >= 2 ? selA : null; }
+    } else if (phase === 'move' && !moved) {
+      if (t.owner === cur) { if (!selA) { if (t.troops > 1) selA = t; } else if (t === selA) selA = null; else if (connected(selA, t)) { move(selA, t, selA.troops - 1); selA = null; } }
+    }
+    hud();
+  });
+  addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { if (!$('menu').hidden) { e.preventDefault(); newGame(false); } else { e.preventDefault(); nextPhase(); } } if (e.key === 'Escape') { selA = null; hud(); } });
+  $('next').onclick = nextPhase;
+  $('all').onclick = () => { const mine = owned(cur).filter(t => nbrs(t).some(n => n.owner !== cur)); while (pool > 0 && mine.length) for (const t of mine) { if (pool <= 0) break; place(t, 1); } hud(); };
+  $('start').onclick = () => newGame(false);
+  $('daily').onclick = () => newGame(true);
+  $('menuBtn').onclick = () => { $('menu').hidden = false; };
+  $('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+  if (kit && kit.muted) $('mute').textContent = '🔇';
+
+  /* ---------- draw ---------- */
+  const fx = [];
+  function hexPath(x, y, r) { g.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); }
+  function draw() {
+    if (!tiles) return;
+    g.fillStyle = '#0b1320'; g.fillRect(0, 0, cv.width, cv.height);
+    const targets = selA ? (phase === 'attack' ? nbrs(selA).filter(n => n.owner !== cur) : []) : [];
+    for (const t of tiles) {
+      const { x, y } = center(t);
+      if (!t.land) { hexPath(x, y, R * .96); g.fillStyle = '#0f2a44'; g.fill(); continue; }
+      hexPath(x, y, R * .96);
+      g.fillStyle = t.owner >= 0 ? COLORS[t.owner] : NEUTRAL; g.globalAlpha = t.owner >= 0 ? .85 : .6; g.fill(); g.globalAlpha = 1;
+      g.lineWidth = t === selA ? 4 : targets.includes(t) ? 3 : 1.2; g.strokeStyle = t === selA ? '#fff' : targets.includes(t) ? '#fde047' : 'rgba(0,0,0,.45)'; g.stroke();
+      if (t.city) { g.font = `${R * .55}px system-ui`; g.textAlign = 'center'; g.fillText(t.capital >= 0 ? '👑' : '🏰', x, y - R * .2); }
+      g.fillStyle = '#fff'; g.font = `bold ${R * .5}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t.troops, x, y + (t.city ? R * .3 : 0)); g.textBaseline = 'alphabetic';
+    }
+    for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i], { x, y } = center(f.t); g.globalAlpha = f.life / .6; hexPath(x, y, R * (1.2 - f.life * .3)); g.strokeStyle = f.win ? '#fde047' : '#f87171'; g.lineWidth = 3; g.stroke(); g.globalAlpha = 1; }
+  }
+  let last = 0;
+  (function loop(ts) { const dt = (ts - last) / 1000 || 0; last = ts; if (fx.length) { fx.forEach(f => f.life -= dt); for (let i = fx.length - 1; i >= 0; i--) if (fx[i].life <= 0) fx.splice(i, 1); draw(); } requestAnimationFrame(loop); })(0);
+  // preview map behind the menu
+  cfg.size = 'm'; gen('m', 0); players = [{ i: 0, alive: true, col: COLORS[0], name: 'You' }]; cur = 0; phase = 'place'; pool = 0; turn = 1;
+  cv.width = Math.ceil(R * 1.732 * (cols + .5) + R * 2); cv.height = Math.ceil(R * 1.5 * rows + R * 1.2); draw();
+  window.__hex = () => ({ phase, cur, pool, turn, over, players, owned: p => owned(p).length, nextPhase, newGame });
+})();
+</script>
+</body></html>

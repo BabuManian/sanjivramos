@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Picross</title>
+<style>
+html,body{margin:0;height:100%;background:#f1f5f9;color:#0f172a;font:14px system-ui,sans-serif;overflow:auto}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;box-sizing:border-box;user-select:none;-webkit-user-select:none;min-height:100%}
+header{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+button,select{font:inherit;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;background:#cbd5e1;color:#0f172a}
+button.sel{background:#0f172a;color:#fff}
+table{border-collapse:collapse;touch-action:none}
+td{padding:0;text-align:center}
+td.c{width:var(--s);height:var(--s);border:1px solid #cbd5e1;background:#fff;cursor:pointer}
+td.c.f{background:#1e293b}
+td.c.x{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 2l6 6M8 2l-6 6' stroke='%23ef4444' stroke-width='1.3'/%3E%3C/svg%3E") center/70% no-repeat}
+td.c.b5r{border-right:2px solid #64748b}td.c.b5b{border-bottom:2px solid #64748b}
+td.rc{padding-right:6px;text-align:right;font-size:calc(var(--s) * .42);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.cc{vertical-align:bottom;font-size:calc(var(--s) * .42);line-height:1.15;padding-bottom:4px;font-variant-numeric:tabular-nums}
+td.done{color:#94a3b8}
+#win{display:none;position:fixed;inset:0;background:rgba(241,245,249,.9);align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#win.on{display:flex}
+#win button{background:#0f172a;color:#fff;font-weight:700;padding:10px 18px}
+p{margin:0;opacity:.7;text-align:center;max-width:480px}
+</style></head><body>
+<header><select id="lvl" aria-label="Level"></select><button id="mf" class="sel">■ Fill</button><button id="mx">✕ Mark</button><button id="reset">↺ Clear</button><span id="tm">0:00</span></header>
+<table id="t"></table>
+<p>The numbers say how many filled squares are in each run of a row or column. Fill squares to match every clue. Right-click or use ✕ Mark to note empty squares.</p>
+<div id="win"><h2 style="margin:0">Solved!</h2><div id="ws"></div><button id="next">Next puzzle</button></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("picross", { vs: { mode: 'time', levelKey: 'sj-picross-unlocked', levels: 12 }, title: "Picross", lower: false, trophies: [{"id": "l10", "name": "Pixel Painter", "desc": "Solve 10 puzzles", "icon": "🖼️"}, {"id": "all", "name": "Picross Pro", "desc": "Solve all 45 puzzles", "icon": "🏆"}] });</script>
+<script>
+(() => {
+  const LEVELS = 45, $ = id => document.getElementById(id);
+  let n, sol, cells, rows, cols, mode = 'f', cur = 1, unlocked = 1, t0, timer, dragVal = null;
+  try { unlocked = +localStorage.getItem('sj-picross-unlocked') || 1; } catch {}
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const clue = line => { const out = []; let run = 0; for (const v of line) { if (v) run++; else if (run) { out.push(run); run = 0; } } if (run) out.push(run); return out.length ? out : [0]; };
+  // A random picture, mirrored left-right for most levels so it looks like a shape.
+  function load(l) {
+    cur = l; const rand = rng(l * 9973 + 3);
+    n = l <= 10 ? 5 : l <= 25 ? 8 : l <= 38 ? 10 : 12;
+    const dens = 0.5 + rand() * 0.15, sym = rand() < 0.75;
+    sol = Array.from({ length: n }, () => Array(n).fill(0));
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) sol[y][x] = sym && x >= n / 2 ? sol[y][n - 1 - x] : (rand() < dens ? 1 : 0);
+    for (let y = 0; y < n; y++) if (!sol[y].some(Boolean)) sol[y][rand() * n | 0] = 1;
+    cells = Array.from({ length: n }, () => Array(n).fill(0)); // 0 empty, 1 filled, 2 marked
+    rows = sol.map(clue); cols = sol[0].map((_, x) => clue(sol.map(r => r[x])));
+    $('lvl').value = l; $('win').classList.remove('on');
+    build(); clearInterval(timer); t0 = Date.now(); timer = setInterval(() => { const s = (Date.now() - t0) / 1000 | 0; $('tm').textContent = `${s / 60 | 0}:${String(s % 60).padStart(2, '0')}`; }, 500);
+  }
+  function build() {
+    const maxRow = Math.max(...rows.map(r => r.length)), maxCol = Math.max(...cols.map(c => c.length));
+    const s = Math.max(20, Math.min(40, Math.floor(Math.min((innerWidth - 20) / (n + maxRow * 0.6), (innerHeight - 170) / (n + maxCol * 0.6)))));
+    const t = $('t'); t.style.setProperty('--s', s + 'px');
+    let html = '<tr><td></td>' + cols.map((c, x) => `<td class="cc" data-col="${x}">${c.join('<br>')}</td>`).join('') + '</tr>';
+    for (let y = 0; y < n; y++) {
+      html += `<tr><td class="rc" data-row="${y}">${rows[y].join(' ')}</td>`;
+      for (let x = 0; x < n; x++) html += `<td class="c${(x + 1) % 5 === 0 && x < n - 1 ? ' b5r' : ''}${(y + 1) % 5 === 0 && y < n - 1 ? ' b5b' : ''}" data-x="${x}" data-y="${y}"></td>`;
+      html += '</tr>';
+    }
+    t.innerHTML = html;
+  }
+  function paint(td) {
+    const x = +td.dataset.x, y = +td.dataset.y;
+    if (cells[y][x] === dragVal) return;
+    cells[y][x] = dragVal;
+    td.classList.toggle('f', dragVal === 1); td.classList.toggle('x', dragVal === 2);
+    check(x, y);
+  }
+  function check(x, y) {
+    const rowDone = clue(cells[y].map(v => v === 1)).join() === rows[y].join();
+    const colDone = clue(cells.map(r => r[x] === 1)).join() === cols[x].join();
+    document.querySelector(`[data-row="${y}"]`).classList.toggle('done', rowDone);
+    document.querySelector(`[data-col="${x}"]`).classList.toggle('done', colDone);
+    // Any picture that matches all clues counts.
+    const ok = cells.every((r, yy) => clue(r.map(v => v === 1)).join() === rows[yy].join()) && cols.every((c, xx) => clue(cells.map(r => r[xx] === 1)).join() === c.join());
+    if (ok) {
+      clearInterval(timer);
+      if (cur >= unlocked) { window.SJG && (SJG.score(cur + 1, 'levels'), cur + 1 >= 10 && SJG.unlock('l10'), cur + 1 >= LEVELS && SJG.unlock('all')); unlocked = Math.min(LEVELS, cur + 1); try { localStorage.setItem('sj-picross-unlocked', String(unlocked)); } catch {} fillSelect(); }
+      $('ws').textContent = `${n}×${n} in ${$('tm').textContent}`; $('next').textContent = cur < LEVELS ? 'Next puzzle' : 'All done! Back to 1';
+      setTimeout(() => $('win').classList.add('on'), 300);
+    }
+  }
+  const t = $('t');
+  t.addEventListener('contextmenu', e => e.preventDefault());
+  t.addEventListener('pointerdown', e => {
+    const td = e.target.closest('td.c'); if (!td) return;
+    e.preventDefault();
+    const want = (e.button === 2 || mode === 'x') ? 2 : 1, curV = cells[+td.dataset.y][+td.dataset.x];
+    dragVal = curV === want ? 0 : want; paint(td);
+  });
+  t.addEventListener('pointermove', e => {
+    if (dragVal === null) return;
+    const td = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('td.c'); if (td) paint(td);
+  });
+  addEventListener('pointerup', () => { dragVal = null; });
+  $('mf').onclick = () => { mode = 'f'; $('mf').classList.add('sel'); $('mx').classList.remove('sel'); };
+  $('mx').onclick = () => { mode = 'x'; $('mx').classList.add('sel'); $('mf').classList.remove('sel'); };
+  function fillSelect() { $('lvl').innerHTML = ''; for (let i = 1; i <= LEVELS; i++) { const sz = i <= 10 ? 5 : i <= 25 ? 8 : i <= 38 ? 10 : 12; const o = document.createElement('option'); o.value = i; o.disabled = i > unlocked; o.textContent = `Puzzle ${i} (${sz}×${sz})` + (i < unlocked ? ' ✓' : i > unlocked ? ' 🔒' : ''); $('lvl').appendChild(o); } $('lvl').value = cur; }
+  $('lvl').onchange = () => load(+$('lvl').value);
+  $('reset').onclick = () => { cells = cells.map(r => r.map(() => 0)); build(); };
+  $('next').onclick = () => load(cur < LEVELS ? cur + 1 : 1);
+  cur = Math.min(unlocked, LEVELS); fillSelect(); load(cur);
+})();
+</script>
+</body></html>

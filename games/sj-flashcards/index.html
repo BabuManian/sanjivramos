@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flashcards</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--ink:#0f172a;--mute:#64748b;--acc:#0ea5e9;--line:#e2e8f0}
+@media (prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--ink:#e2e8f0;--mute:#94a3b8;--line:#334155}}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif}
+#app{max-width:760px;margin:0 auto;padding:12px;box-sizing:border-box;min-height:100%;display:flex;flex-direction:column;gap:12px}
+header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;flex:1}
+button{border:none;border-radius:8px;padding:8px 13px;font:inherit;font-weight:600;cursor:pointer;background:var(--acc);color:#fff}
+button.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+button.bad{background:#ef4444}button.ok{background:#22c55e}button.mid{background:#f59e0b}
+button:disabled{opacity:.45;cursor:default}
+input,textarea,select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);box-sizing:border-box}
+.decks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.deck{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.deck h3{margin:0;font-size:16px}
+.deck .meta{color:var(--mute);font-size:12px}
+.deck .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.deck .acts button{padding:6px 10px;font-size:12px}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.prog i{display:block;height:100%;background:#22c55e}
+.flip{perspective:1000px;flex:1;min-height:240px;display:flex}
+.fc{position:relative;flex:1;transform-style:preserve-3d;transition:transform .45s;cursor:pointer}
+.fc.back{transform:rotateY(180deg)}
+.side{position:absolute;inset:0;backface-visibility:hidden;background:var(--card);border:1px solid var(--line);border-radius:16px;display:flex;align-items:center;justify-content:center;padding:20px;font-size:clamp(18px,4vw,30px);text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.08);white-space:pre-wrap}
+.side.b{transform:rotateY(180deg)}
+.side small{position:absolute;top:10px;left:14px;font-size:12px;color:var(--mute)}
+.bar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.muted{color:var(--mute)}
+table{width:100%;border-collapse:collapse}td{border-bottom:1px solid var(--line);padding:6px;vertical-align:top}
+td input{width:100%}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choices button{background:var(--card);color:var(--ink);border:2px solid var(--line);padding:14px;min-height:60px}
+.choices button.right{border-color:#22c55e;background:#dcfce7;color:#14532d}.choices button.wrong{border-color:#ef4444;background:#fee2e2;color:#7f1d1d}
+.big{font-size:40px;text-align:center}
+</style></head><body>
+<div id="app"></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>
+(() => {
+  const app = document.getElementById('app');
+  const kit = window.SJG ? SJG.init('flashcards', { vs: { finalModes: ['quiz'] }, title: 'Flashcards', trophies: [
+    { id: 'first', name: 'First Steps', desc: 'Finish a study session', icon: '📖' },
+    { id: 'master', name: 'Mastered', desc: 'Move every card in a deck to the top box', icon: '🎓' },
+    { id: 'quiz10', name: 'Quiz Whiz', desc: 'Score 10/10 in a quiz', icon: '🧠' },
+    { id: 'maker', name: 'Deck Maker', desc: 'Create your own deck', icon: '✍️' },
+    { id: 'streak', name: 'On a Roll', desc: 'Study 3 days in a row', icon: '🔥' },
+  ] }) : null;
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const KEY = 'sj-flashcards.v1';
+  const SAMPLE = [
+    { name: 'World Capitals', cards: [['France', 'Paris'], ['Japan', 'Tokyo'], ['Brazil', 'Brasília'], ['Canada', 'Ottawa'], ['Australia', 'Canberra'], ['Egypt', 'Cairo'], ['India', 'New Delhi'], ['Kenya', 'Nairobi'], ['Norway', 'Oslo'], ['Peru', 'Lima'], ['Turkey', 'Ankara'], ['South Korea', 'Seoul']] },
+    { name: 'Times Tables', cards: [['7 × 8', '56'], ['6 × 7', '42'], ['9 × 6', '54'], ['8 × 8', '64'], ['12 × 11', '132'], ['7 × 7', '49'], ['9 × 9', '81'], ['6 × 8', '48'], ['12 × 12', '144'], ['11 × 7', '77']] },
+    { name: 'Spanish Basics', cards: [['hello', 'hola'], ['thank you', 'gracias'], ['please', 'por favor'], ['water', 'agua'], ['house', 'casa'], ['dog', 'perro'], ['cat', 'gato'], ['book', 'libro'], ['friend', 'amigo'], ['good night', 'buenas noches']] },
+    { name: 'Science Facts', cards: [['H₂O', 'Water'], ['Closest star to Earth', 'The Sun'], ['Powerhouse of the cell', 'Mitochondria'], ['Speed of light (approx.)', '300,000 km/s'], ['Largest planet', 'Jupiter'], ['Gas plants breathe in', 'Carbon dioxide'], ['Symbol for gold', 'Au'], ['Number of bones in an adult', '206']] },
+  ];
+  let D;
+  try { D = JSON.parse(localStorage.getItem(KEY)); } catch {}
+  if (!D || !Array.isArray(D.decks)) D = { decks: SAMPLE.map((d, i) => ({ id: 'd' + i + Date.now(), name: d.name, cards: d.cards.map(([f, b]) => ({ f, b, box: 0, due: 0 })) })), days: [] };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch {} };
+  const BOX_DAYS = [0, 1, 3, 7, 16];
+  const now = () => Date.now(), day = 864e5;
+  const dueCards = d => d.cards.filter(c => (c.due || 0) <= now());
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  function home() {
+    app.innerHTML = `<header><h1>🗂️ Flashcards</h1><button class="alt" id="imp">Import CSV</button><button id="new">+ New deck</button></header>
+      <div class="decks">${D.decks.map(d => { const due = dueCards(d).length, top = d.cards.filter(c => c.box >= 4).length; return `<div class="deck"><h3>${esc(d.name)}</h3><div class="meta">${d.cards.length} cards · ${due} due · ${top} mastered</div><div class="prog"><i style="width:${d.cards.length ? 100 * d.cards.reduce((a, c) => a + c.box, 0) / (d.cards.length * 4) : 0}%"></i></div><div class="acts"><button data-a="study" data-id="${d.id}" ${d.cards.length ? '' : 'disabled'}>Study${due ? ` (${due})` : ''}</button><button class="alt" data-a="quiz" data-id="${d.id}" ${d.cards.length >= 4 ? '' : 'disabled'}>Quiz</button><button class="alt" data-a="edit" data-id="${d.id}">Edit</button></div></div>`; }).join('')}</div>
+      <p class="muted">Cards you get right move up a box and come back later (1, 3, 7, then 16 days). Cards you miss go back to box 1. ${streak() > 1 ? `🔥 ${streak()}-day streak.` : ''}</p>`;
+    app.querySelector('.decks').onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; const d = D.decks.find(x => x.id === b.dataset.id); ({ study, quiz, edit })[b.dataset.a](d); };
+    document.getElementById('new').onclick = () => { const d = { id: 'd' + Date.now(), name: 'New deck', cards: [] }; D.decks.push(d); save(); kit && kit.unlock('maker'); edit(d); };
+    document.getElementById('imp').onclick = importCsv;
+  }
+  function streak() { const days = [...new Set(D.days || [])].sort().reverse(); let s = 0, d = new Date(); for (;;) { const k = d.toISOString().slice(0, 10); if (days.includes(k)) { s++; d = new Date(d - day); } else break; } return s; }
+  function markDay() { D.days = D.days || []; const k = new Date().toISOString().slice(0, 10); if (!D.days.includes(k)) D.days.push(k); D.days = D.days.slice(-60); if (streak() >= 3) kit && kit.unlock('streak'); }
+
+  function study(d) {
+    let queue = shuffle(dueCards(d).slice());
+    if (!queue.length) queue = shuffle(d.cards.slice()).slice(0, 10);
+    let i = 0, right = 0, flipped = false, reverse = false;
+    const show = () => {
+      if (i >= queue.length) return done();
+      const c = queue[i];
+      app.innerHTML = `<header><button class="alt" id="bk">← Decks</button><h1>${esc(d.name)}</h1><span class="muted">${i + 1} / ${queue.length}</span><label class="muted"><input type="checkbox" id="rev" ${reverse ? 'checked' : ''}> Reverse</label></header>
+        <div class="flip"><div class="fc" id="fc"><div class="side"><small>${reverse ? 'Answer' : 'Question'} · box ${c.box + 1}</small>${esc(reverse ? c.b : c.f)}</div><div class="side b"><small>${reverse ? 'Question' : 'Answer'}</small>${esc(reverse ? c.f : c.b)}</div></div></div>
+        <div class="bar" id="acts"><button id="fl">Show answer (Space)</button></div>`;
+      document.getElementById('bk').onclick = home;
+      document.getElementById('rev').onchange = e => { reverse = e.target.checked; show(); };
+      const flip = () => { flipped = true; document.getElementById('fc').classList.add('back'); document.getElementById('acts').innerHTML = `<button class="bad" id="no">✗ Missed (1)</button><button class="mid" id="hard">~ Hard (2)</button><button class="ok" id="yes">✓ Got it (3)</button>`; document.getElementById('no').onclick = () => grade(0); document.getElementById('hard').onclick = () => grade(1); document.getElementById('yes').onclick = () => grade(2); };
+      document.getElementById('fc').onclick = () => flipped ? null : flip();
+      document.getElementById('fl').onclick = flip;
+      flipped = false; cur = { flip, grade };
+    };
+    const grade = g => {
+      const c = queue[i];
+      if (g === 0) { c.box = 0; queue.push(c); }
+      else { if (g === 2) right++; c.box = Math.min(4, c.box + (g === 2 ? 1 : 0)); }
+      c.due = g === 0 ? 0 : now() + BOX_DAYS[c.box] * day;
+      kit && kit.sfx(g ? 'coin' : 'click');
+      save(); i++; show();
+    };
+    const done = () => {
+      markDay(); save(); kit && kit.unlock('first'); kit && kit.stat('studied', queue.length);
+      if (d.cards.length && d.cards.every(c => c.box >= 4)) kit && kit.unlock('master');
+      app.innerHTML = `<div class="big">🎉</div><h2 style="text-align:center">Session done</h2><p class="muted" style="text-align:center">${right} right first time out of ${queue.length} reviews.</p><div class="bar"><button id="bk">Back to decks</button><button class="alt" id="ag">Study more</button></div>`;
+      document.getElementById('bk').onclick = home; document.getElementById('ag').onclick = () => study(d);
+      cur = null;
+    };
+    show();
+  }
+  let cur = null;
+  addEventListener('keydown', e => {
+    if (!cur || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (e.key === ' ') { e.preventDefault(); cur.flip(); }
+    if (cur.grade && document.getElementById('yes')) { if (e.key === '1') cur.grade(0); if (e.key === '2') cur.grade(1); if (e.key === '3') cur.grade(2); }
+  });
+
+  function quiz(d) {
+    cur = null;
+    const qs = shuffle(d.cards.slice()).slice(0, 10);
+    let i = 0, score = 0;
+    const show = () => {
+      if (i >= qs.length) {
+        const res = kit ? kit.score(score, 'quiz') : {};
+        if (score === qs.length && qs.length >= 10) kit && kit.unlock('quiz10');
+        markDay(); save();
+        app.innerHTML = `<div class="big">${score === qs.length ? '🏆' : score >= qs.length / 2 ? '👍' : '📚'}</div><h2 style="text-align:center">${score} / ${qs.length}</h2><div class="bar"><button id="bk">Back to decks</button><button class="alt" id="ag">Another quiz</button></div>`;
+        document.getElementById('bk').onclick = home; document.getElementById('ag').onclick = () => quiz(d); return;
+      }
+      const c = qs[i], wrong = shuffle(d.cards.filter(x => x.b !== c.b).map(x => x.b)).slice(0, 3), opts = shuffle([c.b, ...wrong]);
+      app.innerHTML = `<header><button class="alt" id="bk">← Decks</button><h1>Quiz · ${esc(d.name)}</h1><span class="muted">${i + 1}/${qs.length} · ✓ ${score}</span></header><div class="side" style="position:static;min-height:140px">${esc(c.f)}</div><div class="choices">${opts.map(o => `<button data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+      document.getElementById('bk').onclick = home;
+      app.querySelector('.choices').onclick = e => {
+        const b = e.target.closest('button'); if (!b || app.querySelector('.right')) return;
+        const ok = b.dataset.o === c.b; if (ok) score++;
+        kit && kit.sfx(ok ? 'coin' : 'hurt');
+        app.querySelectorAll('.choices button').forEach(x => { if (x.dataset.o === c.b) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+        setTimeout(() => { i++; show(); }, ok ? 600 : 1300);
+      };
+    };
+    show();
+  }
+
+  function edit(d) {
+    cur = null;
+    const rows = () => d.cards.map((c, i) => `<tr><td><input data-i="${i}" data-k="f" value="${esc(c.f)}" placeholder="Front"></td><td><input data-i="${i}" data-k="b" value="${esc(c.b)}" placeholder="Back"></td><td><button class="alt" data-del="${i}" title="Delete">✕</button></td></tr>`).join('');
+    app.innerHTML = `<header><button class="alt" id="bk">← Decks</button><input id="nm" value="${esc(d.name)}" style="flex:1;font-weight:700"><button class="alt" id="exp">Export CSV</button><button class="bad" id="dl">Delete deck</button></header>
+      <table><tbody id="tb">${rows()}</tbody></table><div class="bar"><button id="add">+ Add card</button><button class="alt" id="reset">Reset progress</button></div>`;
+    const tb = document.getElementById('tb');
+    tb.oninput = e => { const t = e.target; if (t.dataset.i === undefined) return; d.cards[+t.dataset.i][t.dataset.k] = t.value; save(); };
+    tb.onclick = e => { const b = e.target.closest('[data-del]'); if (!b) return; d.cards.splice(+b.dataset.del, 1); save(); tb.innerHTML = rows(); };
+    document.getElementById('nm').oninput = e => { d.name = e.target.value || 'Untitled'; save(); };
+    document.getElementById('add').onclick = () => { d.cards.push({ f: '', b: '', box: 0, due: 0 }); save(); tb.innerHTML = rows(); const ins = tb.querySelectorAll('input'); ins[ins.length - 2].focus(); };
+    document.getElementById('reset').onclick = () => { d.cards.forEach(c => { c.box = 0; c.due = 0; }); save(); };
+    document.getElementById('dl').onclick = () => { if (confirm(`Delete “${d.name}”?`)) { D.decks = D.decks.filter(x => x !== d); save(); home(); } };
+    document.getElementById('exp').onclick = () => { const csv = d.cards.map(c => [c.f, c.b].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = (d.name || 'deck') + '.csv'; a.click(); };
+    document.getElementById('bk').onclick = () => { d.cards = d.cards.filter(c => c.f.trim() || c.b.trim()); save(); home(); };
+  }
+  function parseCsv(text) {
+    const out = []; let row = [], v = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { v += '"'; i++; } else if (ch === '"') q = false; else v += ch; }
+      else if (ch === '"') q = true; else if (ch === ',' || ch === '\t' || ch === ';') { row.push(v); v = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(v); out.push(row); row = []; v = ''; } else v += ch;
+    }
+    if (v || row.length) { row.push(v); out.push(row); }
+    return out.filter(r => r.length >= 2 && (r[0].trim() || r[1].trim()));
+  }
+  function importCsv() {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,.tsv,.txt,text/csv';
+    inp.onchange = async () => { const f = inp.files[0]; if (!f) return; const rows = parseCsv(await f.text()); if (!rows.length) { alert('No cards found. Use two columns: front, back.'); return; } D.decks.push({ id: 'd' + Date.now(), name: f.name.replace(/\.\w+$/, ''), cards: rows.map(r => ({ f: r[0].trim(), b: r[1].trim(), box: 0, due: 0 })) }); save(); kit && kit.unlock('maker'); home(); };
+    inp.click();
+  }
+  save(); home();
+})();
+</script>
+</body></html>

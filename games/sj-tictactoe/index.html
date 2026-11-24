@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tic-Tac-Toe</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0c4a6e;color:#f0f9ff;font:14px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px;box-sizing:border-box}
+#status{font-size:18px;min-height:26px;text-align:center}
+#board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(86vw,340px);aspect-ratio:1}
+.cell{background:#075985;border:none;border-radius:12px;color:#fff;font-size:clamp(34px,11vw,56px);font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}
+.cell:hover:not(:disabled){background:#0369a1}.cell:active:not(:disabled){transform:scale(.96)}
+.cell.x{color:#7dd3fc}.cell.o{color:#fca5a5}
+.cell.win{background:#16a34a}
+.cell:disabled{cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+button{background:#0284c7;color:#fff;border:none;border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer}
+button.on{background:#f0f9ff;color:#0c4a6e;font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+.score{display:flex;gap:18px}
+#chat{width:min(86vw,340px);font-size:13px;opacity:.85;max-height:90px;overflow:auto}
+</style></head><body>
+<div class="row" id="modes"><button data-m="ai" class="on">vs AI</button><button data-m="local">2 players</button><button data-m="online">🌐 Online</button></div>
+<div class="score"><span id="lx">You</span> <b id="sx">0</b><span>Draws <b id="sd">0</b></span><span id="lo">AI</span> <b id="so">0</b></div>
+<div id="status">Your move (X)</div>
+<div id="board"></div>
+<div class="row">
+  <button id="new">New round</button>
+  <button id="first">Let AI start: off</button>
+</div>
+<div id="chat"></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>window.SJG && SJG.init("tictactoe", { vs: false, title: "Tic-Tac-Toe", lower: false, trophies: [{"id": "draw", "name": "Stalemate", "desc": "Force a draw against the AI", "icon": "🤝"}, {"id": "online", "name": "Online Winner", "desc": "Win a round online", "icon": "🌐"}] });</script>
+<script>
+(() => {
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  const board = document.getElementById('board');
+  const $ = id => document.getElementById(id);
+  let cells, turn, over, aiStarts = false, mode = 'ai', net = null, myMark = 'x', starter = 'x', winner = null;
+  let score = { x: 0, o: 0, d: 0 };
+  const sfx = n => window.SJG && SJG.sfx(n);
+
+  for (let i = 0; i < 9; i++) {
+    const b = document.createElement('button');
+    b.className = 'cell'; b.dataset.i = i; b.setAttribute('aria-label', 'Cell ' + (i + 1));
+    board.appendChild(b);
+  }
+  const winLine = (c, p) => LINES.find(l => l.every(i => c[i] === p)) || null;
+  // Minimax: the AI never loses. Scores favour quicker wins and slower losses.
+  function minimax(c, player, depth) {
+    if (winLine(c, 'o')) return 10 - depth;
+    if (winLine(c, 'x')) return depth - 10;
+    if (c.every(Boolean)) return 0;
+    const next = player === 'o' ? 'x' : 'o';
+    let best = player === 'o' ? -Infinity : Infinity;
+    for (let i = 0; i < 9; i++) if (!c[i]) {
+      c[i] = player;
+      const s = minimax(c, next, depth + 1);
+      c[i] = null;
+      best = player === 'o' ? Math.max(best, s) : Math.min(best, s);
+    }
+    return best;
+  }
+  function aiMove() {
+    let bestI = -1, bestS = -Infinity;
+    for (let i = 0; i < 9; i++) if (!cells[i]) {
+      cells[i] = 'o';
+      const s = minimax(cells, 'x', 1);
+      cells[i] = null;
+      if (s > bestS) { bestS = s; bestI = i; }
+    }
+    return bestI;
+  }
+  const names = () => mode === 'ai' ? { x: 'You', o: 'AI' } : mode === 'local' ? { x: 'X', o: 'O' } : net ? (() => { const r = net.room, h = r.members.find(m => m.id === r.hostId), g = r.members.find(m => m.id !== r.hostId && !m.spectator); return { x: (h || {}).display || 'X', o: (g || {}).display || 'O' }; })() : { x: 'X', o: 'O' };
+  function canPlay() { if (over) return false; if (mode === 'ai') return turn === 'x'; if (mode === 'local') return true; return !!net && turn === myMark && !net.spectating(); }
+  function render() {
+    const btns = board.children, n = names();
+    for (let i = 0; i < 9; i++) {
+      const b = btns[i];
+      b.textContent = cells[i] ? cells[i].toUpperCase() : '';
+      b.className = 'cell' + (cells[i] ? ' ' + cells[i] : '');
+      b.disabled = !canPlay() || !!cells[i];
+    }
+    if (winner && winner !== 'draw') (winLine(cells, winner) || []).forEach(i => btns[i].classList.add('win'));
+    $('lx').textContent = n.x + ' (X)'; $('lo').textContent = n.o + ' (O)';
+    $('sx').textContent = score.x; $('sd').textContent = score.d; $('so').textContent = score.o;
+    let st;
+    if (over) st = winner === 'draw' ? 'Draw' : mode === 'ai' ? (winner === 'x' ? 'You win! 🎉' : 'AI wins') : mode === 'online' ? (winner === myMark ? 'You win! 🎉' : `${n[winner]} wins`) : `${n[winner]} wins! 🎉`;
+    else if (mode === 'ai') st = turn === 'x' ? 'Your move (X)' : 'AI is thinking…';
+    else if (mode === 'local') st = `${turn.toUpperCase()} to move`;
+    else st = !net ? 'Connecting…' : net.spectating() ? `Watching · ${n[turn]} to move` : turn === myMark ? `Your move (${myMark.toUpperCase()})` : `Waiting for ${n[turn]}…`;
+    $('status').textContent = st;
+    $('first').hidden = mode !== 'ai';
+    $('new').disabled = mode === 'online' && !(net && net.isHost);
+  }
+  function finish(w) {
+    over = true; winner = w || 'draw';
+    if (winner === 'draw') { score.d++; if (mode === 'ai') window.SJG && SJG.unlock('draw'); } else score[winner]++;
+    if (mode === 'online' && winner === myMark) window.SJG && SJG.unlock('online');
+    sfx(winner === 'draw' ? 'click' : (mode === 'online' ? winner === myMark : mode !== 'ai' || winner === 'x') ? 'win' : 'lose');
+    render();
+  }
+  /** Ends the round if someone has won or the board is full. Returns true when the round is over. */
+  function check() {
+    if (winLine(cells, 'x')) { finish('x'); return true; }
+    if (winLine(cells, 'o')) { finish('o'); return true; }
+    if (cells.every(Boolean)) { finish(null); return true; }
+    return false;
+  }
+  function aiTurn() {
+    turn = 'o'; render();
+    setTimeout(() => {
+      if (over || mode !== 'ai') return;
+      cells[aiMove()] = 'o'; sfx('pop');
+      if (check()) return;
+      turn = 'x'; render();
+    }, 350);
+  }
+  function play(i, mark) {
+    if (over || cells[i] || turn !== mark) return false;
+    cells[i] = mark; sfx('pop');
+    if (!check()) turn = mark === 'x' ? 'o' : 'x';
+    render();
+    return true;
+  }
+  function newRound() {
+    cells = Array(9).fill(null); over = false; winner = null;
+    if (mode === 'online') { starter = starter === 'x' ? 'o' : 'x'; turn = starter; }
+    else turn = 'x';
+    render();
+    if (mode === 'ai' && aiStarts) aiTurn();
+    if (mode === 'online' && net && net.isHost) broadcast();
+  }
+  /* ---------- online: the host is X and the referee; the guest (O) sends moves, the host checks and shares the board ---------- */
+  const broadcast = () => net.send({ st: { cells, turn, over, winner, score, starter } });
+  async function goOnline() {
+    if (!window.SJNet) return;
+    try { net = await SJNet.lobby({ game: 'tictactoe', gameName: 'Tic-Tac-Toe', max: 2, min: 2 }); }
+    catch { setMode('ai'); return; }
+    mode = 'online'; myMark = net.isHost ? 'x' : 'o'; score = { x: 0, o: 0, d: 0 }; starter = 'o';
+    $('chat').textContent = `Room ${net.room.code}: ${names().x} is X, ${names().o} is O.`;
+    net.on('m', (d, from) => {
+      if (d.mv !== undefined && net.isHost) { const guest = net.players().find(m => m.id !== net.me.id); if (guest && from === guest.id) play(+d.mv, 'o'); broadcast(); }
+      if (d.st && !net.isHost) { const was = over; ({ cells, turn, over, winner, score, starter } = d.st); if (over && !was && winner) { if (winner === myMark) window.SJG && SJG.unlock('online'); sfx(winner === 'draw' ? 'click' : winner === myMark ? 'win' : 'lose'); } else sfx('pop'); render(); }
+      if (d.hi && net.isHost) broadcast();
+    });
+    net.on('host', () => { myMark = net.isHost ? 'x' : 'o'; render(); });
+    net.on('peer-left', () => { $('chat').textContent = 'Your opponent left.'; });
+    net.on('peer-drop', () => { $('chat').textContent = 'Opponent disconnected — waiting for them to come back…'; });
+    net.on('peer-back', () => { $('chat').textContent = 'Opponent reconnected.'; if (net.isHost) broadcast(); });
+    newRound();
+    if (!net.isHost) net.send({ hi: 1 });
+  }
+  function setMode(m) {
+    if (net && m !== 'online') { try { net.leave(); } catch {} net = null; }
+    mode = m; score = { x: 0, o: 0, d: 0 };
+    document.querySelectorAll('#modes [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+    if (m === 'online') { cells = Array(9).fill(null); over = true; render(); goOnline(); return; }
+    $('chat').textContent = '';
+    newRound();
+  }
+  board.addEventListener('click', e => {
+    const b = e.target.closest('.cell'); if (!b) return;
+    const i = +b.dataset.i;
+    if (mode === 'ai') { if (play(i, 'x') && !over) aiTurn(); }
+    else if (mode === 'local') play(i, turn);
+    else if (net && canPlay() && !cells[i]) { if (net.isHost) { play(i, 'x'); broadcast(); } else net.send({ mv: i }); }
+  });
+  $('modes').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) setMode(b.dataset.m); });
+  $('new').addEventListener('click', newRound);
+  $('first').addEventListener('click', () => { aiStarts = !aiStarts; $('first').textContent = 'Let AI start: ' + (aiStarts ? 'on' : 'off'); });
+  window.__ttt = () => ({ mode, cells, turn, over, winner, myMark, score });
+  if (new URLSearchParams(location.search).get('join') || new URLSearchParams(location.search).get('online')) setMode('online'); else newRound();
+})();
+</script>
+</body></html>

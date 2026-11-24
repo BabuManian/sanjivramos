@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Merge Garden</title>
+<style>
+html,body{margin:0;height:100%;background:#ecfccb;color:#1a2e05;font:14px system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding:8px;box-sizing:border-box;gap:8px}
+#top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{background:#fff;border-radius:999px;padding:5px 12px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.sp{flex:1}
+button{border:none;border-radius:10px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer;background:#65a30d;color:#fff}
+button.alt{background:#fff;color:#365314}
+button:disabled{opacity:.5;cursor:default}
+#orders{display:flex;gap:6px;overflow-x:auto;min-height:92px}
+.order{flex:0 0 auto;background:#fff;border-radius:12px;padding:6px 8px;min-width:96px;box-shadow:0 1px 3px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:3px;align-items:center}
+.order .who{font-size:22px}
+.order .want{display:flex;gap:2px;font-size:22px}
+.order .want span.ok{filter:drop-shadow(0 0 3px #22c55e)}
+.order .rw{font-size:12px;opacity:.75}
+.order button{padding:3px 10px;font-size:12px}
+#board{flex:1;min-height:0;display:grid;gap:5px;background:#a3e635;border-radius:14px;padding:6px;aspect-ratio:var(--cols)/var(--rows);max-height:100%;margin:0 auto;width:min(100%,calc((100vh - 230px) * var(--cols) / var(--rows)))}
+.cell{background:#d9f99d;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:clamp(20px,6vw,34px);position:relative;touch-action:none;min-width:0;min-height:0}
+.cell.locked{background:#84cc16 repeating-linear-gradient(45deg,transparent 0 6px,rgba(0,0,0,.06) 6px 12px)}
+.cell.locked::after{content:"🔒";font-size:14px;opacity:.6}
+.cell.sel{outline:3px solid #f59e0b}
+.cell.hint{animation:hint 1s infinite}
+@keyframes hint{50%{background:#fef08a}}
+.item{pointer-events:none;transition:transform .15s}
+.lvl{position:absolute;bottom:1px;right:4px;font-size:10px;font-weight:700;opacity:.55}
+.pop .item{animation:pop .3s}
+@keyframes pop{0%{transform:scale(.3)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+#ghost{position:fixed;pointer-events:none;font-size:38px;z-index:9;transform:translate(-50%,-50%) scale(1.15);display:none}
+#bottom{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#info{font-size:12px;opacity:.75;flex:1;min-width:120px}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:10}
+#modal[hidden]{display:none}
+.card{background:#fff;border-radius:16px;padding:16px 18px;max-width:360px;width:calc(100% - 40px)}
+.card h2{margin:0 0 6px}
+.chain{display:flex;flex-wrap:wrap;gap:4px;font-size:22px;margin:6px 0}
+</style></head><body>
+<div id="app">
+  <div id="top"><span class="pill">🪙 <span id="coins">0</span></span><span class="pill">⚡ <span id="energy">0</span>/<span id="emax">0</span></span><span class="pill">⭐ Lv <span id="lv">1</span></span><span class="sp"></span><button class="alt" id="help">?</button><button class="alt" id="mute">🔊</button></div>
+  <div id="orders"></div>
+  <div id="board"></div>
+  <div id="bottom"><button id="seed">🌱 Plant (1⚡)</button><button class="alt" id="crate">📦 Crate (25🪙)</button><button class="alt" id="sell" disabled>Sell</button><span id="info">Tap Plant, then drag two of the same thing together to grow them.</span></div>
+</div>
+<div id="ghost"></div>
+<div id="modal" hidden><div class="card" id="mbody"></div></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const kit = window.SJG ? SJG.init('merge', { vs: { live: '#coins', final: false }, title: 'Merge Garden', trophies: [
+    { id: 'tree', name: 'Green Thumb', desc: 'Grow a tree', icon: '🌳' },
+    { id: 'golden', name: 'Golden Touch', desc: 'Grow a golden tree', icon: '✨' },
+    { id: 'castle', name: 'Fairy Castle', desc: 'Build the fairy castle', icon: '🏰' },
+    { id: 'orders25', name: 'Busy Market', desc: 'Fill 25 orders', icon: '🧺' },
+    { id: 'lv10', name: 'Master Gardener', desc: 'Reach level 10', icon: '👩‍🌾' },
+    { id: 'fullboard', name: 'Room to Grow', desc: 'Unlock every plot', icon: '🗺️' },
+    { id: 'rich', name: 'Moneybags', desc: 'Hold 1,000 coins', icon: '💰' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  const CHAINS = {
+    g: ['🌱', '🌿', '🌷', '🌸', '🌳', '🌲', '🌴', '✨'],          // garden
+    f: ['🍒', '🍓', '🍎', '🍑', '🍍', '🍉', '🎂', '🎁'],          // fruit
+    s: ['🪨', '🧱', '🛖', '🏠', '🏡', '🏛️', '🏯', '🏰'],          // stone/buildings
+    b: ['🐛', '🐌', '🐞', '🦋', '🐝', '🐦', '🦚', '🦄'],          // critters
+  };
+  const NAMES = { g: ['Seed', 'Sprout', 'Tulip', 'Blossom', 'Tree', 'Pine', 'Palm', 'Golden tree'], f: ['Cherry', 'Berry', 'Apple', 'Peach', 'Pineapple', 'Melon', 'Cake', 'Gift'], s: ['Pebble', 'Brick', 'Hut', 'House', 'Cottage', 'Temple', 'Pagoda', 'Fairy castle'], b: ['Grub', 'Snail', 'Ladybug', 'Butterfly', 'Bee', 'Bird', 'Peacock', 'Unicorn'] };
+  const COLS = 6, ROWS = 7;
+  const val = (c, l) => Math.round(2 * Math.pow(2.3, l) * (c === 'g' ? 1 : c === 'f' ? 1.2 : c === 's' ? 1.4 : 1.6));
+  const KEY = 'sj-merge.save';
+  let S;
+  function fresh() {
+    const cells = Array(COLS * ROWS).fill(null), locked = Array(COLS * ROWS).fill(false);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (r >= 5 || c >= 5) locked[r * COLS + c] = true;
+    cells[14] = { c: 'g', l: 0 }; cells[15] = { c: 'g', l: 0 };
+    return { cells, locked, coins: 20, energy: 30, emax: 30, eT: Date.now(), xp: 0, lv: 1, orders: [], filled: 0, seen: {} };
+  }
+  try { S = JSON.parse(localStorage.getItem(KEY)); } catch {}
+  if (!S || !S.cells || S.cells.length !== COLS * ROWS) S = fresh();
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+
+  // energy regenerates 1 per 20s, also offline
+  function regen() { const now = Date.now(), n = Math.floor((now - S.eT) / 20000); if (n > 0) { S.energy = Math.min(S.emax, S.energy + n); S.eT += n * 20000; if (S.energy >= S.emax) S.eT = now; } }
+
+  /* ---------- board ---------- */
+  const board = $('board');
+  board.style.setProperty('--cols', COLS); board.style.setProperty('--rows', ROWS);
+  board.style.gridTemplateColumns = `repeat(${COLS},1fr)`; board.style.gridTemplateRows = `repeat(${ROWS},1fr)`;
+  let sel = -1;
+  function render(popAt = -1) {
+    regen();
+    board.innerHTML = S.cells.map((it, i) => {
+      if (S.locked[i]) return `<div class="cell locked" data-i="${i}" title="Unlock for ${unlockCost()} 🪙"></div>`;
+      return `<div class="cell${i === sel ? ' sel' : ''}${i === popAt ? ' pop' : ''}" data-i="${i}">${it ? `<span class="item">${CHAINS[it.c][it.l]}</span><span class="lvl">${it.l + 1}</span>` : ''}</div>`;
+    }).join('');
+    $('coins').textContent = S.coins; $('energy').textContent = S.energy; $('emax').textContent = S.emax; $('lv').textContent = S.lv;
+    $('sell').disabled = sel < 0 || !S.cells[sel];
+    if (sel >= 0 && S.cells[sel]) { const it = S.cells[sel]; $('info').textContent = `${NAMES[it.c][it.l]} (level ${it.l + 1}) — sells for ${val(it.c, it.l)} 🪙` + (it.l < 7 ? `. Merge two to make a ${NAMES[it.c][it.l + 1]}.` : '. The best there is!'); }
+    if (S.coins >= 1000) kit && kit.unlock('rich');
+    renderOrders(); save();
+  }
+  const unlockCost = () => 40 + S.locked.filter(x => !x).length * 6;
+  function emptyCell() { const free = S.cells.map((c, i) => (!c && !S.locked[i] ? i : -1)).filter(i => i >= 0); return free.length ? free[Math.random() * free.length | 0] : -1; }
+  function seed() {
+    regen();
+    if (S.energy <= 0) { flash('Out of energy — it refills over time (1 every 20s), or fill an order.'); return; }
+    const i = emptyCell(); if (i < 0) { flash('The garden is full. Merge or sell something.'); return; }
+    S.energy--; if (S.energy === S.emax - 1) S.eT = Date.now();
+    const r = Math.random(), chains = S.lv >= 6 ? 'ggfsb' : S.lv >= 4 ? 'gggfs' : S.lv >= 2 ? 'gggf' : 'g';
+    S.cells[i] = { c: chains[Math.random() * chains.length | 0], l: r < .1 && S.lv > 2 ? 1 : 0 };
+    sfx('pop'); render(i);
+  }
+  function crate() {
+    if (S.coins < 25) { flash('A crate costs 25 coins.'); return; }
+    const n = Math.min(3, S.cells.filter((c, i) => !c && !S.locked[i]).length);
+    if (!n) { flash('No room for a crate.'); return; }
+    S.coins -= 25;
+    for (let k = 0; k < n; k++) { const i = emptyCell(); const ch = 'gfsb'[Math.random() * Math.min(4, 1 + Math.floor(S.lv / 2)) | 0]; S.cells[i] = { c: ch, l: Math.random() < .35 ? 2 : 1 }; }
+    sfx('coin'); render();
+  }
+  function merge(a, b) {
+    const A = S.cells[a], B = S.cells[b];
+    if (!A || a === b) return false;
+    if (S.locked[b]) return false;
+    if (!B) { S.cells[b] = A; S.cells[a] = null; sel = b; render(); return true; }
+    if (A.c === B.c && A.l === B.l && A.l < 7) {
+      S.cells[a] = null; S.cells[b] = { c: A.c, l: A.l + 1 }; sel = b;
+      gainXp(A.l + 1);
+      const key = A.c + (A.l + 1);
+      if (!S.seen[key]) { S.seen[key] = 1; S.coins += 5 * (A.l + 1); flash(`New: ${CHAINS[A.c][A.l + 1]} ${NAMES[A.c][A.l + 1]}! +${5 * (A.l + 1)} 🪙`); }
+      if (A.c === 'g' && A.l + 1 >= 4) kit && kit.unlock('tree');
+      if (A.c === 'g' && A.l + 1 === 7) kit && kit.unlock('golden');
+      if (A.c === 's' && A.l + 1 === 7) kit && kit.unlock('castle');
+      kit && kit.stat('merges');
+      sfx(A.l >= 4 ? 'power' : 'coin'); render(b); return true;
+    }
+    // swap
+    S.cells[a] = B; S.cells[b] = A; sel = b; render(); return true;
+  }
+  function gainXp(n) {
+    S.xp += n;
+    const need = lv => 12 + lv * 10;
+    while (S.xp >= need(S.lv)) { S.xp -= need(S.lv); S.lv++; S.emax += 5; S.energy = S.emax; flash(`Level ${S.lv}! Energy refilled. ${S.lv === 2 ? 'Fruit can now grow.' : S.lv === 4 ? 'Stones appear now.' : S.lv === 6 ? 'Critters arrive!' : ''}`); sfx('win'); if (S.lv >= 10) kit && kit.unlock('lv10'); kit && kit.score(S.lv, 'level'); }
+  }
+  function sell() {
+    if (sel < 0 || !S.cells[sel]) return;
+    const it = S.cells[sel]; S.coins += val(it.c, it.l); S.cells[sel] = null; sel = -1; sfx('coin'); render();
+  }
+  function unlock(i) {
+    const c = unlockCost();
+    if (S.coins < c) { flash(`Unlocking this plot costs ${c} 🪙.`); return; }
+    const r = Math.floor(i / COLS), col = i % COLS, nb = [[r - 1, col], [r + 1, col], [r, col - 1], [r, col + 1]].some(([y, x]) => y >= 0 && y < ROWS && x >= 0 && x < COLS && !S.locked[y * COLS + x]);
+    if (!nb) { flash('Unlock a plot next to your garden first.'); return; }
+    S.coins -= c; S.locked[i] = false; sfx('power');
+    if (S.locked.every(x => !x)) kit && kit.unlock('fullboard');
+    render(i);
+  }
+
+  /* ---------- orders ---------- */
+  const WHO = ['🧑‍🌾', '👵', '🧒', '👨‍🍳', '🧙', '🧚', '🤴', '👸', '🦊', '🐻'];
+  function newOrder() {
+    const chains = S.lv >= 6 ? 'gfsb' : S.lv >= 4 ? 'gfs' : S.lv >= 2 ? 'gf' : 'g';
+    const n = 1 + (Math.random() < .3 + S.lv * .03 ? 1 : 0);
+    const want = [];
+    for (let k = 0; k < n; k++) { const c = chains[Math.random() * chains.length | 0]; want.push({ c, l: Math.min(6, 1 + (Math.random() * Math.min(6, 1 + S.lv / 2) | 0)) }); }
+    const reward = want.reduce((a, w) => a + val(w.c, w.l) * 2, 0);
+    return { who: WHO[Math.random() * WHO.length | 0], want, reward, xp: want.reduce((a, w) => a + w.l, 0) };
+  }
+  function haveFor(o) {
+    const used = new Set();
+    return o.want.map(w => { const i = S.cells.findIndex((c, j) => c && !used.has(j) && c.c === w.c && c.l === w.l); if (i >= 0) used.add(i); return i; });
+  }
+  function renderOrders() {
+    while (S.orders.length < Math.min(4, 2 + Math.floor(S.lv / 3))) S.orders.push(newOrder());
+    $('orders').innerHTML = S.orders.map((o, k) => {
+      const have = haveFor(o), ok = have.every(i => i >= 0);
+      return `<div class="order"><span class="who">${o.who}</span><span class="want">${o.want.map((w, j) => `<span class="${have[j] >= 0 ? 'ok' : ''}" title="${NAMES[w.c][w.l]}">${CHAINS[w.c][w.l]}</span>`).join('')}</span><span class="rw">${o.reward} 🪙 · ${o.xp} ⭐</span><button data-o="${k}" ${ok ? '' : 'disabled'}>Give</button></div>`;
+    }).join('');
+  }
+  $('orders').onclick = e => {
+    const b = e.target.closest('[data-o]'); if (!b) return;
+    const o = S.orders[+b.dataset.o], have = haveFor(o);
+    if (!have.every(i => i >= 0)) return;
+    have.forEach(i => { S.cells[i] = null; });
+    S.coins += o.reward; gainXp(o.xp); S.energy = Math.min(S.emax, S.energy + 3);
+    S.orders.splice(+b.dataset.o, 1); S.filled++;
+    if (S.filled >= 25) kit && kit.unlock('orders25');
+    kit && kit.score(S.filled, 'orders');
+    sel = -1; sfx('win'); flash(`${o.who} thanks you! +${o.reward} 🪙, +3 ⚡`); render();
+  };
+
+  /* ---------- drag & drop / tap ---------- */
+  const ghost = $('ghost');
+  let drag = null;
+  board.addEventListener('pointerdown', e => {
+    const c = e.target.closest('.cell'); if (!c) return;
+    const i = +c.dataset.i;
+    if (S.locked[i]) { unlock(i); return; }
+    if (!S.cells[i]) { if (sel >= 0 && S.cells[sel]) { merge(sel, i); } return; }
+    drag = { i, x: e.clientX, y: e.clientY, moved: false };
+    board.setPointerCapture(e.pointerId);
+  });
+  board.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) { drag.moved = true; ghost.textContent = CHAINS[S.cells[drag.i].c][S.cells[drag.i].l]; ghost.style.display = 'block'; const it = board.querySelector(`[data-i="${drag.i}"] .item`); if (it) it.style.opacity = .3; hintMatches(drag.i); }
+    if (drag.moved) { ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; }
+  });
+  board.addEventListener('pointerup', e => {
+    if (!drag) return;
+    const d = drag; drag = null; ghost.style.display = 'none';
+    if (d.moved) {
+      const el = document.elementFromPoint(e.clientX, e.clientY), c = el && el.closest('.cell');
+      if (c && !merge(d.i, +c.dataset.i)) render(); else if (!c) render();
+    } else {
+      if (sel >= 0 && sel !== d.i && S.cells[sel]) merge(sel, d.i);
+      else { sel = sel === d.i ? -1 : d.i; render(); if (sel >= 0) hintMatches(sel); sfx('click'); }
+    }
+  });
+  board.addEventListener('pointercancel', () => { drag = null; ghost.style.display = 'none'; render(); });
+  function hintMatches(i) { const it = S.cells[i]; S.cells.forEach((c, j) => { if (j !== i && c && c.c === it.c && c.l === it.l && it.l < 7) board.querySelector(`[data-i="${j}"]`).classList.add('hint'); }); }
+
+  let flashT;
+  function flash(s) { $('info').textContent = s; clearTimeout(flashT); flashT = setTimeout(() => { if (sel < 0) $('info').textContent = 'Drag two of the same thing together to grow them.'; }, 4000); }
+  $('seed').onclick = seed; $('crate').onclick = crate; $('sell').onclick = sell;
+  $('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+  if (kit && kit.muted) $('mute').textContent = '🔇';
+  $('help').onclick = () => {
+    $('mbody').innerHTML = `<h2>🌻 Merge Garden</h2><p>Plant seeds with energy, drag two matching things together to grow them, and give customers what they ask for.</p>` + Object.keys(CHAINS).map(c => `<div class="chain">${CHAINS[c].map((e, l) => `<span title="${NAMES[c][l]}">${S.seen[c + l] || l === 0 ? e : '❔'}</span>`).join('→')}</div>`).join('') + `<p style="font-size:12px;opacity:.7">Locked plots open for coins. Energy refills 1 every 20 seconds, even while you're away. Progress saves on its own.</p><button id="mclose">Close</button> <button class="alt" id="mreset">Start over</button>`;
+    $('modal').hidden = false;
+    $('mclose').onclick = () => { $('modal').hidden = true; };
+    $('mreset').onclick = () => { if (confirm('Start a new garden? Your current one is lost.')) { S = fresh(); sel = -1; $('modal').hidden = true; render(); } };
+  };
+  addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); seed(); } if (e.key === 'Delete' || e.key === 'Backspace') sell(); if (e.key === 'Escape') { sel = -1; $('modal').hidden = true; render(); } });
+  setInterval(() => { const before = S.energy; regen(); if (S.energy !== before) { $('energy').textContent = S.energy; save(); } }, 2000);
+  window.__merge = () => ({ S, merge, seed, sell });
+  render();
+})();
+</script>
+</body></html>

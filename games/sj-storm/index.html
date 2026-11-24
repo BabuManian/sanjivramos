@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Stormhouse</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#04060b;color:#e5e7eb;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;pointer-events:none;z-index:2}
+#bars{left:12px;top:12px;display:flex;flex-direction:column;gap:5px;width:170px}
+.bar{height:12px;border-radius:999px;background:rgba(0,0,0,.5);overflow:hidden;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.bar i{display:block;height:100%;border-radius:999px}
+.bar span{position:absolute;left:8px;top:-1px;font-size:10px;font-weight:700;text-shadow:0 1px 2px #000}
+#obj{left:50%;top:10px;transform:translateX(-50%);text-align:center;text-shadow:0 2px 6px #000;max-width:70vw}
+#obj b{display:block;font-size:17px;color:#fde68a}#obj small{opacity:.85}
+#inv{right:12px;top:12px;background:rgba(0,0,0,.4);padding:8px 12px;border-radius:12px;font-weight:600;display:flex;flex-direction:column;gap:2px;font-size:13px}
+#prompt{left:50%;bottom:24%;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(0,0,0,.6);font-weight:600;white-space:nowrap}
+#prompt:empty{display:none}
+#sub{left:50%;bottom:12%;transform:translateX(-50%);max-width:min(640px,86vw);text-align:center;font-size:16px;text-shadow:0 2px 4px #000;background:rgba(0,0,0,.45);padding:8px 14px;border-radius:12px}
+#sub:empty{display:none}#sub b{color:#fde68a}
+#alert{left:50%;top:70px;transform:translateX(-50%);font-weight:800;font-size:15px;color:#fca5a5;text-shadow:0 2px 6px #000}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:1;background:#dbeafe;opacity:0}
+#hurt{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(circle,transparent 40%,rgba(220,38,38,.55));opacity:0;transition:opacity .25s}
+.panel{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(2,4,10,.8);backdrop-filter:blur(6px)}
+.panel[hidden]{display:none}
+.card{width:min(720px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:linear-gradient(180deg,#151a2a,#0a0e18);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+h1{margin:0;font:900 44px/1 Impact,"Arial Black",sans-serif;letter-spacing:2px;color:#e0f2fe;text-shadow:0 0 30px rgba(125,211,252,.5)}
+h2{margin:0 0 8px;font:800 22px system-ui;color:#fde68a}
+.sub{opacity:.78;margin:6px 0 14px;line-height:1.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{padding:10px 18px;border-radius:12px;background:rgba(255,255,255,.08);font-weight:700}
+.btn.pri{background:linear-gradient(135deg,#0ea5e9,#1d4ed8);color:#fff}
+.btn:disabled{opacity:.35;cursor:default}
+.chs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+.ch{padding:14px;border-radius:14px;background:rgba(255,255,255,.05);text-align:left;border:1px solid rgba(255,255,255,.06)}
+.ch b{display:block;font-size:16px;margin-bottom:4px}.ch small{opacity:.7;line-height:1.4;display:block}
+.ch.lock{opacity:.45}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+#me{width:140px;height:190px;border-radius:14px;background:radial-gradient(circle at 50% 35%,#1e3a5f,#060a14)}
+#touch{position:fixed;right:10px;bottom:10px;z-index:3;display:none;grid-template-columns:repeat(3,62px);gap:8px}
+#touch.on{display:grid}
+#touch button{height:56px;border-radius:16px;background:rgba(255,255,255,.14);font-weight:700;font-size:12px;touch-action:none}
+#touch button.on{background:rgba(14,165,233,.6)}
+.keys{columns:2;font-size:13px;line-height:1.7;opacity:.85}.keys b{display:inline-block;min-width:64px;color:#7dd3fc}
+#story{font:17px/1.6 Georgia,serif;text-align:center}
+</style></head>
+<body>
+<canvas id="gl"></canvas>
+<div id="flash"></div><div id="hurt"></div>
+<div class="hud" id="bars"></div><div class="hud" id="obj"></div><div class="hud" id="inv"></div>
+<div class="hud" id="alert"></div><div class="hud" id="prompt"></div><div class="hud" id="sub"></div>
+<div id="touch"><button data-btn="act">🏏 Swing</button><button data-btn="use">✋ Use</button><button data-btn="board">🪵 Board</button><button data-btn="light">🔦 Light</button><button data-btn="crouch">🫣 Crouch</button><button data-btn="heal">➕ Heal</button><button data-btn="run">🏃 Run</button><button data-btn="night">🌙 Night</button><button data-btn="pause">⏸</button></div>
+
+<div class="panel" id="menu"><div class="card">
+  <div class="row"><div style="flex:1;min-width:250px">
+    <h1>STORMHOUSE</h1>
+    <p class="sub">The storm cut the power to Grandma June’s farm at Willow Creek, and the radio says the <b>Grinners</b> — looters in yellow raincoats and smiling masks — are working the valley in the dark. You’re the one who has to keep your little brother Pip safe.</p>
+  </div><div style="text-align:center"><canvas id="me" width="280" height="380"></canvas><div style="font-size:12px;opacity:.7">You (your online character)</div></div></div>
+  <div class="chs"><button class="ch" id="c1"><b>Chapter 1 — Lights Out</b><small>Get the generator running, board up the farmhouse, then hold off three waves of Grinners until dawn.</small><small id="b1"></small></button>
+  <button class="ch" id="c2"><b>Chapter 2 — The Long Road</b><small>The bridge is out. Sneak Pip across the valley, find the keys and the fuse, and lower the drawbridge.</small><small id="b2"></small></button></div>
+  <div class="btns"><button class="btn" id="bKeys">⌨ Controls</button><button class="btn" id="bLook">🧍 Edit my character</button><button class="btn" id="bDiff">Difficulty: Normal</button></div>
+  <div id="keys" hidden style="margin-top:12px"><div class="keys"><div><b>WASD</b> move</div><div><b>Shift</b> run</div><div><b>Mouse</b> look (click to lock)</div><div><b>Click / J</b> swing the bat</div><div><b>E</b> use · doors · pick up</div><div><b>R</b> nail a board (window/door)</div><div><b>F</b> flashlight (dazzles Grinners)</div><div><b>C / Ctrl</b> crouch (hide in bushes)</div><div><b>H</b> use a first-aid kit</div><div><b>N</b> start the night early</div><div><b>Esc</b> pause</div></div></div>
+</div></div>
+<div class="panel" id="pause" hidden><div class="card" style="max-width:420px;text-align:center"><h2>Paused</h2><div class="btns" style="justify-content:center"><button class="btn pri" id="bResume">Resume</button><button class="btn" id="bRetry">Restart checkpoint</button><button class="btn" id="bQuit">Quit to menu</button></div></div></div>
+<div class="panel" id="over" hidden><div class="card" style="text-align:center"><div id="story"></div><div class="btns" style="justify-content:center" id="overBtns"></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('storm', { title: 'Stormhouse', vs: false, trophies: [
+  { id: 'power', name: 'Let There Be Light', desc: 'Get the generator running', icon: '💡' },
+  { id: 'boarded', name: 'Fortress', desc: 'Board up every window before nightfall', icon: '🪵' },
+  { id: 'ch1', name: 'Lights Out', desc: 'Finish Chapter 1', icon: '🏚️' },
+  { id: 'flawless', name: 'Not a Scratch', desc: 'Finish a night without getting hurt', icon: '🛡️' },
+  { id: 'ko20', name: 'Home Run', desc: 'Knock out 20 Grinners', icon: '🏏' },
+  { id: 'ch2', name: 'The Long Road', desc: 'Finish Chapter 2', icon: '🌉' },
+  { id: 'ghost', name: 'Ghost', desc: 'Finish Chapter 2 without being spotted', icon: '👻' },
+  { id: 'hard', name: 'Storm Chaser', desc: 'Finish a chapter on Hard', icon: '⛈️' },
+] }) : null;
+const G3 = window.GL3D, { M, hex, dirOf, pushBox, pushCone } = G3;
+const $ = id => document.getElementById(id);
+const TEST = /[?&]nogl\b/.test(location.search);
+const cv = $('gl');
+let R = null;
+if (!TEST) { try { R = G3.create(cv, { maxDpr: 1.5 }); } catch (e) { console.warn(e); } }
+if (!R && !TEST) $('menu').querySelector('.sub').innerHTML = 'This browser can’t run WebGL, so Stormhouse can’t be drawn here. Try Chrome or Firefox with hardware acceleration on.';
+const IN = G3.Input(cv); IN.bindButtons($('touch'));
+const sfx = n => kit && kit.sfx(n);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a) * t;
+const MAPS = { 1: [
+"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+"F,,Q,,,,,,,,,,,,,,,,Q,,,,,,,,,,,,,,,Q,,F",
+"F,SSSSSSS,,,,,,,,,,,,,,,,,,,,,,SSSSS,,,F",
+"F,S.p.p.S,,,,,,,,,,,T,,,,,,,,,,S.G.S,,,F",
+"F,S..p..S,,,,,,,,,,,,,,,,,,,,,,S..uS,,,F",
+"F,S.....S,,,,,,,,,,,,,,,,,,,,,,Sz..S,,,F",
+"F,SSSdSSS,,,,,,,,,,,,,,,,,T,,,,SSdSS,,,F",
+"F,,,,,,,,,,,,,T,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,#####W####W####W#####,,,,,,,,,F",
+"F,,,,,,,,#L.......#....f....L#,,,,,,,,,F",
+"F,,,,,,,,#...C....#.........K#,,,,,,,,,F",
+"F,,,,,,,,W...C....D........K.W,,,,,,T,,F",
+"F,,,,,,,,#.r......#....m....K#,,,,,,,,,F",
+"F,,,,,,,,####D#########D######,,,,,,,,,F",
+"F,Q,,,,,,#.......#...........#,,,,,,,,,F",
+"F,,,,,,,,#.BB....#...........#,,,,,,,Q,F",
+"F,,,,,,,,W..P.J..D.....b.....D,,,,,,,,,F",
+"F,,,,,,,,#.BB..L.#.....L.....#,,,,T,,,,F",
+"F,,,,,,,,#.......#...........#,,,,,,,,,F",
+"F,,T,,,,,####W#######D###W####,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,Y,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,,,,p,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,T,,,,,,,,,,,,,,,,F",
+"F,,,T,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,,,,,F",
+"F,,,,,,,,,,,T,,,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,F",
+"F,,Q,,,,,,,,,,,,,,,,Q,,,,,,,,,,,,,,,Q,,F",
+"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+],
+2: [
+"~~~~~~~~~~~~~~EEEE~~~~~~~~~~~~~~",
+"F~~~~~~~~~~~~~====~~~~~~~~~~~~~F",
+"F~~~~~~~~~~~~~====~~~~~~~~~~~~~F",
+"F~~~~~~~~~~~~~====~~~~~~~~~~~~~F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,,,,,F",
+"F,,,,,,T,,,,,*::::,,T,,,,,,,,,,F",
+"F,,,V,,,,,,,,,::::,,,,,,,,,V,,,F",
+"F,,,,,,,,,,T,,::::,,,,,,,,,,,,,F",
+"F,,,,,X*,,,T,,::::,,,,,,,,,*,,,F",
+"F,,,,,,,,,,,,,::::,,K,,,,*,,,,,F",
+"F,,,,,,,,,,,,,::::*,,,,*,,,,,,,F",
+"F,,TT,,,,,,,,,::::,,,,,,,,,,,*,F",
+"F,,,,,,,KK,,,,::::,T,,,,,,,,,,TF",
+"F,,,,,,,,,T,,T::::,,,,K,,,,,,,,F",
+"F,,,,T,,,,,,,,::::,*,,K,,,,,,,,F",
+"F,,,,,,,,,,,,,::::,,,*,,,,*,,,,F",
+"F,,,,,,,,,TK,,::::,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,R,T,F",
+"F,,,,K,,,,,,,T::::,,,,,T,,,,,,,F",
+"FT,,,,,,,,,,,,::::,,,,,,,,,,,,,F",
+"F,*,,,,,,,,,,,::::,,,T,,T,,,,,,F",
+"F,,,,,,,,,,,,,::::,,*,,,,,,*,,,F",
+"F,,,,,T,,*,T,,::::,,,,,,,,,,,,,F",
+"FFFFFFFFFFFFFFF22FFFFFFFFFFFFFFF",
+"F,,T*,,,,,,,,,::::,,T,,,*,,,,,,F",
+"F,,,,,,T,,,,,,::::,,,,,,,,,,*,,F",
+"F,#########,,,::::,,,#########,F",
+"F,#.......#,,,::::,,*#.......#TF",
+"F*#.b.....#,,,::::,,,#.......#,F",
+"F,#.......d,,,::::,,,d.......#,F",
+"F,#.......#,,,:Q::,,,#.....z.#,F",
+"F,#.......#,,,::::,,,#.......#,F",
+"F,#########,,,::::,,T#########,F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,,,,,F",
+"F,,,,,Q,,,,,,,::::,,,,,,,,,,,,,F",
+"FT,,,,,,,,,,,*::::,,,*,,,Q,,,,TF",
+"FT,,,,,,,,,T,,::::,,,,,,**,,,,,F",
+"F,,########,,,::::,,,########,,F",
+"F,,#......#,,,::::,,,#....f.#,,F",
+"F,,#.m....#,,,::::,,,#......#,TF",
+"F,,#......d,,,::::,,,d......#,,F",
+"F,,#......#TT,::::*,,#......#,,F",
+"F,,#......#,,,::Q:,,,#......#,,F",
+"F,,########,########,########,,F",
+"F,,,,,**,,,,##....##,,,,,,,,,,,F",
+"F,,,,,,,,,,,########,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,,,,,F",
+"FFFFFFFFFFFFFFF11FFFFFFFFFFFFFFF",
+"F,,,,,,,,,,,TT::::,,,,,,T,,*,,,F",
+"F,,,,,,,,,,,*,::::,,,,,T,,,,*,,F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,,,,*F",
+"F**,,*,,,,,,,,::::,,,,,,Q,,,*,,F",
+"F,,,,,,,,,,,,,::::,,,,,,*,,,,,,F",
+"F,,#######*,,,::::,,,,,,,,,,,,,F",
+"F,,#.....#,,,,::::,,,,T,,,,,,,,F",
+"F,*#.a...#,,,,::::,,,,,,,,,,,T,F",
+"F,,#.....d,,T,::::,,,,,,,,,,*,,F",
+"F,,#.....#*,*,::::,,,,,,,,Q,,,,F",
+"F,,#######,,,,::::,,T,,,,,,,,,,F",
+"F,,*,,,,*,,,,,::::,*,,######,,,F",
+"F,,,,*,,*,,,,,::::,,T,#....#,,,F",
+"F,,,,,,,,,,,T,::::,,,,d..m.#,,,F",
+"F,,,,,,,,,,,,,::::,,,,#....#,,,F",
+"F,,,,,,,,,T,*,::::,,,,######,,,F",
+"F,,,,,,,,,,,,T::::,,,,,,,,*,,,*F",
+"F*,,,,,*,,T,,,::::T,,,,*,,,,T,,F",
+"F,,,,,,,,T,,,,::::,,,,,,,,,,,,,F",
+"F,,,,,,,,,,T,,:Y::,,T,,,,,,,*,,F",
+"F,,,,,,,,,,,*,H:P:,,,,,,,,,,,,,F",
+"F,,,,,,,,,,,,,::::,,,,,,,,,,,,,F",
+"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+] };
+
+const TS = 1.6, WALL_H = 3;
+const SOLID = { F: 1.3, '#': WALL_H, S: WALL_H, T: 4, K: 1.05, B: 0.6, C: 0.8, r: 0.9, G: 1.0, X: 1.5, V: 1.2, '~': 0.4, '=': 0.4, '1': 2, '2': 2 };
+const ITEMS = 'pufmzab';
+let DIFF = +(localStorage.getItem('sj-storm-diff') || 1);   // 0 easy 1 normal 2 hard
+const DIFFN = ['Easy', 'Normal', 'Hard'];
+
+/* =================== LEVEL =================== */
+let L = null;   // current level
+function buildLevel(ch) {
+  const rows = MAPS[ch], H = rows.length, W = rows[0].length;
+  const lv = { ch, W, H, t: [], items: [], openings: [], spawns: [], lamps: [], boss: null, start: null, pip: null, gran: null, dog: null, gates: [], bridge: [], levers: [], control: null, exit: [], tileBoxes: new Map(), mesh: null, bedroom: new Set() };
+  for (let r = 0; r < H; r++) { lv.t.push(rows[r].split('')); }
+  const cx = c => (c + 0.5) * TS, cz = r => (r + 0.5) * TS;
+  const a = [];
+  const groundCol = ch === 1 ? { ',': '#2f4a2a', '.': '#6b5440', ':': '#4b4237' } : { ',': '#2c4428', '.': '#5b4a3c', ':': '#4a4a4a' };
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    let k = lv.t[r][c];
+    const x0 = c * TS, z0 = r * TS, x1 = x0 + TS, z1 = z0 + TS;
+    // markers → remember, then treat as ground
+    if ('YPJHQRL'.includes(k)) {
+      if (k === 'Y') lv.start = [cx(c), cz(r)]; if (k === 'P') lv.pip = [cx(c), cz(r)]; if (k === 'J') lv.gran = [cx(c), cz(r)]; if (k === 'H') lv.dog = [cx(c), cz(r)];
+      if (k === 'Q') lv.spawns.push([r, c]); if (k === 'R') lv.boss = [r, c]; if (k === 'L') lv.lamps.push([cx(c), 2.6, cz(r)]);
+      k = insideHouse(lv, r, c) || 'PJL'.includes(k) ? '.' : (ch === 2 && c >= 14 && c <= 17 ? ':' : ','); lv.t[r][c] = k;
+    }
+    if (ITEMS.includes(k) || (ch === 1 && k === 'b')) { const kind = ch === 1 && k === 'b' ? 'bat' : ({ p: 'planks', u: 'fuel', f: 'flashlight', m: 'medkit', z: 'fuse', a: 'keyA', b: 'keyB' })[k]; lv.items.push({ kind, x: cx(c), z: cz(r), r, c, n: kind === 'planks' ? 5 : 1 }); k = insideHouse(lv, r, c) || isIndoor(lv, r, c) ? '.' : ','; lv.t[r][c] = k; }
+    if (k === 'E') lv.exit.push([r, c]);
+    const ground = k === '.' || k === 'd' || k === 'D' || k === 'W' ? '#5c4a38' : k === ':' || k === '=' || k === 'E' || k === '1' || k === '2' ? groundCol[':'] : groundCol[','];
+    if (k !== '~') pushBox(a, x0, -0.2, z0, x1, k === '.' ? 0.02 : 0, z1, shade(ground, ((r * 7 + c * 13) % 5) * 0.025));
+    else pushBox(a, x0, -0.6, z0, x1, -0.35, z1, '#16304d');
+    const boxes = [];
+    if (k === '#' || k === 'S') { pushBox(a, x0, 0, z0, x1, WALL_H, z1, k === 'S' ? '#6b3f2a' : '#d6cbb3'); boxes.push([x0, 0, z0, x1, WALL_H, z1]); }
+    else if (k === 'F') { pushBox(a, x0 + 0.2, 0, z0 + 0.2, x1 - 0.2, 1.3, z1 - 0.2, '#5b4636'); pushBox(a, x0, 0.9, z0, x1, 1.05, z1, '#6b5444'); boxes.push([x0, 0, z0, x1, 1.3, z1]); }
+    else if (k === 'T') { pushBox(a, x0 + 0.55, 0, z0 + 0.55, x1 - 0.55, 2.2, z1 - 0.55, '#4a3220'); pushCone(a, cx(c), 1.6, cz(r), 1.5, 2.6, '#1d3b26', 7); pushCone(a, cx(c), 3, cz(r), 1.1, 2.2, '#22472d', 7); boxes.push([x0 + 0.5, 0, z0 + 0.5, x1 - 0.5, 4, z1 - 0.5]); }
+    else if (k === '*') { pushCone(a, cx(c), 0, cz(r), 0.85, 1.25, '#24502b', 6); pushCone(a, cx(c) + 0.3, 0, cz(r) - 0.2, 0.6, 1.0, '#2b5d32', 5); }
+    else if (k === 'K') { pushBox(a, x0 + 0.1, 0, z0 + 0.1, x1 - 0.1, 1.05, z1 - 0.1, ch === 1 ? '#8b6b4a' : '#7c5a32'); if (ch === 1) pushBox(a, x0 + 0.05, 1.0, z0 + 0.05, x1 - 0.05, 1.1, z1 - 0.05, '#cbd5e1'); boxes.push([x0, 0, z0, x1, 1.1, z1]); }
+    else if (k === 'B') { pushBox(a, x0, 0, z0, x1, 0.55, z1, '#7c3aed'); pushBox(a, x0 + 0.1, 0.55, z0 + 0.1, x1 - 0.1, 0.62, z1 - 0.1, '#ede9fe'); boxes.push([x0, 0, z0, x1, 0.6, z1]); }
+    else if (k === 'C') { pushBox(a, x0 + 0.1, 0, z0, x1 - 0.1, 0.5, z1, '#9f1239'); pushBox(a, x0 + 0.1, 0.5, z0, x0 + 0.4, 1, z1, '#881337'); boxes.push([x0, 0, z0, x1, 0.8, z1]); }
+    else if (k === 'r') { pushBox(a, x0 + 0.2, 0, z0 + 0.2, x1 - 0.2, 0.8, z1 - 0.2, '#78350f'); pushBox(a, x0 + 0.45, 0.8, z0 + 0.5, x1 - 0.45, 1.15, z1 - 0.5, '#1f2937'); lv.radio = [cx(c), cz(r)]; boxes.push([x0 + 0.2, 0, z0 + 0.2, x1 - 0.2, 0.9, z1 - 0.2]); }
+    else if (k === 'G') { pushBox(a, x0 + 0.2, 0, z0 + 0.3, x1 - 0.2, 0.9, z1 - 0.3, '#b91c1c'); pushBox(a, x0 + 0.4, 0.9, z0 + 0.5, x1 - 0.4, 1.1, z1 - 0.5, '#374151'); lv.gen = [cx(c), cz(r)]; boxes.push([x0 + 0.2, 0, z0 + 0.3, x1 - 0.2, 1.1, z1 - 0.3]); }
+    else if (k === 'X') { pushBox(a, x0 + 0.4, 0, z0 + 0.4, x1 - 0.4, 1.6, z1 - 0.4, '#475569'); lv.control = [cx(c), cz(r)]; boxes.push([x0 + 0.4, 0, z0 + 0.4, x1 - 0.4, 1.6, z1 - 0.4]); }
+    else if (k === 'V') { pushBox(a, x0 + 0.5, 0, z0 + 0.5, x1 - 0.5, 0.9, z1 - 0.5, '#57534e'); lv.levers.push({ x: cx(c), z: cz(r), pulled: false, hold: 0 }); boxes.push([x0 + 0.5, 0, z0 + 0.5, x1 - 0.5, 0.9, z1 - 0.5]); }
+    else if (k === '~') boxes.push([x0, -1, z0, x1, 3, z1]);
+    else if (k === '=') lv.bridge.push([r, c]);
+    else if (k === '1' || k === '2') lv.gates.push({ r, c, key: k === '1' ? 'keyA' : 'keyB', open: false });
+    else if (k === 'W' || k === 'D') lv.openings.push({ r, c, kind: k, x: cx(c), z: cz(r), open: false, glass: k === 'W' ? 1 : 0, boards: 0, hp: 0, horiz: isWallAt(rows, r, c - 1) || isWallAt(rows, r, c + 1), outside: false });
+    else if (k === 'd' && ch === 1) { /* open doorway in barn / shed */ }
+    if (boxes.length) lv.tileBoxes.set(r * W + c, boxes);
+  }
+  // which openings face outside (Grinners come in through those) — a neighbour tile that is grass
+  for (const o of lv.openings) { const n = o.horiz ? [[o.r - 1, o.c], [o.r + 1, o.c]] : [[o.r, o.c - 1], [o.r, o.c + 1]]; o.sides = n; o.outside = n.some(([r, c]) => lv.t[r] && lv.t[r][c] === ','); }
+  // the bedroom: floor tiles connected to Pip without crossing walls/openings
+  if (lv.pip) { const st = [[Math.floor(lv.pip[1] / TS), Math.floor(lv.pip[0] / TS)]]; while (st.length) { const [r, c] = st.pop(), k = r * W + c; if (lv.bedroom.has(k) || lv.t[r][c] !== '.') continue; lv.bedroom.add(k); st.push([r + 1, c], [r - 1, c], [r, c + 1], [r, c - 1]); } }
+  if (R) lv.mesh = R.mesh(a);
+  return lv;
+}
+function isWallAt(rows, r, c) { const k = rows[r] && rows[r][c]; return k === '#' || k === 'S'; }
+function insideHouse(lv, r, c) { return false; }
+function isIndoor(lv, r, c) { const row = MAPS[lv.ch]; let walls = 0; for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { for (let k = 1; k < 9; k++) { const ch = row[r + dr * k] && row[r + dr * k][c + dc * k]; if (!ch) break; if ('#SWDd'.includes(ch)) { walls++; break; } if (ch === ',' || ch === 'F' || ch === ':') break; } } return walls >= 3; }
+function shade(h, k) { const c = hex(h); return c.map(v => clamp(v * (1 - k), 0, 1)); }
+const tileAt = (x, z) => [Math.floor(z / TS), Math.floor(x / TS)];
+const tileK = (r, c) => (L.t[r] && L.t[r][c]) || 'F';
+const openingAt = (r, c) => L.openings.find(o => o.r === r && o.c === c);
+/** does this opening block the player? windows always do (you can't climb out); doors when closed */
+const blocksPlayer = o => o.kind === 'W' || !o.open;
+function boxesNear(x, z) {
+  const [r0, c0] = tileAt(x, z), out = [];
+  for (let r = r0 - 2; r <= r0 + 2; r++) for (let c = c0 - 2; c <= c0 + 2; c++) {
+    if (r < 0 || c < 0 || r >= L.H || c >= L.W) { out.push([c * TS, -1, r * TS, (c + 1) * TS, 5, (r + 1) * TS]); continue; }
+    const b = L.tileBoxes.get(r * L.W + c); if (b) out.push(...b);
+    const k = L.t[r][c];
+    if (k === '=' && !S.bridgeDown) out.push([c * TS, -1, r * TS, (c + 1) * TS, 3, (r + 1) * TS]);
+    if (k === '1' || k === '2') { const g = L.gates.find(g => g.r === r && g.c === c); if (g && !g.open) out.push([c * TS, 0, r * TS, (c + 1) * TS, 2, (r + 1) * TS]); }
+    if (k === 'W' || k === 'D') { const o = openingAt(r, c); if (o && blocksPlayer(o)) out.push(o.horiz ? [c * TS, 0, r * TS + 0.55, (c + 1) * TS, WALL_H, (r + 1) * TS - 0.55] : [c * TS + 0.55, 0, r * TS, (c + 1) * TS - 0.55, WALL_H, (r + 1) * TS]); }
+  }
+  return out;
+}
+// enemies walk the tile grid
+function passableForEnemy(r, c) {
+  const k = tileK(r, c);
+  if (k === 'W' || k === 'D') return true;   // handled by bashing
+  if (k === '=' ) return S.bridgeDown; if (k === '1' || k === '2') return false;
+  return !(k in SOLID) || k === '*';
+}
+function bfs(fromR, fromC, goal, maxN = 2600) {   // goal(r,c) → bool; returns path [[r,c],...] (excluding start)
+  const W = L.W, prev = new Int32Array(L.W * L.H).fill(-2), q = [fromR * W + fromC]; prev[q[0]] = -1;
+  for (let i = 0; i < q.length && i < maxN; i++) {
+    const k = q[i], r = (k / W) | 0, c = k % W;
+    if (goal(r, c) && i > 0) { const path = []; let p = k; while (prev[p] !== -1) { path.unshift([(p / W) | 0, p % W]); p = prev[p]; } return path; }
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nr = r + dr, nc = c + dc; if (nr < 0 || nc < 0 || nr >= L.H || nc >= L.W) continue; const nk = nr * W + nc; if (prev[nk] !== -2 || !passableForEnemy(nr, nc)) continue; prev[nk] = k; q.push(nk); }
+  }
+  return null;
+}
+function los(ax, az, bx, bz, hideBush) {   // grid line of sight (walls / closed openings / trees block; bushes block a crouching target)
+  const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / (TS * 0.4));
+  for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, z = az + (bz - az) * i / n, [r, c] = tileAt(x, z), k = tileK(r, c); if (k === '#' || k === 'S' || k === 'T' || (k === 'D' && !(openingAt(r, c) || {}).open)) return false; if (k === '*' && hideBush && i > n - 3) return false; }
+  return true;
+}
+
+/* =================== STATE =================== */
+let S, P, pip, gran, dog, foes = [], fx = [], subs = [], running = false, paused = false, ckpt = null, camYaw = 0, camPitch = -0.62, camDist = 7.5, lightningT = 4, flashA = 0, now0 = 0;
+function newState(ch) {
+  S = { ch, hp: 100, bat: true, flash: ch === 2, battery: 100, flashOn: false, planks: 0, fuel: false, fuse: false, keyA: false, keyB: false, medkits: ch === 2 ? 1 : 0, power: false, phase: ch === 1 ? 'prep' : 'road', prepT: 150, wave: 0, waveT: 0, threat: 0, ko: 0, hurtNight: false, spotted: 0, bridgeDown: false, fuseIn: false, crouch: false, t: 0, done: false };
+  if (ch === 1) S.bat = false;
+}
+function startChapter(ch, fromCkpt) {
+  if (!R && !TEST) return;
+  L = buildLevel(ch); newState(ch);
+  P = Object.assign(G3.Body(L.start[0], 0, L.start[1]), { yaw: Math.PI, face: Math.PI, walk: 0, swing: 0, swingT: 0, inv: 0 });
+  pip = L.pip ? { x: L.pip[0], z: L.pip[1], y: 0, yaw: 0, walk: 0, scared: 0, grabbed: null, path: null, pt: 0 } : null;
+  gran = L.gran ? { x: L.gran[0], z: L.gran[1], yaw: Math.PI / 2 } : null;
+  dog = L.dog ? { x: L.dog[0], z: L.dog[1], yaw: 0, walk: 0, bark: 0 } : (ch === 1 ? { x: L.start[0] + 1, z: L.start[1], yaw: 0, walk: 0, bark: 0 } : null);
+  foes = []; fx = []; subs = [];
+  camYaw = Math.PI; camPitch = -0.62;
+  if (ch === 2) for (const [r, c] of L.spawns) foes.push(makeFoe((c + 0.5) * TS, (r + 0.5) * TS, 'patrol'));
+  if (fromCkpt && ckpt && ckpt.ch === ch) restoreCkpt();
+  $('menu').hidden = true; running = true; paused = false; closePanels();
+  $('touch').classList.toggle('on', IN.touch);
+  if (!fromCkpt) {
+    if (ch === 1) { say('Grandma', 'Storm’s knocked the power out again. Be a dear and get the generator going — fuel’s in the barn, and there’s a spare fuse in the shed.', 7); say('Pip', 'There was a van on the road with no headlights on… I don’t like it.', 5); }
+    else { say('You', 'Ranger Cole took Grandma in the truck — no room for us. We meet him at the station across the river.', 6); say('Pip', 'Can Biscuit come? …Biscuit’s coming.', 4); }
+  }
+  last = performance.now();
+}
+function makeFoe(x, z, mode, boss) { return { x, z, y: 0, yaw: 0, walk: 0, hp: boss ? 9999 : 100, mode, boss: !!boss, stun: 0, flashCd: 0, path: null, pt: 0, home: [x, z], cd: 0, swing: 0, bashT: 0, see: 0, ko: 0, carry: false, target: null, wander: null, alert: 0 }; }
+function saveCkpt() { ckpt = { ch: S.ch, S: JSON.parse(JSON.stringify(S)), openings: L.openings.map(o => ({ ...o })), items: L.items.map(i => ({ ...i })), P: { x: P.x, z: P.z } }; }
+function restoreCkpt() { Object.assign(S, JSON.parse(JSON.stringify(ckpt.S))); L.openings.forEach((o, i) => Object.assign(o, ckpt.openings[i])); L.items = ckpt.items.map(i => ({ ...i })); P.x = ckpt.P.x; P.z = ckpt.P.z; foes = []; S.waveT = 4; S.done = false;
+  for (const g of L.gates) if (S[g.key]) g.open = true;
+  if (S.ch === 2 && S.fuseIn && L.boss) { const [r, c] = L.boss; foes.push(makeFoe((c + 0.5) * TS, (r + 0.5) * TS, 'hunt', true)); } }
+
+/* =================== TEXT =================== */
+function say(who, text, secs = 4) { subs.push({ who, text, t: secs }); }
+function alertT(t) { $('alert').textContent = t; clearTimeout(alertT.h); alertT.h = setTimeout(() => $('alert').textContent = '', 2500); }
+function objective() {
+  if (S.ch === 1) {
+    if (S.phase === 'prep') { const todo = []; if (!S.power) todo.push(!S.fuel ? 'find fuel (barn)' : !S.fuse ? 'find the fuse (shed)' : 'start the generator'); if (!S.bat) todo.push('find a weapon'); const open = L.openings.filter(o => o.outside && o.kind === 'W' && o.boards === 0).length; if (open) todo.push(`board up windows (${open} left)`); return ['Before dark', (todo.join(' · ') || 'Ready. Press N (or the radio) to start the night') + ` — ${Math.ceil(S.prepT)}s`]; }
+    if (S.phase === 'night') return [`Night — wave ${S.wave}/3`, foes.length ? `${foes.filter(f => f.ko <= 0 && f.mode !== 'flee').length} Grinners around. Keep them out of the back bedroom!` : 'Quiet… for now. Fix the boards.'];
+    return ['Dawn', ''];
+  }
+  if (!S.keyA) return ['The farm road', 'The gate is locked. Search the old barn for a key.'];
+  if (!S.keyB && !S.fuse) return ['Willow Creek town', 'Find the gate key and a fuse for the bridge motor.'];
+  if (!S.keyB) return ['Willow Creek town', 'Find the key to the north gate.'];
+  if (!S.fuse) return ['Willow Creek town', 'You still need a fuse for the bridge motor.'];
+  if (!S.fuseIn) return ['The bridge yard', 'Put the fuse in the control box.'];
+  if (!S.bridgeDown) return ['The bridge yard', `Pull both levers (${L.levers.filter(l => l.pulled).length}/2) — hold E`];
+  return ['Go!', 'Run across the bridge with Pip!'];
+}
+
+/* =================== ACTIONS =================== */
+const near = (x, z, d) => Math.hypot(P.x - x, P.z - z) < d;
+function facingPt(x, z, maxD, cone = 0.3) { const f = dirOf(P.face), dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz); if (d > maxD) return false; if (d < 0.8) return true; return (dx * f[0] + dz * f[2]) / d > cone; }
+function nearestOpening(maxD) { let best = null, bd = maxD; for (const o of L.openings) { const d = Math.hypot(o.x - P.x, o.z - P.z); if (d < bd && facingPt(o.x, o.z, maxD, 0)) { bd = d; best = o; } } return best; }
+function usable() {
+  for (const it of L.items) if (near(it.x, it.z, 1.4)) return { label: `Pick up ${({ planks: `planks (${it.n})`, fuel: 'the fuel can', flashlight: 'the flashlight', medkit: 'a first-aid kit', fuse: 'the fuse', bat: 'the baseball bat', keyA: 'the gate key', keyB: 'the north-gate key' })[it.kind]}`, run: () => take(it) };
+  if (L.gen && near(L.gen[0], L.gen[1], 1.9) && !S.power) return S.fuel && S.fuse ? { label: 'Start the generator', run: () => { S.power = true; kit && kit.unlock('power'); say('Grandma', 'Lights! Good work, sweetheart.', 3); G3.tone(80, 1.2, 'sawtooth', 0.05, 160); } } : { label: `Generator: needs ${!S.fuel ? 'fuel' : ''}${!S.fuel && !S.fuse ? ' and ' : ''}${!S.fuse ? 'a fuse' : ''}`, run: () => {} };
+  if (L.radio && near(L.radio[0], L.radio[1], 1.9)) return { label: S.phase === 'prep' ? 'Listen to the radio (and start the night)' : 'Listen to the radio', run: () => { say('Radio', '…masked looters calling themselves the Grinners are hitting farms in the blackout. Lock your doors, board your windows, and stay together…', 6); if (S.phase === 'prep') S.prepT = Math.min(S.prepT, 6); } };
+  if (gran && near(gran.x, gran.z, 1.8) && S.ch === 1) return { label: 'Talk to Grandma', run: () => say('Grandma', S.phase === 'prep' ? 'Planks are in the barn. Nail them over the windows with R. Your granddad’s old bat is in the hallway.' : 'Keep them away from this room. I’ll keep Pip calm.', 5) };
+  if (L.control && near(L.control[0], L.control[1], 1.9) && !S.fuseIn) return S.fuse ? { label: 'Put the fuse in the control box', run: () => { S.fuseIn = true; say('You', 'Power’s on. Now the two levers…', 3); spawnBoss(); } } : { label: 'Control box — the fuse is missing', run: () => {} };
+  for (const lv of L.levers) if (!lv.pulled && near(lv.x, lv.z, 1.9)) return S.fuseIn ? { label: `Hold E to pull the lever ${Math.round(lv.hold * 40)}%`, hold: lv } : { label: 'A dead lever — the control box has no fuse', run: () => {} };
+  for (const g of L.gates) if (!g.open && near((g.c + 0.5) * TS, (g.r + 0.5) * TS, 2)) return S[g.key] ? { label: 'Unlock the gate', run: () => { for (const x of L.gates) if (x.key === g.key) x.open = true; G3.tone(300, 0.2, 'square', 0.05, 600); say('Pip', 'You did it!', 2); } } : { label: 'Locked gate', run: () => say('You', g.key === 'keyA' ? 'Locked. There might be a key in that old barn.' : 'Locked. Someone in town must have the key.', 3) };
+  if (pip && pip.scared > 0 && near(pip.x, pip.z, 1.8)) return { label: 'Calm Pip down', run: () => { pip.scared = 0; say('Pip', 'O-okay. I’m right behind you.', 2); } };
+  const o = nearestOpening(1.9);
+  if (o && o.kind === 'D') return { label: (o.open ? 'Close' : 'Open') + ' the door' + (o.boards ? ' (boarded)' : ''), run: () => { if (o.boards && !o.open) return say('You', 'It’s boarded shut.', 2); if (o.open && foes.some(f => Math.hypot(f.x - o.x, f.z - o.z) < 0.9)) return; o.open = !o.open; G3.tone(o.open ? 220 : 160, 0.12, 'triangle', 0.05); } };
+  return null;
+}
+function take(it) {
+  const k = it.kind; L.items.splice(L.items.indexOf(it), 1); sfx('coin');
+  if (k === 'planks') { S.planks += it.n; alertT(`🪵 +${it.n} planks`); }
+  if (k === 'fuel') { S.fuel = true; alertT('⛽ Fuel can'); }
+  if (k === 'fuse') { S.fuse = true; alertT('🔌 Fuse'); }
+  if (k === 'flashlight') { S.flash = true; S.battery = 100; alertT('🔦 Flashlight (F)'); }
+  if (k === 'medkit') { S.medkits++; alertT('➕ First-aid kit (H)'); }
+  if (k === 'bat') { S.bat = true; alertT('🏏 Baseball bat — click to swing'); }
+  if (k === 'keyA' || k === 'keyB') { S[k] = true; alertT('🔑 Gate key'); }
+}
+function board() {
+  const o = nearestOpening(2.1);
+  if (!o) return alertT('Face a window or door to board it up');
+  if (S.planks <= 0) return alertT('No planks — there are more in the barn');
+  if (o.kind === 'D' && o.open) return alertT('Close the door first');
+  if (o.boards >= 3) return alertT('That one’s as strong as it gets');
+  S.planks--; o.boards++; o.hp = o.boards * 40; G3.noise(0.08, 0.08, 1500); setTimeout(() => G3.noise(0.08, 0.08, 1500), 140);
+  if (L.openings.filter(x => x.outside && x.kind === 'W').every(x => x.boards > 0) && S.phase === 'prep') kit && kit.unlock('boarded');
+}
+function swing() {
+  if (!S.bat) return alertT('You need something to swing — granddad’s bat is in the hallway');
+  if (P.swingT > 0) return; P.swingT = 0.45; G3.noise(0.1, 0.03, 3000);
+  setTimeout(() => {
+    for (const f of foes) {
+      if (f.ko > 0 || !facingPt(f.x, f.z, 2.4, 0.2)) continue;
+      const dx = f.x - P.x, dz = f.z - P.z, d = Math.hypot(dx, dz) || 1;
+      f.kx = dx / d * 6; f.kz = dz / d * 6; f.stun = Math.max(f.stun, 0.6); G3.tone(140, 0.12, 'square', 0.08, 70);
+      if (f.boss) { f.hits = (f.hits || 0) + 0.5; say('Big Grin', ['Ow! Feisty!', 'Hah! That tickles.', 'Grrr…'][Math.random() * 3 | 0], 2); continue; }
+      f.hp -= DIFF === 2 ? 28 : 34;
+      if (f.carry && pip) { pip.grabbed = null; f.carry = false; pip.scared = 3; say('Pip', 'Let go of me!', 2); }
+      if (f.hp <= 0) { f.ko = S.ch === 2 ? 25 : 0; f.mode = S.ch === 1 ? 'flee' : 'ko'; S.ko++; f.path = null; if (S.ko >= 20) kit && kit.unlock('ko20'); say('', '💫 Knocked out!', 1); }
+    }
+  }, 170);
+}
+function heal() { if (S.medkits <= 0 || S.hp >= 100) return; S.medkits--; S.hp = Math.min(100, S.hp + 45); sfx('power'); }
+function hurt(n) { if (P.inv > 0) return; n *= [0.6, 1, 1.4][DIFF]; S.hp -= n; P.inv = 0.6; S.hurtNight = true; $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 200); G3.tone(110, 0.2, 'sawtooth', 0.08, 60); if (S.hp <= 0) fail('You were knocked out', 'The Grinners got past you.'); }
+function fail(title, why) { if (S.done) return; S.done = true; story(title, why + '<br><br>Try again from the checkpoint?', [['Try again', () => startChapter(S.ch, true)], ['Menu', toMenu]]); }
+
+/* =================== CHAPTER 1: waves =================== */
+function startNight() {
+  if (S.phase !== 'prep') return;
+  S.phase = 'night'; S.wave = 0; S.waveT = 3; saveCkpt(); S.hurtNight = false;
+  say('Grandma', 'Lock up, love. Whatever happens, don’t let them near your brother.', 4);
+  G3.tone(70, 2, 'sine', 0.06, 50);
+}
+function nextWave() {
+  S.wave++;
+  const n = [0, 2, 4, 5][S.wave] + DIFF - 1, spots = L.spawns.slice().sort(() => Math.random() - 0.5);
+  for (let i = 0; i < Math.max(1, n); i++) { const [r, c] = spots[i % spots.length]; foes.push(makeFoe((c + 0.5) * TS, (r + 0.5) * TS, 'raid')); }
+  if (S.wave === 3) { const [r, c] = spots[0]; foes.push(makeFoe((c + 0.5) * TS, (r + 0.5) * TS, 'raid', true)); say('Big Grin', 'Kno-ock knock! Anybody hooome?', 4); }
+  else say('Pip', S.wave === 1 ? 'There’s someone in the yard…' : 'More of them! With flashlights!', 3);
+  alertT(`Wave ${S.wave}`);
+}
+function updCh1(dt) {
+  if (S.phase === 'prep') { S.prepT -= dt; if (S.prepT <= 0 || IN.hit('KeyN') || IN.hit('Btnnight')) startNight(); return; }
+  if (S.phase !== 'night') return;
+  const active = foes.filter(f => f.mode !== 'flee');
+  if (!active.length) {
+    if (S.wave >= 3) { winCh1(); return; }
+    S.waveT -= dt; if (S.waveT <= 0) { nextWave(); S.waveT = 14; }
+  }
+  // threat: a Grinner standing in the bedroom
+  const inRoom = active.some(f => L.bedroom.has(tileAt(f.x, f.z)[0] * L.W + tileAt(f.x, f.z)[1]));
+  S.threat = clamp(S.threat + (inRoom ? dt * [10, 16, 24][DIFF] : -dt * 4), 0, 100);
+  if (S.threat >= 100) fail('They took Pip', 'A Grinner got into the back bedroom.');
+  // the boss: when beaten up enough (stunned 4 times) he leaves and takes the rest with him
+  const boss = foes.find(f => f.boss);
+  if (boss && (boss.hits || 0) >= 4 && boss.mode !== 'flee') { boss.mode = 'flee'; for (const f of foes) f.mode = 'flee'; say('Big Grin', 'Fine! FINE! This house ain’t worth it!', 4); }
+}
+function winCh1() {
+  if (S.done) return; S.done = true;
+  kit && kit.unlock('ch1'); if (!S.hurtNight) kit && kit.unlock('flawless'); if (DIFF === 2) kit && kit.unlock('hard');
+  try { localStorage.setItem('sj-storm-ch', String(Math.max(2, +localStorage.getItem('sj-storm-ch') || 1))); } catch {}
+  story('Dawn at Willow Creek', 'The rain thins to a drizzle. Somewhere down the road, an engine coughs and the Grinners’ van splashes away toward town.<br><br>At seven, Ranger Cole’s truck crunches up the drive. “Bridge is out,” he says. “I can take your gran now — you two will have to walk to the station across the river. Stick to the road.”<br><br><b>Chapter 1 complete.</b>', [['Chapter 2 →', () => startChapter(2)], ['Menu', toMenu]]);
+}
+
+/* =================== CHAPTER 2 =================== */
+function spawnBoss() { if (!L.boss) return; const [r, c] = L.boss; foes.push(makeFoe((c + 0.5) * TS, (r + 0.5) * TS, 'hunt', true)); say('Big Grin', 'You didn’t think we were done, didja? That bridge stays UP.', 4); G3.tone(60, 1.5, 'sawtooth', 0.05, 40); saveCkpt(); }
+function updCh2(dt) {
+  // levers are held
+  const u = usable();
+  for (const lv of L.levers) if (!lv.pulled) { if (u && u.hold === lv && (IN.down('KeyE') || IN.btn.use)) { lv.hold += dt / 2.5; if (lv.hold >= 1) { lv.pulled = true; G3.tone(200, 0.5, 'square', 0.05, 90); if (L.levers.every(l => l.pulled)) { S.bridgeDown = true; say('Pip', 'The bridge is coming down! RUN!', 3); G3.noise(1.5, 0.08, 120); } } } else lv.hold = Math.max(0, lv.hold - dt * 0.5); }
+  // exit
+  if (S.bridgeDown) for (const [r, c] of L.exit) if (near((c + 0.5) * TS, (r + 0.5) * TS, 2) && pip && Math.hypot(pip.x - P.x, pip.z - P.z) < 6 && !pip.grabbed) winCh2();
+}
+function winCh2() {
+  if (S.done) return; S.done = true; kit && kit.unlock('ch2'); if (!S.spotted) kit && kit.unlock('ghost'); if (DIFF === 2) kit && kit.unlock('hard');
+  story('The ranger station', 'Behind you, the drawbridge groans and the river swallows the road. Big Grin shouts something nobody hears over the water.<br><br>The station’s porch light is on. Grandma June is on the steps in a borrowed blanket, and Biscuit gets there first.<br><br><i>“Told you,” Pip says, very quietly, holding your sleeve. “Told you we’d make it.”</i><br><br><b>Stormhouse — complete.</b>', [['Menu', toMenu]]);
+}
+
+/* =================== GRINNERS =================== */
+function updFoes(dt) {
+  const ch1 = S.ch === 1;
+  for (const f of foes) {
+    f.flashCd = Math.max(0, f.flashCd - dt); f.cd = Math.max(0, f.cd - dt); f.swing = Math.max(0, f.swing - dt * 2.5);
+    if (f.kx) { f.x += f.kx * dt; f.z += f.kz * dt; f.kx *= 0.85; f.kz *= 0.85; if (Math.abs(f.kx) < 0.05) f.kx = f.kz = 0; pushOut(f); }
+    if (f.ko > 0) { f.ko -= dt; if (f.ko <= 0) { f.hp = 100; f.mode = 'patrol'; f.alert = 0; } continue; }
+    // flashlight dazzle
+    if (S.flashOn && S.battery > 0 && f.flashCd <= 0) { const fd = dirOf(camYaw), dx = f.x - P.x, dz = f.z - P.z, d = Math.hypot(dx, dz); if (d < 9 && (dx * fd[0] + dz * fd[2]) / d > 0.9 && los(P.x, P.z, f.x, f.z)) { f.stun = f.boss ? 2 : 1.3; f.flashCd = f.boss ? 4 : 3; if (f.boss) f.hits = (f.hits || 0) + 1; G3.tone(1200, 0.1, 'sine', 0.04, 600); } }
+    if (f.stun > 0) { f.stun -= dt; continue; }
+    const spd = (f.boss ? 2.9 : 2.5) * [0.8, 1, 1.2][DIFF] * (ch1 && S.power && isLit(f) ? 0.7 : 1);
+    const dP = Math.hypot(P.x - f.x, P.z - f.z);
+    let goalPt = null;
+    if (f.mode === 'flee') { // run for the edge and vanish
+      if (!f.path || f.pt >= f.path.length) { const [r, c] = tileAt(f.x, f.z); f.path = bfs(r, c, (r2, c2) => r2 <= 1 || c2 <= 1 || r2 >= L.H - 2 || c2 >= L.W - 2) || []; f.pt = 0; if (!f.path.length) f.gone = true; }
+      if (f.pt >= f.path.length) f.gone = true;
+    } else if (ch1) {
+      // raid: go for the player if close and visible, otherwise into the house towards the bedroom
+      if (dP < 5 && los(f.x, f.z, P.x, P.z)) goalPt = [P.x, P.z];
+      else if (!f.path || f.pt >= f.path.length || (f.repath -= dt) <= 0) { f.repath = 1.5; const [r, c] = tileAt(f.x, f.z); f.path = bfs(r, c, (r2, c2) => L.bedroom.has(r2 * L.W + c2)) || []; f.pt = 0; }
+    } else {
+      // chapter 2: patrol, spot, chase, grab Pip
+      const hidden = S.crouch && tileK(...tileAt(P.x, P.z)) === '*';
+      const fd = dirOf(f.yaw), seeCone = ((P.x - f.x) * fd[0] + (P.z - f.z) * fd[2]) / (dP || 1) > 0.45;
+      const sees = !hidden && dP < (S.crouch ? 6 : 10) && (seeCone || dP < 2.2) && los(f.x, f.z, P.x, P.z, false);
+      if (sees || f.boss) { if (f.mode !== 'chase' && !f.boss) { f.see += dt * (dP < 5 ? 3 : 1.5); if (f.see > 0.8) { f.mode = 'chase'; f.alert = 6; S.spotted++; alertT('❗ You’ve been spotted!'); G3.tone(880, 0.15, 'square', 0.05, 440); } } else f.alert = 6; }
+      else f.see = Math.max(0, f.see - dt);
+      if (f.mode === 'chase' || f.boss) { f.alert -= f.boss ? 0 : dt; if (f.alert <= 0) { f.mode = 'patrol'; f.path = null; } else goalPt = pip && !pip.grabbed && Math.hypot(pip.x - f.x, pip.z - f.z) < dP * 0.6 && !f.boss ? [pip.x, pip.z] : [P.x, P.z]; }
+      if (f.carry) { goalPt = null; if (!f.path || f.pt >= f.path.length) { const [r, c] = tileAt(f.x, f.z); f.path = bfs(r, c, (r2, c2) => c2 <= 1 || c2 >= L.W - 2) || []; f.pt = 0; } f.carryT = (f.carryT || 0) + dt; if (f.carryT > 12 || f.pt >= f.path.length) fail('They took Pip', 'A Grinner carried Pip away into the storm.'); }
+      else if (f.mode === 'patrol' && !goalPt && (!f.path || f.pt >= f.path.length)) { f.wait = (f.wait || 0) - dt; if (f.wait <= 0) { f.wait = 1 + Math.random() * 2; const [r, c] = tileAt(f.x, f.z); let tries = 0, tr, tc; do { tr = Math.round(f.home[1] / TS - 0.5 + (Math.random() - 0.5) * 12); tc = Math.round(f.home[0] / TS - 0.5 + (Math.random() - 0.5) * 12); tries++; } while (tries < 20 && !(tr > 0 && tc > 0 && tr < L.H && tc < L.W && passableForEnemy(tr, tc) && !'WD'.includes(tileK(tr, tc)))); f.path = bfs(r, c, (r2, c2) => r2 === tr && c2 === tc, 900) || []; f.pt = 0; } }
+    }
+    // move
+    let tx, tz;
+    if (goalPt && los(f.x, f.z, goalPt[0], goalPt[1])) { tx = goalPt[0]; tz = goalPt[1]; f.path = null; }
+    else if (goalPt) { if (!f.path || f.pt >= f.path.length || (f.repath = (f.repath || 0) - dt) <= 0) { f.repath = 0.8; const [r, c] = tileAt(f.x, f.z), [gr, gc] = tileAt(goalPt[0], goalPt[1]); f.path = bfs(r, c, (r2, c2) => Math.abs(r2 - gr) + Math.abs(c2 - gc) <= 0) || []; f.pt = 0; } }
+    if (tx === undefined && f.path && f.pt < f.path.length) {
+      const [r, c] = f.path[f.pt], k = tileK(r, c);
+      if (k === 'W' || k === 'D') {  // an opening in the way
+        const o = openingAt(r, c);
+        if (o && !(o.kind === 'D' && o.open) && !(o.kind === 'W' && !o.glass && o.boards <= 0)) {
+          const ox = o.x - (o.horiz ? 0 : Math.sign(o.x - f.x) * TS * 0.75), oz = o.z - (o.horiz ? Math.sign(o.z - f.z) * TS * 0.75 : 0);
+          if (Math.hypot(ox - f.x, oz - f.z) > 0.35) { tx = ox; tz = oz; }
+          else { // bash
+            f.yaw = Math.atan2(-(o.x - f.x), -(o.z - f.z)); f.bashT += dt; f.swing = Math.sin(f.bashT * 6) > 0.9 ? 1 : f.swing;
+            if (f.bashT > (S.power && isLit(f) ? 1.4 : 1)) { f.bashT = 0; G3.noise(0.15, 0.1, 500);
+              if (o.boards > 0) { o.hp -= f.boss ? 60 : 20; if (o.hp <= (o.boards - 1) * 40) { o.boards--; G3.tone(90, 0.3, 'sawtooth', 0.06, 50); } }
+              else if (o.kind === 'W' && o.glass) { o.glass = 0; G3.noise(0.5, 0.12, 2500); say('', '💥 Glass breaks!', 1.5); }
+              else if (o.kind === 'D') { o.open = true; }
+            }
+            continue;
+          }
+        }
+      }
+      if (tx === undefined) { tx = (c + 0.5) * TS; tz = (r + 0.5) * TS; if (Math.hypot(tx - f.x, tz - f.z) < 0.25) { f.pt++; continue; } }
+    }
+    if (tx === undefined) { f.walk *= 0.9; continue; }
+    const dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz) || 1;
+    if (goalPt && d < (f.boss ? 1.3 : 1.05)) {   // attack / grab
+      f.yaw = Math.atan2(-dx, -dz);
+      if (f.cd <= 0) { f.cd = f.boss ? 1.4 : 1.1; f.swing = 1;
+        if (pip && goalPt[0] === pip.x && S.ch === 2 && !f.boss) { if (!pip.grabbed) { pip.grabbed = f; f.carry = true; f.carryT = 0; f.path = null; say('Pip', 'HELP!!', 2); } }
+        else if (Math.hypot(P.x - f.x, P.z - f.z) < 1.4) hurt(f.boss ? 24 : 12); }
+      continue;
+    }
+    const sp = spd * (f.carry ? 0.75 : 1) * (f.mode === 'patrol' ? 0.55 : 1);
+    f.x += dx / d * sp * dt; f.z += dz / d * sp * dt; f.yaw = Math.atan2(-dx, -dz); f.walk += dt * sp * 3;
+  }
+  foes = foes.filter(f => !f.gone);
+}
+function pushOut(f) { const [r, c] = tileAt(f.x, f.z); if (!passableForEnemy(r, c)) { f.x -= f.kx * 0.02; f.z -= f.kz * 0.02; f.kx = f.kz = 0; } }
+function isLit(f) { if (!S.power) return false; for (const l of L.lamps) if (Math.hypot(l[0] - f.x, l[2] - f.z) < 5) return true; return false; }
+
+/* =================== PIP & DOG =================== */
+function updPip(dt) {
+  if (!pip) return;
+  if (S.ch === 1) { pip.walk = 0; pip.yaw += Math.sin(now0 * 0.001) * 0.002; return; }
+  if (pip.grabbed) { const g = pip.grabbed; pip.x = g.x + 0.3; pip.z = g.z + 0.3; pip.y = 0.6; if (!foes.includes(g) || !g.carry) { pip.grabbed = null; pip.y = 0; } return; }
+  pip.y = 0;
+  if (pip.scared > 0) { pip.scared -= dt * 0.2; return; }
+  const d = Math.hypot(P.x - pip.x, P.z - pip.z);
+  if (d < 1.8) { pip.walk *= 0.9; return; }
+  let tx = P.x, tz = P.z;
+  if (!los(pip.x, pip.z, P.x, P.z)) { if (!pip.path || pip.pt >= pip.path.length || (pip.re = (pip.re || 0) - dt) <= 0) { pip.re = 0.6; const [r, c] = tileAt(pip.x, pip.z), [gr, gc] = tileAt(P.x, P.z); pip.path = bfs(r, c, (r2, c2) => r2 === gr && c2 === gc) || []; pip.pt = 0; } if (pip.path.length > pip.pt) { const [r, c] = pip.path[pip.pt]; tx = (c + 0.5) * TS; tz = (r + 0.5) * TS; if (Math.hypot(tx - pip.x, tz - pip.z) < 0.3) pip.pt++; } }
+  const dx = tx - pip.x, dz = tz - pip.z, dd = Math.hypot(dx, dz) || 1, sp = d > 6 ? 5.6 : 4;
+  const nx = pip.x + dx / dd * sp * dt, nz = pip.z + dz / dd * sp * dt, [r, c] = tileAt(nx, nz);
+  if (passableForEnemy(r, c) && !'WD'.includes(tileK(r, c)) || (tileK(r, c) === 'D' && (openingAt(r, c) || {}).open) || ('12'.includes(tileK(r, c)) && L.gates.some(g => g.r === r && g.c === c && g.open))) { pip.x = nx; pip.z = nz; }
+  pip.yaw = Math.atan2(-dx, -dz); pip.walk += dt * sp * 3;
+  if (d > 25) { pip.x = P.x - 1; pip.z = P.z - 1; }   // never lose him for good
+}
+function updDog(dt) {
+  if (!dog) return;
+  const tx = S.ch === 1 && pip ? pip.x + 1 : P.x - 1.2, tz = S.ch === 1 && pip ? pip.z : P.z + 1.2, dx = tx - dog.x, dz = tz - dog.z, d = Math.hypot(dx, dz);
+  if (S.ch === 1 && S.phase === 'prep' && Math.hypot(P.x - dog.x, P.z - dog.z) > 1.5) { const ex = P.x - dog.x, ez = P.z - dog.z, ed = Math.hypot(ex, ez); dog.x += ex / ed * Math.min(ed - 1.4, 5 * dt); dog.z += ez / ed * Math.min(ed - 1.4, 5 * dt); dog.yaw = Math.atan2(-ex, -ez); dog.walk += dt * 12; }
+  else if (d > 1 && S.ch === 2) { dog.x += dx / d * Math.min(d, 5.5 * dt); dog.z += dz / d * Math.min(d, 5.5 * dt); dog.yaw = Math.atan2(-dx, -dz); dog.walk += dt * 12; }
+  dog.bark -= dt;
+  const close = foes.find(f => f.ko <= 0 && f.mode !== 'flee' && Math.hypot(f.x - dog.x, f.z - dog.z) < 12);
+  if (close && dog.bark <= 0) { dog.bark = 3; G3.tone(520, 0.08, 'square', 0.05, 380); setTimeout(() => G3.tone(500, 0.08, 'square', 0.05, 360), 160); if (S.ch === 2 && Math.random() < 0.3) say('Biscuit', 'Woof! Woof!', 1.2); }
+}
+
+/* =================== MAIN UPDATE =================== */
+function update(dt) {
+  const inp = IN.frame(); now0 += dt * 1000; S.t += dt;
+  camYaw -= inp.lookX * 0.0042; camPitch = clamp(camPitch - inp.lookY * 0.0036, -1.25, -0.08);
+  if (inp.wheel) camDist = clamp(camDist + inp.wheel * 0.6, 3, 12);
+  if (IN.hit('Escape') || IN.hit('Btnpause')) { pause(); IN.endFrame(); return; }
+  if (IN.hit('KeyF') || IN.hit('Btnlight')) { if (S.flash) { S.flashOn = !S.flashOn && S.battery > 0; G3.tone(900, 0.03, 'square', 0.04); } else alertT('No flashlight yet — check the kitchen'); }
+  if (IN.hit('KeyC') || IN.hit('ControlLeft') || IN.hit('Btncrouch')) S.crouch = !S.crouch;
+  if (IN.hit('KeyH') || IN.hit('Btnheal')) heal();
+  if (IN.hit('KeyR') || IN.hit('Btnboard')) board();
+  if (IN.hit('Mouse0') || IN.hit('KeyJ') || IN.hit('Btnact') || IN.hit('Tap')) swing();
+  if (S.flashOn) { S.battery = Math.max(0, S.battery - dt * (S.ch === 1 ? 0.55 : 0.4)); if (S.battery <= 0) { S.flashOn = false; alertT('🔦 Battery dead'); } }
+  const u = usable();
+  $('prompt').textContent = u ? (IN.touch ? '✋ ' : 'E: ') + u.label : '';
+  if (u && u.run && (IN.hit('KeyE') || IN.hit('Btnuse'))) u.run();
+  // movement
+  const f = dirOf(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  let mx = rx * inp.mx + f[0] * -inp.mz, mz = rz * inp.mx + f[2] * -inp.mz; const ml = Math.hypot(mx, mz);
+  const run = (inp.run || IN.down('run')) && !S.crouch;
+  const spd = S.crouch ? 2.2 : run ? 6.6 : 4.2;
+  if (ml > 0.05) { mx /= Math.max(1, ml); mz /= Math.max(1, ml); P.face = Math.atan2(-mx, -mz); P.walk += dt * (run ? 13 : 9); }
+  P.vx = lerp(P.vx, mx * spd, Math.min(1, dt * 12)); P.vz = lerp(P.vz, mz * spd, Math.min(1, dt * 12));
+  G3.moveBody(P, dt, boxesNear(P.x, P.z), null);
+  if (P.swingT > 0) { P.swingT -= dt; P.swing = 1 - P.swingT / 0.45; } else P.swing = 0;
+  P.yaw += Math.atan2(Math.sin(P.face - P.yaw), Math.cos(P.face - P.yaw)) * Math.min(1, dt * 12);
+  P.inv = Math.max(0, P.inv - dt);
+  if (S.ch === 1) updCh1(dt); else updCh2(dt);
+  updFoes(dt); updPip(dt); updDog(dt);
+  // weather
+  lightningT -= dt; if (lightningT <= 0) { lightningT = 6 + Math.random() * 10; flashA = 1; setTimeout(() => G3.noise(1.6, 0.09, 60), 300 + Math.random() * 900); }
+  flashA = Math.max(0, flashA - dt * 3);
+  for (const s of subs) if (s === subs[0]) s.t -= dt; while (subs.length && subs[0].t <= 0) subs.shift();
+  IN.endFrame();
+}
+
+/* =================== DRAW =================== */
+const LOOK_GRIN = { skin: '#e7c6a5', shirt: '#eab308', shirt2: '#ca8a04', shirtStyle: 1, pants: '#1f2937', shoes: '#111827', hat: 2, hatColor: '#ca8a04', acc: 3, accColor: '#f8fafc', hair: '#111827', body: 1 };
+const LOOK_BOSS = { ...LOOK_GRIN, shirt: '#f59e0b', body: 2, hat: 0, hair: '#7f1d1d', hairStyle: 4 };
+const LOOK_PIP = { skin: '#f8c9a0', hair: '#d6a756', shirt: '#22c55e', shirt2: '#f1f5f9', shirtStyle: 3, pants: '#1e3a8a', shoes: '#b91c1c', hairStyle: 6, body: 0 };
+const LOOK_GRAN = { skin: '#f3d4b8', hair: '#e5e7eb', shirt: '#a855f7', shirt2: '#f1f5f9', shirtStyle: 4, pants: '#4c1d95', shoes: '#111827', hairStyle: 5, acc: 1, accColor: '#78716c', body: 1 };
+let rainMesh = null;
+function makeRain() { const a = []; const r = G3.rng(3); for (let i = 0; i < 380; i++) { const x = (r() - 0.5) * 30, y = r() * 18, z = (r() - 0.5) * 30; pushBox(a, x, y, z, x + 0.025, y + 0.55, z + 0.025, '#94a3b8'); } return R.mesh(a); }
+function render(now) {
+  if (!R || !L) return;
+  const tgt = [P.x, P.y + (S.crouch ? 1.0 : 1.5), P.z], f = dirOf(camYaw, camPitch);
+  let eye = [tgt[0] - f[0] * camDist, tgt[1] - f[1] * camDist, tgt[2] - f[2] * camDist];
+  const back = [eye[0] - tgt[0], eye[1] - tgt[1], eye[2] - tgt[2]], bl = Math.hypot(...back), hd = G3.rayBoxes(tgt, back.map(v => v / bl), boxesNear(P.x, P.z), bl);
+  if (hd < bl) eye = [tgt[0] + back[0] / bl * (hd - 0.2), tgt[1] + back[1] / bl * (hd - 0.2), tgt[2] + back[2] / bl * (hd - 0.2)];
+  const night = S.ch === 1 ? (S.phase === 'prep' ? clamp(1 - S.prepT / 150, 0.45, 1) : 1) : 0.8, lit = flashA * 0.9;
+  const lights = [];
+  if (S.ch === 1 && S.power) for (const l of L.lamps) lights.push({ p: l, c: [1.2, 1.0, 0.75], r: 8 });
+  if (S.ch === 2 && S.fuseIn && L.control) lights.push({ p: [L.control[0], 2.2, L.control[1]], c: [0.6, 1, 0.6], r: 6 });
+  if (S.ch === 2) for (const lv of L.levers) lights.push({ p: [lv.x, 1.6, lv.z], c: lv.pulled ? [0.4, 1, 0.4] : [1, 0.4, 0.3], r: 3.5 });
+  for (const fo of foes) if (fo.ko <= 0 && fo.mode !== 'flee') lights.push({ p: [fo.x, 1.4, fo.z], c: fo.boss ? [1, 0.3, 0.2] : [0.55, 0.5, 0.2], r: 3.5 });
+  for (const it of L.items) if (Math.hypot(it.x - P.x, it.z - P.z) < 14) lights.push({ p: [it.x, 0.8, it.z], c: [0.9, 0.8, 0.4], r: 2.2 });
+  const amb = [0.07 + lit, 0.08 + lit, 0.13 + lit].map((v, i) => v + (1 - night) * [0.25, 0.25, 0.28][i]);
+  R.begin({ eye, yaw: camYaw, pitch: Math.atan2(tgt[1] - eye[1], Math.hypot(tgt[0] - eye[0], tgt[2] - eye[2])), fov: 1.1, far: 120 },
+    { sky: flashA > 0.4 ? '#c7d2fe' : night > 0.9 ? '#05070d' : '#1e293b', skyTop: flashA > 0.4 ? '#a5b4fc' : '#02040a', skyHorizon: flashA > 0.4 ? '#c7d2fe' : night > 0.9 ? '#0b1020' : '#273449', clouds: 0.9, cloudCol: flashA > 0.4 ? [0.8, 0.85, 1] : [0.1, 0.12, 0.17], sunGlow: [0, 0, 0], spec: 0.35, rim: 0.25, fog: [10 + lit * 30, 34 + lit * 40], sun: [0.3, 1, 0.4], sunCol: [0.1 + lit, 0.12 + lit, 0.2 + lit], amb, lights,
+      flash: S.flashOn && S.battery > 0 ? { p: [P.x + f[0] * 0.3, P.y + 1.4, P.z + f[2] * 0.3], d: dirOf(camYaw, Math.max(camPitch * 0.4, -0.25)), c: [1.4, 1.35, 1.2], range: 20 } : null });
+  R.draw(L.mesh);
+  // openings: doors swing, boards, glass
+  for (const o of L.openings) {
+    const x0 = o.c * TS, z0 = o.r * TS, x1 = x0 + TS, z1 = z0 + TS, hz = o.horiz;
+    if (o.kind === 'W') {
+      // wall below and above the window
+      R.box(hz ? x0 : x0 + 0.55, 0, hz ? z0 + 0.55 : z0, hz ? x1 : x1 - 0.55, 1, hz ? z1 - 0.55 : z1, '#d6cbb3'); R.box(hz ? x0 : x0 + 0.55, 2.3, hz ? z0 + 0.55 : z0, hz ? x1 : x1 - 0.55, WALL_H, hz ? z1 - 0.55 : z1, '#d6cbb3');
+      if (o.glass) R.box(hz ? x0 : x0 + 0.78, 1, hz ? z0 + 0.78 : z0, hz ? x1 : x1 - 0.78, 2.3, hz ? z1 - 0.78 : z1, [0.55, 0.7, 0.85], 0.35, 0.2);
+    } else {
+      R.box(hz ? x0 : x0 + 0.55, 2.3, hz ? z0 + 0.55 : z0, hz ? x1 : x1 - 0.55, WALL_H, hz ? z1 - 0.55 : z1, '#d6cbb3');
+      const ang = o.open ? Math.PI / 2 : 0, len = TS;
+      if (hz) R.cube(M.chain(M.T(x0, 1.15, z0 + TS / 2), M.RY(ang), M.T(len / 2, 0, 0), M.S(len, 2.3, 0.1)), '#7c4a1e');
+      else R.cube(M.chain(M.T(x0 + TS / 2, 1.15, z0), M.RY(ang), M.T(0, 0, len / 2), M.S(0.1, 2.3, len)), '#7c4a1e');
+    }
+    for (let b = 0; b < o.boards; b++) { const y = 1.15 + b * 0.42; R.cube(M.chain(M.T(o.x, y, o.z), M.RY(hz ? 0 : Math.PI / 2), M.RZ((b - 1) * 0.12), M.S(TS * 0.95, 0.22, 0.08)), '#a0743f'); }
+  }
+  for (const g of L.gates) if (!g.open) R.box(g.c * TS, 0, g.r * TS + 0.6, (g.c + 1) * TS, 2, (g.r + 1) * TS - 0.6, '#64748b');
+  for (const [r, c] of L.bridge) { const lift = S.bridgeDown ? 0 : 2.5; R.cube(M.chain(M.T((c + 0.5) * TS, -0.1 + lift * (r - 0.5) / 3, (r + 0.5) * TS), M.RX(S.bridgeDown ? 0 : 0.55), M.S(TS, 0.25, TS)), '#78716c'); }
+  for (const it of L.items) R.cube(M.chain(M.T(it.x, 0.45 + Math.sin(now * 0.004 + it.x) * 0.08, it.z), M.RY(now * 0.002), M.S(it.kind === 'planks' ? 1.2 : 0.4, it.kind === 'planks' ? 0.18 : 0.4, it.kind === 'planks' ? 0.35 : 0.4)), { planks: '#a0743f', fuel: '#dc2626', fuse: '#facc15', flashlight: '#e5e7eb', medkit: '#f8fafc', bat: '#b45309', keyA: '#fde047', keyB: '#fde047' }[it.kind], 1, 0.35);
+  for (const lv of L.levers) R.cube(M.chain(M.T(lv.x, 0.9, lv.z), M.RX(lv.pulled ? 1 : -0.6 + lv.hold * 1.6), M.T(0, 0.45, 0), M.S(0.1, 0.9, 0.1)), '#ef4444');
+  if (S.ch === 1 && S.power) for (const l of L.lamps) R.box(l[0] - 0.2, 2.6, l[2] - 0.2, l[0] + 0.2, 2.9, l[2] + 0.2, '#fef3c7', 1, 1);
+  // rain around the camera
+  if (!rainMesh) rainMesh = makeRain();
+  const ry = -((now * 0.022) % 18);
+  for (const off of [0, 18]) R.draw(rainMesh, M.T(Math.floor(eye[0] / 30) * 30 + 0, ry + off - 3, Math.floor(eye[2] / 30) * 30), [0.7, 0.75, 0.85], 0.35);
+  for (const off of [0, 18]) R.draw(rainMesh, M.T(Math.floor(eye[0] / 30) * 30 + 15, ry + off - 3, Math.floor(eye[2] / 30) * 30 + 15), [0.7, 0.75, 0.85], 0.35);
+  // people
+  R.person(window.SJLook ? SJLook.cached : null, P.x, P.y - (S.crouch ? 0.35 : 0), P.z, P.yaw, { walk: P.walk, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 4), swing: P.swing, hold: S.bat ? '#b45309' : null, scale: S.crouch ? 0.85 : 1 });
+  if (pip) R.person(LOOK_PIP, pip.x, pip.y || 0, pip.z, pip.yaw, { walk: pip.walk, speed: 1, scale: 0.68 });
+  if (gran) { R.person(LOOK_GRAN, gran.x, 0, gran.z, gran.yaw, { walk: 0, scale: 0.95 }); }
+  if (dog) { const b = M.chain(M.T(dog.x, 0, dog.z), M.RY(dog.yaw)); const bob = Math.abs(Math.sin(dog.walk)) * 0.05; R.cube(M.chain(b, M.T(0, 0.45 + bob, 0), M.S(0.35, 0.32, 0.8)), '#c08a4a'); R.cube(M.chain(b, M.T(0, 0.7 + bob, -0.45), M.S(0.3, 0.3, 0.32)), '#c08a4a'); R.cube(M.chain(b, M.T(0, 0.62 + bob, -0.65), M.S(0.16, 0.14, 0.16)), '#3f2a1a'); for (const [sx, sz] of [[-0.12, -0.3], [0.12, -0.3], [-0.12, 0.3], [0.12, 0.3]]) R.cube(M.chain(b, M.T(sx, 0.15, sz + Math.sin(dog.walk + sx * 9) * 0.06), M.S(0.1, 0.3, 0.1)), '#a87640'); R.cube(M.chain(b, M.T(0, 0.62, 0.45), M.RX(-0.8 + Math.sin(now * 0.02) * 0.2), M.S(0.06, 0.3, 0.06)), '#a87640'); }
+  for (const fo of foes) {
+    const down = fo.ko > 0;
+    if (down) { R.cube(M.chain(M.T(fo.x, 0.2, fo.z), M.RY(fo.yaw), M.S(0.5, 0.3, 1.8)), '#eab308'); continue; }
+    R.person(fo.boss ? LOOK_BOSS : LOOK_GRIN, fo.x, 0, fo.z, fo.yaw, { walk: fo.walk, speed: 1, swing: fo.swing, scale: fo.boss ? 1.35 : 1, hold: fo.boss ? '#57534e' : '#1f2937' });
+    // the grin
+    const s = fo.boss ? 1.35 : 1, b = M.chain(M.T(fo.x, 0, fo.z), M.RY(fo.yaw), M.S(s, s, s));
+    R.cube(M.chain(b, M.T(0, 1.63, -0.235), M.S(0.26, 0.04, 0.01)), '#111827'); for (const sx of [-0.13, 0.13]) R.cube(M.chain(b, M.T(sx, 1.66, -0.235), M.S(0.04, 0.06, 0.01)), '#111827');
+    if (fo.stun > 0) for (let i = 0; i < 3; i++) { const a = now * 0.008 + i * 2.1; R.box(fo.x + Math.cos(a) * 0.4 - 0.06, 2.25 * s, fo.z + Math.sin(a) * 0.4 - 0.06, fo.x + Math.cos(a) * 0.4 + 0.06, 2.37 * s, fo.z + Math.sin(a) * 0.4 + 0.06, '#fde047', 1, 1); }
+    if (S.ch === 2 && fo.mode === 'chase' && !fo.boss) R.box(fo.x - 0.06, 2.3, fo.z - 0.06, fo.x + 0.06, 2.8, fo.z + 0.06, '#ef4444', 1, 1);
+    else if (S.ch === 2 && fo.see > 0.2) R.box(fo.x - 0.06, 2.3, fo.z - 0.06, fo.x + 0.06, 2.3 + fo.see * 0.5, fo.z + 0.06, '#facc15', 1, 1);
+  }
+  if (S.ch === 1 && S.power) for (const l of L.lamps) R.glow([l[0], 2.75, l[2]], 1.5, [1, 0.85, 0.55], 0.55);
+  for (const fo of foes) if (fo.ko <= 0) R.glow([fo.x, 1.0, fo.z], 0.8, fo.boss ? [1, 0.3, 0.2] : [0.8, 0.7, 0.25], 0.35);
+  for (const it of L.items) R.glow([it.x, 0.5, it.z], 0.8, [1, 0.9, 0.5], 0.4);
+  if (S.ch === 2) { if (S.fuseIn && L.control) R.glow([L.control[0], 1.8, L.control[1]], 1.2, [0.4, 1, 0.5], 0.6); for (const lv of L.levers) R.glow([lv.x, 1.4, lv.z], 0.7, lv.pulled ? [0.3, 1, 0.3] : [1, 0.3, 0.2], 0.6); }
+  if (S.flashOn && S.battery > 0) { const fd = dirOf(camYaw); R.glow([P.x + fd[0] * 0.6, 1.4, P.z + fd[2] * 0.6], 0.6, [1, 1, 0.9], 0.6); }
+  R.end();
+  $('flash').style.opacity = flashA * 0.25;
+}
+
+/* =================== HUD =================== */
+let hudT = 0;
+function hud(dt) {
+  hudT -= dt; if (hudT > 0) return; hudT = 0.12;
+  const bar = (n, v, c) => `<div class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${c}"></i><span>${n}</span></div>`;
+  $('bars').innerHTML = bar('❤ Health', S.hp, '#ef4444') + (S.flash ? bar('🔦 Battery', S.battery, '#facc15') : '') + (S.ch === 1 && S.phase === 'night' ? bar('⚠ Bedroom danger', S.threat, '#f97316') : '');
+  const [t, s] = objective(); $('obj').innerHTML = `<b>${t}</b><small>${s}</small>`;
+  const it = [];
+  if (S.planks) it.push(`🪵 Planks ×${S.planks}`); if (S.bat) it.push('🏏 Bat'); if (S.medkits) it.push(`➕ First aid ×${S.medkits}`); if (S.fuel && !S.power) it.push('⛽ Fuel'); if (S.fuse && !S.power && !S.fuseIn) it.push('🔌 Fuse'); if (S.keyA) it.push('🔑 Gate key'); if (S.keyB) it.push('🗝 North key');
+  if (S.crouch) it.push('🫣 Crouching'); if (S.power && S.ch === 1) it.push('💡 Power on');
+  $('inv').innerHTML = it.map(x => `<span>${x}</span>`).join('') || '<span style="opacity:.6">Empty hands</span>'; $('inv').style.display = '';
+  $('sub').innerHTML = subs.length ? (subs[0].who ? `<b>${subs[0].who}:</b> ` : '') + subs[0].text : '';
+}
+
+/* =================== FLOW =================== */
+function story(title, html, btns) { $('over').hidden = false; paused = true; if (document.pointerLockElement) document.exitPointerLock(); $('story').innerHTML = `<h2>${title}</h2>${html}`; $('overBtns').innerHTML = ''; for (const [t, fn] of btns) { const b = document.createElement('button'); b.className = 'btn pri'; b.textContent = t; b.onclick = fn; $('overBtns').appendChild(b); } }
+function closePanels() { $('over').hidden = true; $('pause').hidden = true; paused = false; last = performance.now(); }
+function pause() { $('pause').hidden = false; paused = true; if (document.pointerLockElement) document.exitPointerLock(); }
+function toMenu() { closePanels(); running = false; $('menu').hidden = false; $('touch').classList.remove('on'); refreshMenu(); }
+$('bResume').onclick = closePanels; $('bQuit').onclick = toMenu; $('bRetry').onclick = () => startChapter(S.ch, true);
+addEventListener('keydown', e => { if (e.code === 'Escape' && running && !$('pause').hidden) { e.preventDefault(); closePanels(); IN.endFrame(); } });
+function refreshMenu() { const un = +(localStorage.getItem('sj-storm-ch') || 1); $('c2').classList.toggle('lock', un < 2); $('b2').textContent = un < 2 ? '🔒 Finish Chapter 1 first' : ''; $('bDiff').textContent = 'Difficulty: ' + DIFFN[DIFF]; }
+$('c1').onclick = () => startChapter(1);
+$('c2').onclick = () => { if (+(localStorage.getItem('sj-storm-ch') || 1) < 2 && !confirm('Chapter 2 is meant to be played after Chapter 1. Play it anyway?')) return; startChapter(2); };
+$('bKeys').onclick = () => { $('keys').hidden = !$('keys').hidden; };
+$('bDiff').onclick = () => { DIFF = (DIFF + 1) % 3; try { localStorage.setItem('sj-storm-diff', DIFF); } catch {} refreshMenu(); };
+$('bLook').onclick = () => { location.href = '../sj-avatar/'; };
+const meC = $('me').getContext('2d');
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) { if (!$('menu').hidden && window.SJLook) { meC.clearRect(0, 0, 280, 380); SJLook.draw(meC, SJLook.cached, 140, 360, 310, { t: now / 1000, pose: 'idle' }); } return; }
+  if (!paused) update(dt); else { IN.frame(); IN.endFrame(); }
+  render(now); hud(dt);
+}
+if (window.SJLook) SJLook.get();
+document.addEventListener('visibilitychange', () => { if (document.hidden && running && !paused) pause(); });
+refreshMenu(); requestAnimationFrame(frame);
+window.__storm = () => ({ S, P: P && { x: P.x, z: P.z, y: P.y }, foes: foes.map(f => ({ x: f.x, z: f.z, mode: f.mode, hp: f.hp, ko: f.ko, boss: f.boss })), pip: pip && { x: pip.x, z: pip.z, grabbed: !!pip.grabbed, scared: pip.scared }, openings: L && L.openings.map(o => ({ kind: o.kind, outside: o.outside, boards: o.boards, glass: o.glass, open: o.open })), running, paused, prompt: $('prompt').textContent });
+window.__stormStep = (n, dt = 1 / 30, fn) => { for (let i = 0; i < n; i++) { if (fn) fn(i); if (!paused) update(dt); } return window.__storm(); };
+window.__stormApi = { startChapter, get L() { return L; }, get P() { return P; }, get S() { return S; }, get foes() { return foes; }, get pip() { return pip; }, usable, board, swing, take, startNight, bfs, tileAt, TS, closePanels, setCam: (y, p) => { camYaw = y; camPitch = p; } };
+})();
+</script>
+</body></html>

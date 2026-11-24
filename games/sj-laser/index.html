@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laser Lab</title>
+<style>
+html,body{margin:0;height:100%;background:#020617;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+header{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+header b{color:#fff}
+button,select{font:inherit;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;background:#1e293b;color:#e2e8f0}
+canvas{display:block;touch-action:manipulation;border-radius:10px;cursor:pointer}
+#win{display:none;position:fixed;inset:0;background:rgba(2,6,23,.82);align-items:center;justify-content:center;flex-direction:column;gap:12px;text-align:center}
+#win.on{display:flex}
+#win button{background:#f43f5e;color:#fff;font-weight:700;padding:10px 18px}
+p{margin:0;opacity:.7;text-align:center;max-width:520px}
+</style></head><body>
+<header>
+  <select id="lvl" aria-label="Level"></select>
+  <span>Targets <b id="lit">0/0</b></span><span>Turns <b id="turns">0</b></span>
+  <button id="reset">↺ Reset</button>
+</header>
+<canvas id="cv" aria-label="Laser Lab board"></canvas>
+<p>Tap a mirror to flip it. Light up every ◎ target with the laser. 🔒 mirrors can't be turned, and dark blocks stop the beam.</p>
+<div id="win"><h2 style="margin:0">All targets lit!</h2><div id="ws"></div><button id="next">Next level</button></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("laser", { vs: { mode: 'time', levelKey: 'sj-laser-unlocked', levels: 12 }, title: "Laser Lab", lower: false, trophies: [{"id": "l10", "name": "Lab Assistant", "desc": "Solve 10 levels", "icon": "🔬"}, {"id": "all", "name": "Laser Scientist", "desc": "Solve all 40 levels", "icon": "🏆"}] });</script>
+<script>
+(() => {
+  const LEVELS = 40;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  let G, turns = 0, cur = 1, unlocked = 1, TS = 56, beam = [], litSet = new Set(), t0 = performance.now();
+  try { unlocked = +localStorage.getItem('sj-laser-unlocked') || 1; } catch {}
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  // '/' turns right-moving light up; '\' turns right-moving light down.
+  const reflect = (m, [dx, dy]) => m === '/' ? [-dy, -dx] : [dy, dx];
+
+  // Level n: walk a beam from the emitter, dropping a mirror at each turn, put targets along
+  // the path, then scramble the mirrors and add decoys and blocks off the path.
+  function generate(n) {
+    const rand = rng(n * 104729 + 7), R = k => rand() * k | 0;
+    const size = Math.min(9, 5 + (n / 6 | 0));
+    const wantMirrors = Math.min(10, 2 + (n * 0.35 | 0));
+    for (let attempt = 0; attempt < 400; attempt++) {
+      const cells = Array.from({ length: size }, () => Array(size).fill(null));
+      // Emitter sits just outside the board on the left or top edge.
+      const side = R(2);
+      let x, y, d;
+      if (side === 0) { x = -1; y = R(size); d = [1, 0]; } else { x = R(size); y = -1; d = [0, 1]; }
+      const emitter = { x, y, d: d.slice() };
+      const path = [], used = new Set(); let mirrors = 0;
+      for (let step = 0; step < size * size; step++) {
+        x += d[0]; y += d[1];
+        if (x < 0 || y < 0 || x >= size || y >= size) break;
+        if (used.has(x + ',' + y)) { path.length = 0; break; }
+        used.add(x + ',' + y); path.push([x, y]);
+        const wantTurn = mirrors < wantMirrors && path.length > 1 && rand() < 0.42;
+        // Turn if asked, or if about to run off the board while still short of mirrors.
+        const ahead = [x + d[0], y + d[1]], offNext = ahead[0] < 0 || ahead[1] < 0 || ahead[0] >= size || ahead[1] >= size;
+        if (wantTurn || (offNext && mirrors < wantMirrors)) {
+          const opts = [[-d[1], d[0]], [d[1], -d[0]]].filter(([ndx, ndy]) => { const ax = x + ndx, ay = y + ndy; return ax >= 0 && ay >= 0 && ax < size && ay < size && !used.has(ax + ',' + ay); });
+          if (!opts.length) continue;
+          const nd = opts[R(opts.length)];
+          cells[y][x] = { m: (nd[0] === -d[1] && nd[1] === -d[0]) ? '/' : '\\', path: true };
+          d = nd; mirrors++;
+        }
+      }
+      if (!path.length || mirrors < wantMirrors) continue;
+      const plain = path.filter(([px, py]) => !cells[py][px]);
+      const nTargets = Math.min(plain.length, 2 + Math.min(3, n / 8 | 0));
+      if (plain.length < nTargets) continue;
+      const targets = [];
+      // Always put a target near the end so every mirror matters.
+      const lastPlain = plain[plain.length - 1]; targets.push(lastPlain);
+      const pool = plain.slice(0, -1);
+      while (targets.length < nTargets && pool.length) targets.push(pool.splice(R(pool.length), 1)[0]);
+      targets.forEach(([tx, ty]) => cells[ty][tx] = { target: true });
+      // Off-path decoys and blocks.
+      const empty = []; for (let yy = 0; yy < size; yy++) for (let xx = 0; xx < size; xx++) if (!cells[yy][xx] && !used.has(xx + ',' + yy)) empty.push([xx, yy]);
+      const decoys = Math.min(empty.length, 1 + (n / 3 | 0));
+      for (let i = 0; i < decoys; i++) { const [ex, ey] = empty.splice(R(empty.length), 1)[0]; cells[ey][ex] = { m: rand() < 0.5 ? '/' : '\\' }; }
+      const blocks = Math.min(empty.length, 1 + (n / 4 | 0));
+      for (let i = 0; i < blocks; i++) { const [ex, ey] = empty.splice(R(empty.length), 1)[0]; cells[ey][ex] = { block: true }; }
+      // Lock a few path mirrors (already correct) on later levels as anchors.
+      const pathMirrors = []; cells.forEach(row => row.forEach(c => c && c.path && pathMirrors.push(c)));
+      if (n > 10) for (let i = 0; i < Math.min(2, n / 12 | 0); i++) pathMirrors[R(pathMirrors.length)].locked = true;
+      // Scramble every unlocked mirror; make sure the start isn't already solved.
+      const all = []; cells.forEach(row => row.forEach(c => c && c.m && !c.locked && all.push(c)));
+      all.forEach(c => { if (rand() < 0.6) c.m = c.m === '/' ? '\\' : '/'; });
+      const lvl = { size, cells, emitter, nTargets };
+      if (trace(lvl).lit.size === nTargets) { const c = all.find(c => c.path); if (!c) continue; c.m = c.m === '/' ? '\\' : '/'; }
+      if (trace(lvl).lit.size === nTargets) continue;
+      return lvl;
+    }
+    return null;
+  }
+  function trace(lvl) {
+    const pts = [], lit = new Set(), seen = new Set();
+    let { x, y } = lvl.emitter, d = lvl.emitter.d.slice();
+    pts.push([x, y]);
+    for (let i = 0; i < 400; i++) {
+      x += d[0]; y += d[1];
+      if (x < 0 || y < 0 || x >= lvl.size || y >= lvl.size) { pts.push([x, y]); break; }
+      const k = `${x},${y},${d}`; if (seen.has(k)) { pts.push([x, y]); break; } seen.add(k);
+      const c = lvl.cells[y][x];
+      if (c && c.block) { pts.push([x - d[0] * 0.5, y - d[1] * 0.5]); break; }
+      if (c && c.target) lit.add(x + ',' + y);
+      if (c && c.m) { pts.push([x, y]); d = reflect(c.m, d); }
+    }
+    return { pts, lit };
+  }
+  function load(n) {
+    cur = n; G = generate(n); turns = 0; $('lvl').value = n; $('win').classList.remove('on');
+    update(); fit();
+  }
+  function update() {
+    const r = trace(G); beam = r.pts; litSet = r.lit;
+    $('lit').textContent = `${litSet.size}/${G.nTargets}`; $('turns').textContent = turns;
+    if (litSet.size === G.nTargets) {
+      if (cur >= unlocked) { window.SJG && (SJG.score(cur + 1, 'levels'), cur + 1 >= 10 && SJG.unlock('l10'), cur + 1 >= LEVELS && SJG.unlock('all')); unlocked = Math.min(LEVELS, cur + 1); try { localStorage.setItem('sj-laser-unlocked', String(unlocked)); } catch {} fillSelect(); }
+      $('ws').textContent = `Solved in ${turns} turn${turns === 1 ? '' : 's'}.`;
+      $('next').textContent = cur < LEVELS ? 'Next level' : 'All done! Back to 1';
+      setTimeout(() => $('win').classList.add('on'), 500);
+    }
+  }
+  function fit() {
+    if (!G) return;
+    TS = Math.max(28, Math.min(72, Math.floor(Math.min(innerWidth - 20, innerHeight - 150) / (G.size + 1))));
+    cv.width = (G.size + 1) * TS; cv.height = (G.size + 1) * TS;
+  }
+  // Board is offset by half a cell on each side so the emitter fits outside it.
+  const P = v => (v + 1) * TS;
+  function draw() {
+    const now = performance.now() / 1000;
+    ctx.fillStyle = '#020617'; ctx.fillRect(0, 0, cv.width, cv.height);
+    const s = G.size;
+    for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+      const px = P(x) - TS / 2, py = P(y) - TS / 2;
+      ctx.fillStyle = (x + y) % 2 ? '#0f172a' : '#111c33'; ctx.fillRect(px, py, TS, TS);
+      const c = G.cells[y][x]; if (!c) continue;
+      if (c.block) { ctx.fillStyle = '#334155'; ctx.fillRect(px + 4, py + 4, TS - 8, TS - 8); ctx.fillStyle = '#475569'; ctx.fillRect(px + 4, py + 4, TS - 8, 5); }
+      if (c.target) {
+        const on = litSet.has(x + ',' + y);
+        ctx.strokeStyle = on ? '#4ade80' : '#64748b'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, TS * 0.3, 0, 7); ctx.stroke();
+        ctx.fillStyle = on ? '#4ade80' : '#334155'; ctx.beginPath(); ctx.arc(px + TS / 2, py + TS / 2, TS * 0.14 + (on ? Math.sin(now * 6) * 2 : 0), 0, 7); ctx.fill();
+      }
+    }
+    // Beam with glow.
+    const pulse = 0.75 + Math.sin(now * 8) * 0.25;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    [[10, `rgba(244,63,94,${0.25 * pulse})`], [5, 'rgba(244,63,94,.7)'], [2, '#fecdd3']].forEach(([w, col]) => {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+      beam.forEach(([bx, by], i) => i ? ctx.lineTo(P(bx), P(by)) : ctx.moveTo(P(bx), P(by))); ctx.stroke();
+    });
+    for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+      const c = G.cells[y][x]; if (!c || !c.m) continue;
+      const cx = P(x), cy = P(y), r = TS * 0.36;
+      ctx.strokeStyle = c.locked ? '#94a3b8' : '#e0f2fe'; ctx.lineWidth = TS * 0.1; ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (c.m === '/') { ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx + r, cy - r); } else { ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r); }
+      ctx.stroke();
+      if (c.locked) { ctx.font = `${TS * 0.26}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔒', cx + r * 0.9, cy + r * 0.9); }
+    }
+    // Emitter.
+    const e = G.emitter, ex = P(e.x), ey = P(e.y);
+    ctx.fillStyle = '#be123c'; ctx.beginPath(); ctx.arc(ex, ey, TS * 0.28, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fecdd3'; ctx.beginPath(); ctx.arc(ex + e.d[0] * TS * 0.12, ey + e.d[1] * TS * 0.12, TS * 0.1, 0, 7); ctx.fill();
+    requestAnimationFrame(draw);
+  }
+  cv.addEventListener('click', e => {
+    if ($('win').classList.contains('on')) return;
+    const r = cv.getBoundingClientRect();
+    const x = Math.round((e.clientX - r.left) * cv.width / r.width / TS - 1), y = Math.round((e.clientY - r.top) * cv.height / r.height / TS - 1);
+    const c = G.cells[y]?.[x];
+    if (!c || !c.m || c.locked) return;
+    c.m = c.m === '/' ? '\\' : '/'; turns++; update();
+  });
+  function fillSelect() {
+    $('lvl').innerHTML = '';
+    for (let i = 1; i <= LEVELS; i++) { const o = document.createElement('option'); o.value = i; o.disabled = i > unlocked; o.textContent = `Level ${i}` + (i < unlocked ? ' ✓' : i > unlocked ? ' 🔒' : ''); $('lvl').appendChild(o); }
+    $('lvl').value = cur;
+  }
+  $('lvl').onchange = () => load(+$('lvl').value);
+  $('reset').onclick = () => load(cur);
+  $('next').onclick = () => load(cur < LEVELS ? cur + 1 : 1);
+  addEventListener('keydown', e => { if (e.key === 'Enter' && $('win').classList.contains('on')) $('next').click(); else if (e.key === 'r' || e.key === 'R') load(cur); });
+  addEventListener('resize', fit);
+  cur = Math.min(unlocked, LEVELS); fillSelect(); load(cur); requestAnimationFrame(draw);
+})();
+</script>
+</body></html>

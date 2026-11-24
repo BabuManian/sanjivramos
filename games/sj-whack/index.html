@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Whack-a-Mole</title>
+<style>
+html,body{margin:0;min-height:100%;background:#422006;color:#fef3c7;font:14px system-ui,sans-serif;user-select:none}
+body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px;box-sizing:border-box}
+header{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;align-items:center}
+#modes{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+#modes button{background:#78350f;color:#fef3c7;border:none;border-radius:999px;padding:6px 12px;font:inherit;cursor:pointer}
+#modes button.on{background:#f59e0b;color:#422006;font-weight:700}
+#grid{display:grid;gap:10px;width:min(90vw,400px)}
+.hole{aspect-ratio:1;border-radius:50%;background:#78350f;border:none;position:relative;overflow:hidden;cursor:pointer;touch-action:manipulation;padding:0}
+.hole::after{content:"";position:absolute;inset:auto 14% 6% 14%;height:22%;border-radius:50%;background:#451a03}
+.mole{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,8vw,46px);transform:translateY(100%);transition:transform .12s ease-out;z-index:1}
+.hole.up .mole{transform:translateY(0)}
+.hole.hit .mole{transform:translateY(40%) scale(.8);filter:grayscale(1)}
+.hole.gold{background:#a16207;box-shadow:0 0 18px #facc15}
+.hole.bomb{background:#3f3f46}
+.pts{position:absolute;left:50%;top:20%;transform:translateX(-50%);font-weight:800;font-size:18px;z-index:2;pointer-events:none;animation:up .7s forwards}
+@keyframes up{to{top:-10%;opacity:0}}
+button.main{background:#f59e0b;color:#422006;border:none;border-radius:8px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer}
+#combo{min-width:90px;text-align:center;color:#fde047;font-weight:700}
+#mute{background:#78350f;color:#fff;border:none;border-radius:8px;padding:4px 8px;cursor:pointer}
+p{opacity:.75;margin:0;text-align:center;max-width:420px}
+</style></head><body>
+<header>
+  <span>Score <b id="sc">0</b></span><span id="tml">Time <b id="tm">30</b></span><span>Best <b id="bs">0</b></span><span id="combo"></span><button id="mute">🔊</button>
+</header>
+<div id="modes"><button data-m="classic" class="on">Classic</button><button data-m="frenzy">Frenzy</button><button data-m="survival">Survival</button><button data-m="zen">Zen</button></div>
+<div id="grid"></div>
+<button class="main" id="go">Start</button>
+<p id="desc"></p>
+<script src="../sj-gamekit/kit.js"></script>
+<script>
+(() => {
+  const grid = document.getElementById('grid');
+  const $ = id => document.getElementById(id);
+  const kit = window.SJG ? SJG.init('whack', { vs: { live: '#sc' }, title: 'Whack-a-Mole', trophies: [
+    { id: 's30', name: 'Quick Hands', desc: 'Score 30 in Classic', icon: '🔨' },
+    { id: 'gold5', name: 'Gold Digger', desc: 'Whack 5 golden moles in one game', icon: '🌟' },
+    { id: 'combo15', name: 'Unstoppable', desc: 'Reach a 15 combo', icon: '🔥' },
+    { id: 'frenzy100', name: 'Frenzied', desc: 'Score 100 in Frenzy', icon: '⚡' },
+    { id: 'survive60', name: 'Survivor', desc: 'Last 60 seconds in Survival', icon: '❤️' },
+    { id: 'nobomb', name: 'Careful Now', desc: 'Finish Frenzy without hitting a bomb', icon: '💣' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  const MODES = {
+    classic: { size: 3, time: 30, desc: 'Tap moles before they hide. 30 seconds. Golden moles are worth 5.', bombs: false },
+    frenzy: { size: 4, time: 45, desc: '4×4 board, faster moles and combos. Don\'t hit the bombs (−5 and combo lost).', bombs: true },
+    survival: { size: 3, time: 0, lives: 3, desc: 'No clock — but every mole that escapes costs a heart. It gets faster.', bombs: true },
+    zen: { size: 3, time: 0, desc: 'No clock, no pressure. Relax and whack.', bombs: false },
+  };
+  let mode = 'classic', holes = [], score = 0, left = 0, running = false, spawnT = null, tickT = null, hideT = [], combo = 0, lives = 0, golds = 0, bombHit = false, elapsed = 0;
+  const bestOf = m => (kit && kit.best(m)) || (m === 'classic' ? (+localStorage.getItem('sj-whack-best') || 0) : 0);
+
+  function build() {
+    const n = MODES[mode].size;
+    grid.style.gridTemplateColumns = `repeat(${n},1fr)`;
+    grid.innerHTML = ''; holes = [];
+    for (let i = 0; i < n * n; i++) {
+      const h = document.createElement('button');
+      h.className = 'hole'; h.setAttribute('aria-label', 'Hole ' + (i + 1));
+      h.innerHTML = '<span class="mole">🐹</span>';
+      grid.appendChild(h); holes.push(h);
+    }
+    $('desc').textContent = MODES[mode].desc;
+    $('bs').textContent = bestOf(mode);
+    $('tml').innerHTML = MODES[mode].time ? `Time <b id="tm">${MODES[mode].time}</b>` : mode === 'survival' ? `Hearts <b id="tm">❤️❤️❤️</b>` : `Time <b id="tm">0</b>`;
+  }
+  function setScore(v) { score = Math.max(0, v); $('sc').textContent = score; }
+  function setCombo(v) { combo = v; $('combo').textContent = combo >= 3 ? `${combo} combo ×${mult()}` : ''; if (combo >= 15) kit && kit.unlock('combo15'); }
+  const mult = () => mode === 'zen' ? 1 : 1 + Math.floor(combo / 5);
+  function pace() { const m = MODES[mode]; const t = mode === 'survival' ? elapsed : m.time ? (m.time - left) : 0; const k = mode === 'frenzy' ? .6 : 1; return { up: Math.max(350, (900 - t * 8) * k), gap: Math.max(160, (600 - t * 6) * k) }; }
+  function popUp() {
+    if (!running) return;
+    const free = holes.filter(h => !h.classList.contains('up'));
+    if (free.length) {
+      const h = free[Math.random() * free.length | 0];
+      const r = Math.random(), kind = r < .07 ? 'gold' : MODES[mode].bombs && r < .2 ? 'bomb' : 'mole';
+      h.dataset.kind = kind;
+      h.classList.remove('hit', 'gold', 'bomb'); if (kind !== 'mole') h.classList.add(kind);
+      h.querySelector('.mole').textContent = kind === 'gold' ? '🤩' : kind === 'bomb' ? '💣' : ['🐹', '🐭', '🦫'][Math.random() * 3 | 0];
+      h.classList.add('up');
+      const p = pace();
+      const t = setTimeout(() => {
+        if (h.classList.contains('up') && !h.classList.contains('hit')) {
+          h.classList.remove('up');
+          if (kind !== 'bomb' && running) { if (mode !== 'zen') setCombo(0); if (mode === 'survival') { lives--; $('tm').textContent = '❤️'.repeat(Math.max(0, lives)) || '—'; sfx('hurt'); if (lives <= 0) stop(); } }
+        }
+      }, kind === 'gold' ? p.up * .7 : p.up + Math.random() * 300);
+      hideT.push(t);
+    }
+    const p = pace();
+    spawnT = setTimeout(popUp, p.gap + Math.random() * p.gap);
+    if (mode === 'frenzy' && Math.random() < .3) setTimeout(popUp, 120);
+  }
+  function stop() {
+    if (!running) return;
+    running = false;
+    clearTimeout(spawnT); clearInterval(tickT); hideT.forEach(clearTimeout); hideT = [];
+    holes.forEach(h => h.classList.remove('up'));
+    const res = kit ? kit.score(score, mode) : { isBest: score > bestOf(mode) };
+    if (mode === 'classic') { try { if (score > (+localStorage.getItem('sj-whack-best') || 0)) localStorage.setItem('sj-whack-best', String(score)); } catch {} if (score >= 30) kit && kit.unlock('s30'); }
+    if (mode === 'frenzy') { if (score >= 100) kit && kit.unlock('frenzy100'); if (!bombHit) kit && kit.unlock('nobomb'); }
+    if (mode === 'survival' && elapsed >= 60) kit && kit.unlock('survive60');
+    $('bs').textContent = bestOf(mode);
+    $('go').textContent = 'Play again';
+    $('sc').textContent = score + (res.isBest ? ' 🏆 new best!' : ' (done)');
+    setCombo(0);
+    sfx(res.isBest ? 'win' : 'lose');
+    document.querySelectorAll('#modes button').forEach(b => b.disabled = false);
+  }
+  function start() {
+    build();
+    setScore(0); setCombo(0); golds = 0; bombHit = false; elapsed = 0;
+    const m = MODES[mode];
+    left = m.time; lives = m.lives || 0; running = true;
+    $('go').textContent = mode === 'zen' || mode === 'survival' ? 'Stop' : 'Playing…';
+    document.querySelectorAll('#modes button').forEach(b => b.disabled = true);
+    tickT = setInterval(() => {
+      elapsed++;
+      if (m.time) { left--; $('tm').textContent = left; if (left <= 0) stop(); }
+      else if (mode === 'zen') $('tm').textContent = elapsed;
+    }, 1000);
+    popUp();
+  }
+  function pts(h, text, col) { const s = document.createElement('span'); s.className = 'pts'; s.textContent = text; s.style.color = col; h.appendChild(s); setTimeout(() => s.remove(), 700); }
+  grid.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.hole');
+    if (!h || !running) return;
+    if (!h.classList.contains('up') || h.classList.contains('hit')) { if (mode === 'frenzy') setCombo(0); return; }
+    h.classList.add('hit');
+    const kind = h.dataset.kind;
+    if (kind === 'bomb') { bombHit = true; setScore(score - 5); setCombo(0); pts(h, '−5', '#f87171'); sfx('boom'); if (mode === 'survival') { lives--; $('tm').textContent = '❤️'.repeat(Math.max(0, lives)) || '—'; if (lives <= 0) stop(); } }
+    else { setCombo(combo + 1); const v = (kind === 'gold' ? 5 : 1) * mult(); setScore(score + v); pts(h, '+' + v, kind === 'gold' ? '#fde047' : '#fff'); sfx(kind === 'gold' ? 'coin' : 'hit'); if (kind === 'gold' && ++golds >= 5) kit && kit.unlock('gold5'); }
+    setTimeout(() => h.classList.remove('up'), 160);
+  });
+  $('modes').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b || running) return; mode = b.dataset.m; document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x === b)); build(); $('sc').textContent = 0; $('go').textContent = 'Start'; });
+  $('go').addEventListener('click', () => { if (!running) start(); else if (mode === 'zen' || mode === 'survival') stop(); });
+  addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !running) { e.preventDefault(); start(); } });
+  $('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+  if (kit && kit.muted) $('mute').textContent = '🔇';
+  window.__whack = () => ({ mode, running, score, combo, holes: holes.length, start, stop });
+  build();
+})();
+</script>
+</body></html>

@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Write</title>
+<script src="../sj-officekit/kit.js"></script>
+<style>
+:root{--k-acc:#2b6cd8}
+#app{display:flex;flex-direction:column;height:100%}
+#home{flex:1;overflow:auto}
+#ed{flex:1;display:none;flex-direction:column;min-height:0}
+#ed.on{display:flex} #home.off{display:none}
+.wscroll{flex:1;overflow:auto;padding:24px 12px 60px;background:var(--k-bg)}
+.paper{margin:0 auto;background:#fff;color:#1b1b1b;box-shadow:0 1px 3px rgba(0,0,0,.2),0 6px 24px rgba(0,0,0,.08);width:816px;min-height:1056px;padding:96px;outline:none;font:11pt/1.5 Carlito,Calibri,"Segoe UI",Arial,sans-serif;word-wrap:break-word;transform-origin:top center}
+.paper.a4{width:794px;min-height:1123px}
+.paper:empty::before{content:'Start typing…';color:#999}
+.paper h1{font-size:20pt;margin:.6em 0 .3em;color:#1f3864;font-weight:600}
+.paper h2{font-size:15pt;margin:.6em 0 .3em;color:#2f5496;font-weight:600}
+.paper h3{font-size:12.5pt;margin:.6em 0 .3em;color:#1f3864;font-weight:600}
+.paper p{margin:0 0 .55em}
+.paper blockquote{margin:.6em 0;padding:.2em 1em;border-left:3px solid #b4c6e7;color:#444;font-style:italic}
+.paper pre{background:#f4f5f7;padding:8px 10px;border-radius:4px;font:10pt/1.4 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.paper table{border-collapse:collapse;width:100%;margin:.5em 0}
+.paper td,.paper th{border:1px solid #9aa4b2;padding:4px 7px;vertical-align:top;min-width:30px}
+.paper img{max-width:100%;height:auto;cursor:pointer}
+.paper img.sel{outline:2px solid var(--k-acc)}
+.paper a{color:#1d5fbf}
+.paper hr{border:none;border-top:1px solid #aaa;margin:1em 0}
+.paper hr.pb{border-top:2px dashed #b9c3d0;margin:2em -96px;position:relative;overflow:visible}
+.paper hr.pb::after{content:'Page break';position:absolute;left:50%;top:-9px;transform:translateX(-50%);background:#fff;color:#8794a6;font:11px system-ui;padding:0 8px}
+.paper ul,.paper ol{margin:0 0 .55em;padding-left:2em}
+.paper .found{background:#ffe066}
+.k-status b{font-weight:500}
+.wfind{display:none;gap:6px;align-items:center;padding:6px 8px;background:var(--k-panel);border-bottom:1px solid var(--k-line);flex-wrap:wrap}
+.wfind.on{display:flex}
+.wfind input{font:inherit;padding:5px 8px;border:1px solid var(--k-line);border-radius:6px;background:var(--k-bg);color:var(--k-text);width:170px}
+.imgbar{position:fixed;z-index:50;display:none;gap:2px;background:var(--k-panel);border:1px solid var(--k-line);border-radius:8px;padding:3px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.imgbar.on{display:flex}
+.tpl-page{position:absolute;inset:0;padding:12% 12%;font:5px/1.5 sans-serif;text-align:left}
+.tpl-page b{display:block;font-size:9px;margin-bottom:4px;color:#1f3864}
+.tpl-page i{display:block;height:3px;background:#d5d9e0;margin:3px 0;border-radius:2px}
+@media (max-width:700px){.wscroll{padding:10px 4px 40px}}
+@media print{
+  @page{margin:0}
+  body{background:#fff}
+  #home,.k-bar,.k-tools,.wfind,.imgbar{display:none!important}
+  #ed,.wscroll{display:block!important;overflow:visible!important;padding:0!important;background:#fff!important}
+  .paper{box-shadow:none!important;transform:none!important;zoom:1!important;width:auto!important;min-height:0!important;margin:0!important}
+  .paper hr.pb{border:none;margin:0;break-after:page}.paper hr.pb::after{display:none}
+  .paper .found{background:none}
+}
+</style></head>
+<body><div id="app"><div id="home"></div><div id="ed">
+  <div class="k-bar">
+    <button class="k-mb" data-m="file">File</button><button class="k-mb" data-m="edit">Edit</button><button class="k-mb" data-m="insert">Insert</button><button class="k-mb" data-m="format">Format</button><button class="k-mb" data-m="view">View</button>
+    <input class="k-title" id="title" spellcheck="false">
+    <span class="k-status" id="status"></span>
+  </div>
+  <div class="k-tools" id="tools">
+    <button class="k-tb" data-c="undo" title="Undo (Ctrl+Z)">↶</button><button class="k-tb" data-c="redo" title="Redo (Ctrl+Y)">↷</button><span class="k-vs"></span>
+    <select id="block" title="Paragraph style"><option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option><option value="pre">Code</option></select>
+    <select id="font" title="Font"><option value="">Default font</option><option>Arial</option><option>Calibri</option><option>Georgia</option><option>Times New Roman</option><option>Verdana</option><option>Trebuchet MS</option><option>Courier New</option><option>Comic Sans MS</option></select>
+    <select id="size" title="Font size"><option value="">Size</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option><option>28</option><option>36</option><option>48</option><option>72</option></select>
+    <span class="k-vs"></span>
+    <button class="k-tb" data-c="bold" title="Bold (Ctrl+B)"><b>B</b></button><button class="k-tb" data-c="italic" title="Italic (Ctrl+I)"><i>I</i></button><button class="k-tb" data-c="underline" title="Underline (Ctrl+U)"><u>U</u></button><button class="k-tb" data-c="strikeThrough" title="Strikethrough"><s>S</s></button>
+    <button class="k-tb" data-c="superscript" title="Superscript">x²</button><button class="k-tb" data-c="subscript" title="Subscript">x₂</button>
+    <span class="k-col k-tb" title="Text colour"><b>A</b><i id="fcI" style="background:#c00000"></i><input type="color" id="fc" value="#c00000"></span>
+    <span class="k-col k-tb" title="Highlight"><span>🖍</span><i id="hcI" style="background:#ffff00"></i><input type="color" id="hc" value="#ffff00"></span>
+    <span class="k-vs"></span>
+    <button class="k-tb" data-c="insertUnorderedList" title="Bullets">•≡</button><button class="k-tb" data-c="insertOrderedList" title="Numbering">1≡</button>
+    <button class="k-tb" data-c="outdent" title="Decrease indent">⇤</button><button class="k-tb" data-c="indent" title="Increase indent">⇥</button>
+    <span class="k-vs"></span>
+    <button class="k-tb" data-c="justifyLeft" title="Align left">⫷</button><button class="k-tb" data-c="justifyCenter" title="Centre">≡</button><button class="k-tb" data-c="justifyRight" title="Align right">⫸</button><button class="k-tb" data-c="justifyFull" title="Justify">☰</button>
+    <span class="k-vs"></span>
+    <button class="k-tb" data-x="link" title="Link (Ctrl+K)">🔗</button><button class="k-tb" data-x="image" title="Picture">🖼</button><button class="k-tb" data-x="table" title="Table">▦</button><button class="k-tb" data-c="removeFormat" title="Clear formatting">⌫</button>
+  </div>
+  <div class="wfind" id="find"><input id="fq" placeholder="Find"><input id="fr" placeholder="Replace with"><button class="k-btn" id="fn">Next</button><button class="k-btn" id="fra">Replace all</button><span id="fcnt" style="color:var(--k-sub);font-size:12px"></span><button class="k-tb" id="fx" title="Close">✕</button></div>
+  <div class="wscroll" id="scroll"><div class="paper" id="paper" contenteditable="true" spellcheck="true"></div></div>
+</div></div>
+<div class="imgbar" id="imgbar"><button class="k-tb" data-w="25">25%</button><button class="k-tb" data-w="50">50%</button><button class="k-tb" data-w="75">75%</button><button class="k-tb" data-w="100">100%</button><span class="k-vs"></span><button class="k-tb" data-a="left">⫷</button><button class="k-tb" data-a="center">≡</button><button class="k-tb" data-a="right">⫸</button><button class="k-tb" data-a="del" title="Delete">🗑</button></div>
+<script>
+'use strict';
+const { $, $$, h, esc, x } = Kit;
+const lib = new Kit.Library('write');
+const paper = $('#paper'), title = $('#title'), status = $('#status');
+let doc = null, dirty = false, saveT = 0, zoomLvl = 'fit';
+
+// ---------- templates ----------
+const P = s => `<p>${s}</p>`;
+const TEMPLATES = [
+  { name: 'Blank document', html: '<p><br></p>' },
+  { name: 'Letter', html: `<p style="text-align:right">Your Name<br>123 Street Name<br>City, Postcode<br>${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</p><p><br></p><p>Recipient Name<br>Company<br>Address</p><p><br></p><p>Dear Recipient,</p><p>Write the first paragraph of your letter here. Say why you are writing.</p><p>Add the details in the second paragraph.</p><p>Close with what you would like to happen next.</p><p><br></p><p>Yours sincerely,</p><p><br></p><p>Your Name</p>` },
+  { name: 'Report', html: `<h1>Report title</h1><p style="color:#666">Prepared by Your Name · ${new Date().toLocaleDateString()}</p><h2>Summary</h2><p>One paragraph that tells the reader what this report found.</p><h2>Background</h2><p>Why this work was done.</p><h2>Findings</h2><ul><li>First finding</li><li>Second finding</li><li>Third finding</li></ul><h2>Next steps</h2><ol><li>Do this</li><li>Then this</li></ol>` },
+  { name: 'Resume', html: `<h1 style="text-align:center">Your Name</h1><p style="text-align:center">email@example.com · 555 0100 · City</p><h2>Experience</h2><p><b>Job title</b> — Company · 2022 – now</p><ul><li>What you achieved, with a number if you can</li><li>Another achievement</li></ul><p><b>Job title</b> — Company · 2019 – 2022</p><ul><li>What you did there</li></ul><h2>Education</h2><p><b>Qualification</b> — School · Year</p><h2>Skills</h2><p>Skill one · Skill two · Skill three</p>` },
+  { name: 'Meeting notes', html: `<h1>Meeting notes</h1><p><b>Date:</b> ${new Date().toLocaleDateString()}<br><b>Attendees:</b> </p><h2>Agenda</h2><ol><li>Topic</li><li>Topic</li></ol><h2>Notes</h2><p><br></p><h2>Action items</h2><table><tbody><tr><th>Task</th><th>Owner</th><th>Due</th></tr><tr><td><br></td><td><br></td><td><br></td></tr><tr><td><br></td><td><br></td><td><br></td></tr></tbody></table>` },
+  { name: 'Essay', html: `<h1 style="text-align:center">Essay title</h1><p style="text-align:center">Your Name · Class · Date</p><p style="text-indent:2em">Introduction: open with a hook and end with your main argument.</p><p style="text-indent:2em">Body paragraph one: your first point and the evidence for it.</p><p style="text-indent:2em">Body paragraph two: your second point.</p><p style="text-indent:2em">Conclusion: sum up and say why it matters.</p>` }
+];
+TEMPLATES.forEach(t => t.preview = `<div class="tpl-page"><b>${esc(t.name === 'Blank document' ? '' : t.name)}</b>${t.name === 'Blank document' ? '' : '<i></i><i style="width:80%"></i><i></i><i style="width:60%"></i><i></i><i style="width:70%"></i>'}</div>`);
+
+// ---------- home / open ----------
+const showHome = () => { flush(); doc = null; $('#ed').classList.remove('on'); $('#home').classList.remove('off'); refreshHome(); document.title = 'Write'; };
+const refreshHome = Kit.home({ el: $('#home'), title: 'Write', accent: '#2b6cd8', lib, templates: TEMPLATES, importLabel: 'Open a file…',
+  onNew: t => openDoc({ id: Kit.uid(), name: t.name === 'Blank document' ? 'Untitled document' : t.name, html: t.html, page: 'letter' }, true),
+  onOpen: id => { const d = lib.load(id); if (d) openDoc({ ...d, id }); else Kit.toast('That document is gone'); },
+  onImport: () => importFile() });
+const openDoc = (d, isNew) => {
+  doc = d; paper.innerHTML = d.html || '<p><br></p>'; title.value = d.name;
+  paper.classList.toggle('a4', d.page === 'a4');
+  $('#home').classList.add('off'); $('#ed').classList.add('on'); document.title = d.name + ' — Write';
+  fitZoom(); if (isNew) save(); dirty = false; counts();
+  paper.focus(); placeCaretStart();
+};
+const placeCaretStart = () => { try { const r = document.createRange(); r.setStart(paper, 0); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch {} };
+const save = () => { if (!doc) return; clearFound(); doc.html = paper.innerHTML; doc.name = title.value.trim() || 'Untitled document'; lib.save(doc.id, doc.name, { name: doc.name, html: doc.html, page: doc.page }); dirty = false; counts(); };
+const flush = () => { if (dirty) save(); };
+const changed = () => { dirty = true; status.textContent = 'Saving…'; clearTimeout(saveT); saveT = setTimeout(save, 700); counts(); };
+paper.addEventListener('input', changed);
+title.addEventListener('input', () => { document.title = title.value + ' — Write'; changed(); });
+title.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); paper.focus(); } });
+addEventListener('beforeunload', flush); addEventListener('pagehide', flush);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+const counts = () => { const t = paper.innerText.trim(); const w = t ? t.split(/\s+/).length : 0; $('#status').dataset.c = w; status.title = `${w} words · ${t.replace(/\s/g, '').length} characters`; status.innerHTML = `<b>${w} words</b> · ${dirty ? 'Saving…' : 'Saved'}`; };
+
+// ---------- zoom ----------
+const fitZoom = () => {
+  const avail = $('#scroll').clientWidth - 24, w = paper.offsetWidth || 816;
+  const z = zoomLvl === 'fit' ? Math.min(1, avail / w) : zoomLvl;
+  paper.style.zoom = z;
+};
+addEventListener('resize', () => { if (doc) fitZoom(); });
+
+// ---------- commands ----------
+document.execCommand('defaultParagraphSeparator', false, 'p');
+const cmd = (c, v = null) => { paper.focus(); document.execCommand('styleWithCSS', false, !/^(bold|italic|underline|strikeThrough)$/.test(c)); document.execCommand(c, false, v); changed(); syncTools(); };
+$$('[data-c]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => cmd(b.dataset.c); });
+$$('[data-x]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => ({ link: insertLink, image: insertImage, table: insertTable })[b.dataset.x](); });
+let savedRange = null;
+const keepSel = () => { const s = getSelection(); if (s.rangeCount && paper.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); };
+const restoreSel = () => { paper.focus(); if (savedRange) { const s = getSelection(); s.removeAllRanges(); s.addRange(savedRange); } };
+document.addEventListener('selectionchange', () => { keepSel(); syncTools(); });
+$('#block').onchange = e => { restoreSel(); cmd('formatBlock', '<' + e.target.value + '>'); };
+$('#font').onchange = e => { restoreSel(); if (e.target.value) cmd('fontName', e.target.value); };
+$('#size').onchange = e => { restoreSel(); setSize(+e.target.value); };
+const setSize = pt => {
+  if (!pt) return;
+  document.execCommand('styleWithCSS', false, false); document.execCommand('fontSize', false, '7');
+  $$('font[size="7"]', paper).forEach(f => { const s = document.createElement('span'); s.style.fontSize = pt + 'pt'; s.innerHTML = f.innerHTML; f.replaceWith(s); });
+  changed();
+};
+$('#fc').oninput = e => { $('#fcI').style.background = e.target.value; restoreSel(); cmd('foreColor', e.target.value); };
+$('#hc').oninput = e => { $('#hcI').style.background = e.target.value; restoreSel(); cmd('hiliteColor', e.target.value); };
+const syncTools = () => {
+  if (!doc) return;
+  ['bold', 'italic', 'underline', 'strikeThrough', 'superscript', 'subscript', 'insertUnorderedList', 'insertOrderedList', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'].forEach(c => { const b = $(`[data-c="${c}"]`); if (b) b.classList.toggle('on', document.queryCommandState(c)); });
+  const s = getSelection(); let n = s.anchorNode; if (!n || !paper.contains(n)) return;
+  if (n.nodeType === 3) n = n.parentNode;
+  const blk = n.closest('h1,h2,h3,blockquote,pre,p,li,td,th,div'); const tag = blk && blk !== paper ? blk.tagName.toLowerCase() : 'p';
+  $('#block').value = ['h1', 'h2', 'h3', 'blockquote', 'pre'].includes(tag) ? tag : 'p';
+  const cs = getComputedStyle(n); $('#size').value = String(Math.round(parseFloat(cs.fontSize) * 0.75)) || '';
+  if (!$('#size').value) $('#size').value = '';
+  const fam = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(); $('#font').value = [...$('#font').options].some(o => o.value === fam) ? fam : '';
+};
+const insertHTML = html => { restoreSel(); document.execCommand('insertHTML', false, html); changed(); };
+const insertLink = async () => {
+  keepSel(); const sel = String(getSelection());
+  const v = await Kit.dialog('Insert link', [{ id: 'u', label: 'Address', value: 'https://' }, ...(sel ? [] : [{ id: 't', label: 'Text to show', value: '' }])], { ok: 'Insert' });
+  if (!v || !v.u.trim()) return;
+  const url = /^[a-z]+:/i.test(v.u.trim()) ? v.u.trim() : 'https://' + v.u.trim();
+  if (sel) { restoreSel(); cmd('createLink', url); } else insertHTML(`<a href="${esc(url)}">${esc(v.t || url)}</a>`);
+};
+const insertImage = async () => {
+  keepSel(); const f = await Kit.pick('image/*'); if (!f) return;
+  const url = await Kit.readAs(f, 'readAsDataURL'); const sz = await Kit.imgSize(url);
+  insertHTML(`<img src="${url}" style="width:${sz.w > 600 ? 100 : Math.round(sz.w / 6.24)}%" alt="${esc(f.name)}">`);
+};
+const insertTable = async () => {
+  keepSel(); const v = await Kit.dialog('Insert table', [{ id: 'r', label: 'Rows', type: 'number', value: 3, min: 1, max: 60 }, { id: 'c', label: 'Columns', type: 'number', value: 3, min: 1, max: 12 }, { id: 'hd', label: 'Header row', type: 'select', value: 'y', options: [['y', 'Yes'], ['n', 'No']] }], { ok: 'Insert' });
+  if (!v) return; const r = Kit.clamp(+v.r || 3, 1, 60), c = Kit.clamp(+v.c || 3, 1, 12);
+  let t = '<table><tbody>'; for (let i = 0; i < r; i++) { t += '<tr>'; for (let j = 0; j < c; j++) t += i === 0 && v.hd === 'y' ? '<th><br></th>' : '<td><br></td>'; t += '</tr>'; } t += '</tbody></table><p><br></p>';
+  insertHTML(t);
+};
+const cellOf = () => { const s = getSelection(); let n = s.anchorNode; if (!n) return null; if (n.nodeType === 3) n = n.parentNode; return n.closest && paper.contains(n) ? n.closest('td,th') : null; };
+const tableOp = op => {
+  const c = cellOf(); if (!c) return Kit.toast('Put the cursor in a table first');
+  const tr = c.parentNode, tbl = c.closest('table'), idx = [...tr.children].indexOf(c);
+  if (op === 'rowA' || op === 'rowB') { const n = document.createElement('tr'); [...tr.children].forEach(() => n.appendChild(h('<td><br></td>'))); op === 'rowA' ? tr.after(n) : tr.before(n); }
+  if (op === 'colA' || op === 'colB') $$('tr', tbl).forEach(r => { const ref = r.children[idx]; const n = h(ref && ref.tagName === 'TH' ? '<th><br></th>' : '<td><br></td>'); if (!ref) r.appendChild(n); else op === 'colA' ? ref.after(n) : ref.before(n); });
+  if (op === 'rowD') { tr.remove(); if (!$('tr', tbl)) tbl.remove(); }
+  if (op === 'colD') { $$('tr', tbl).forEach(r => r.children[idx] && r.children[idx].remove()); if (!$('td,th', tbl)) tbl.remove(); }
+  if (op === 'tblD') tbl.remove();
+  changed();
+};
+
+// ---------- image tools ----------
+let selImg = null;
+const imgbar = $('#imgbar');
+const placeImgBar = () => { if (!selImg || !paper.contains(selImg)) { imgbar.classList.remove('on'); selImg = null; return; } const r = selImg.getBoundingClientRect(); imgbar.classList.add('on'); imgbar.style.left = Math.max(4, r.left) + 'px'; imgbar.style.top = Math.max(4, r.top - 40) + 'px'; };
+paper.addEventListener('click', e => { $$('img.sel', paper).forEach(i => i.classList.remove('sel')); selImg = e.target.tagName === 'IMG' ? e.target : null; if (selImg) selImg.classList.add('sel'); placeImgBar(); });
+$('#scroll').addEventListener('scroll', placeImgBar);
+$$('[data-w]', imgbar).forEach(b => b.onclick = () => { if (selImg) { selImg.style.width = b.dataset.w + '%'; selImg.style.height = 'auto'; changed(); placeImgBar(); } });
+$$('[data-a]', imgbar).forEach(b => b.onclick = () => {
+  if (!selImg) return; const a = b.dataset.a;
+  if (a === 'del') { selImg.remove(); selImg = null; placeImgBar(); changed(); return; }
+  let p = selImg.parentNode; if (p === paper) { p = document.createElement('p'); selImg.before(p); p.appendChild(selImg); }
+  p.style.textAlign = a; changed(); placeImgBar();
+});
+
+// ---------- find & replace ----------
+const clearFound = () => $$('mark.found', paper).forEach(m => m.replaceWith(...m.childNodes)) || paper.normalize();
+const findAll = q => {
+  clearFound(); paper.normalize(); if (!q) { $('#fcnt').textContent = ''; return []; }
+  const out = [], walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT), nodes = []; let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  const ql = q.toLowerCase();
+  nodes.forEach(t => { let i, s = t.nodeValue.toLowerCase(), node = t; let off = 0;
+    while ((i = s.indexOf(ql, off)) >= 0) { const r = node.splitText(i); const rest = r.splitText(q.length); const m = document.createElement('mark'); m.className = 'found'; r.before(m); m.appendChild(r); out.push(m); node = rest; s = rest.nodeValue.toLowerCase(); off = 0; } });
+  $('#fcnt').textContent = out.length ? out.length + ' found' : 'Not found'; return out;
+};
+let fIdx = -1;
+$('#fq').oninput = () => { fIdx = -1; findAll($('#fq').value); };
+$('#fn').onclick = () => { const m = $$('mark.found', paper); if (!m.length) return findAll($('#fq').value); fIdx = (fIdx + 1) % m.length; m[fIdx].scrollIntoView({ block: 'center' }); m.forEach((x, i) => x.style.background = i === fIdx ? '#ffb347' : ''); };
+$('#fq').onkeydown = e => { if (e.key === 'Enter') $('#fn').click(); if (e.key === 'Escape') closeFind(); };
+$('#fra').onclick = () => { const m = findAll($('#fq').value); m.forEach(x => x.replaceWith(document.createTextNode($('#fr').value))); paper.normalize(); Kit.toast(m.length + ' replaced'); $('#fcnt').textContent = ''; changed(); };
+const openFind = () => { $('#find').classList.add('on'); $('#fq').focus(); $('#fq').select(); };
+const closeFind = () => { $('#find').classList.remove('on'); clearFound(); paper.focus(); };
+$('#fx').onclick = closeFind;
+
+// ---------- menus ----------
+const MENUS = {
+  file: () => [
+    { label: 'New', act: () => { flush(); openDoc({ id: Kit.uid(), name: 'Untitled document', html: '<p><br></p>', page: doc.page }, true); } },
+    { label: 'Open…', act: showHome },
+    { label: 'Open a file from this device…', act: importFile },
+    '-',
+    { label: 'Save as Word (.docx)', hint: 'Ctrl+S', act: () => exportDocx() },
+    { label: 'Save as PDF / Print', hint: 'Ctrl+P', act: () => { clearFound(); print(); } },
+    { label: 'Save as web page (.html)', act: exportHtml },
+    { label: 'Save as plain text (.txt)', act: () => Kit.download(new Blob([paper.innerText], { type: 'text/plain' }), Kit.safeName(title.value) + '.txt') },
+    '-',
+    { label: 'Page size: Letter', checked: doc.page !== 'a4', act: () => setPage('letter') },
+    { label: 'Page size: A4', checked: doc.page === 'a4', act: () => setPage('a4') },
+    '-',
+    { label: 'Close document', act: showHome }
+  ],
+  edit: () => [
+    { label: 'Undo', hint: 'Ctrl+Z', act: () => cmd('undo') }, { label: 'Redo', hint: 'Ctrl+Y', act: () => cmd('redo') }, '-',
+    { label: 'Select all', hint: 'Ctrl+A', act: () => { paper.focus(); document.execCommand('selectAll'); } },
+    { label: 'Find and replace', hint: 'Ctrl+F', act: openFind }
+  ],
+  insert: () => [
+    { label: 'Picture…', act: insertImage }, { label: 'Table…', act: insertTable }, { label: 'Link…', hint: 'Ctrl+K', act: insertLink },
+    '-',
+    { label: 'Page break', hint: 'Ctrl+Enter', act: () => insertHTML('<hr class="pb"><p><br></p>') },
+    { label: 'Horizontal line', act: () => insertHTML('<hr><p><br></p>') },
+    { label: 'Today’s date', act: () => insertHTML(esc(new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }))) },
+    { label: 'Symbol…', act: async () => { keepSel(); const v = await Kit.dialog('Insert symbol', [{ id: 's', label: 'Pick one', type: 'select', value: '©', options: '© ® ™ € £ ¥ ° ± × ÷ ≈ ≠ ≤ ≥ → ← ↑ ↓ • … — – ½ ¼ ¾ √ ∞ π Ω µ ✓ ✗ ★ ♥'.split(' ').map(s => [s, s]) }], { ok: 'Insert' }); if (v) insertHTML(esc(v.s)); } },
+    '-',
+    { label: 'Table: row above', act: () => tableOp('rowB') }, { label: 'Table: row below', act: () => tableOp('rowA') },
+    { label: 'Table: column left', act: () => tableOp('colB') }, { label: 'Table: column right', act: () => tableOp('colA') },
+    { label: 'Table: delete row', act: () => tableOp('rowD') }, { label: 'Table: delete column', act: () => tableOp('colD') }, { label: 'Table: delete table', act: () => tableOp('tblD') }
+  ],
+  format: () => [
+    { label: 'Normal text', act: () => cmd('formatBlock', '<p>') }, { label: 'Heading 1', act: () => cmd('formatBlock', '<h1>') }, { label: 'Heading 2', act: () => cmd('formatBlock', '<h2>') }, { label: 'Heading 3', act: () => cmd('formatBlock', '<h3>') },
+    '-',
+    { label: 'Line spacing: single', act: () => lineSpacing(1.15) }, { label: 'Line spacing: 1.5', act: () => lineSpacing(1.5) }, { label: 'Line spacing: double', act: () => lineSpacing(2) },
+    '-',
+    { label: 'UPPERCASE', act: () => changeCase(s => s.toUpperCase()) }, { label: 'lowercase', act: () => changeCase(s => s.toLowerCase()) }, { label: 'Title Case', act: () => changeCase(s => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase())) },
+    '-',
+    { label: 'Clear formatting', act: () => cmd('removeFormat') }
+  ],
+  view: () => [
+    ...[['fit', 'Fit to window'], [0.75, '75%'], [1, '100%'], [1.25, '125%'], [1.5, '150%']].map(([z, l]) => ({ label: 'Zoom: ' + l, checked: zoomLvl === z, act: () => { zoomLvl = z; fitZoom(); } })),
+    '-',
+    { label: `Word count (${$('#status').dataset.c || 0})`, act: () => { const t = paper.innerText; Kit.dialog('Word count', [], { cancel: '', ok: 'Close', html: `<p>Words: <b>${t.trim() ? t.trim().split(/\s+/).length : 0}</b><br>Characters: <b>${t.replace(/\n/g, '').length}</b><br>Characters (no spaces): <b>${t.replace(/\s/g, '').length}</b><br>Paragraphs: <b>${t.split(/\n+/).filter(s => s.trim()).length}</b></p>` }); } }
+  ]
+};
+$$('[data-m]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => Kit.menu(b, MENUS[b.dataset.m]()); });
+const setPage = p => { doc.page = p; paper.classList.toggle('a4', p === 'a4'); fitZoom(); changed(); };
+const selectedBlocks = () => { const s = getSelection(); if (!s.rangeCount) return []; const r = s.getRangeAt(0); return $$('p,h1,h2,h3,li,blockquote,pre,div', paper).filter(b => r.intersectsNode(b)); };
+const lineSpacing = v => { restoreSel(); const b = selectedBlocks(); (b.length ? b : [...paper.children]).forEach(el => el.style.lineHeight = v); changed(); };
+const changeCase = f => { restoreSel(); const s = String(getSelection()); if (!s) return Kit.toast('Select some text first'); document.execCommand('insertText', false, f(s)); changed(); };
+
+// ---------- keys ----------
+document.addEventListener('keydown', e => {
+  if (!doc) return; const c = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (c && k === 's') { e.preventDefault(); save(); exportDocx(); }
+  else if (c && k === 'p') { e.preventDefault(); clearFound(); print(); }
+  else if (c && k === 'f') { e.preventDefault(); openFind(); }
+  else if (c && k === 'h') { e.preventDefault(); openFind(); $('#fr').focus(); }
+  else if (c && k === 'k') { e.preventDefault(); insertLink(); }
+  else if (c && k === 'enter') { e.preventDefault(); insertHTML('<hr class="pb"><p><br></p>'); }
+  else if (c && e.shiftKey && (k === '>' || k === '.')) { e.preventDefault(); bumpSize(1); }
+  else if (c && e.shiftKey && (k === '<' || k === ',')) { e.preventDefault(); bumpSize(-1); }
+  else if (e.key === 'Tab' && document.activeElement === paper && !cellOf()) { e.preventDefault(); if (document.queryCommandState('insertUnorderedList') || document.queryCommandState('insertOrderedList')) cmd(e.shiftKey ? 'outdent' : 'indent'); else document.execCommand('insertText', false, ' '); }
+});
+const bumpSize = d => { const sizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72]; const cur = +$('#size').value || 11; const i = sizes.findIndex(s => s >= cur); setSize(sizes[Kit.clamp(i + d, 0, sizes.length - 1)]); };
+paper.addEventListener('paste', e => {
+  // keep pasted HTML but drop scripts/styles/classes from other sites
+  const html = e.clipboardData.getData('text/html'); if (!html) return;
+  e.preventDefault();
+  const d = new DOMParser().parseFromString(html, 'text/html');
+  $$('script,style,meta,link,iframe,object,embed,form,input,button,svg', d).forEach(n => n.remove());
+  $$('*', d.body).forEach(n => { [...n.attributes].forEach(a => { if (!['href', 'src', 'colspan', 'rowspan', 'style'].includes(a.name) || /^on/i.test(a.name)) n.removeAttribute(a.name); }); if (n.hasAttribute('href') && /^\s*javascript:/i.test(n.getAttribute('href'))) n.removeAttribute('href'); if (n.style) { n.style.removeProperty('position'); n.style.removeProperty('font-family'); n.style.removeProperty('background'); } });
+  document.execCommand('insertHTML', false, d.body.innerHTML); changed();
+});
+
+// ---------- export: HTML ----------
+const exportHtml = () => { clearFound(); Kit.download(new Blob([`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title.value)}</title><style>body{max-width:800px;margin:40px auto;font:11pt/1.5 Calibri,Arial,sans-serif;padding:0 20px}table{border-collapse:collapse}td,th{border:1px solid #999;padding:4px 7px}img{max-width:100%}</style></head><body>${paper.innerHTML}</body></html>`], { type: 'text/html' }), Kit.safeName(title.value) + '.html'); };
+
+// ---------- export: DOCX ----------
+const colorHex = c => { if (!c) return null; c = c.trim(); let m = /^#([0-9a-f]{3})$/i.exec(c); if (m) return m[1].split('').map(x => x + x).join('').toUpperCase(); m = /^#([0-9a-f]{6})$/i.exec(c); if (m) return m[1].toUpperCase(); m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(c); if (m) { if (m[4] !== undefined && +m[4] === 0) return null; return [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('').toUpperCase(); } const t = document.createElement('i'); t.style.color = c; document.body.appendChild(t); const r = getComputedStyle(t).color; t.remove(); return r !== c && /^rgb/.test(r) ? colorHex(r) : null; };
+const sizePt = s => { if (!s) return null; let m = /([\d.]+)pt/.exec(s); if (m) return +m[1]; m = /([\d.]+)px/.exec(s); if (m) return +m[1] * 0.75; const named = { 'x-small': 7.5, small: 10, medium: 12, large: 13.5, 'x-large': 18, 'xx-large': 24, 'xxx-large': 36 }; return named[s] || null; };
+const exportDocx = async () => {
+  clearFound();
+  const media = [], links = []; let docPrId = 1, numCount = 0; const nums = [];
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  const contentW = doc.page === 'a4' ? 602 : 624;   // px at 96dpi (page minus 1in margins)
+  const rPr = s => { let o = ''; if (s.font) o += `<w:rFonts w:ascii="${x(s.font)}" w:hAnsi="${x(s.font)}" w:cs="${x(s.font)}"/>`; if (s.b) o += '<w:b/>'; if (s.i) o += '<w:i/>'; if (s.s) o += '<w:strike/>'; if (s.color) o += `<w:color w:val="${s.color}"/>`; if (s.size) o += `<w:sz w:val="${Math.round(s.size * 2)}"/><w:szCs w:val="${Math.round(s.size * 2)}"/>`; if (s.hl) o += `<w:shd w:val="clear" w:color="auto" w:fill="${s.hl}"/>`; if (s.u) o += '<w:u w:val="single"/>'; if (s.va) o += `<w:vertAlign w:val="${s.va}"/>`; if (s.link) o += '<w:rStyle w:val="Hyperlink"/>'; return o ? `<w:rPr>${o}</w:rPr>` : ''; };
+  const styleOf = (el, s) => {
+    s = { ...s }; const t = el.tagName, st = el.style || {};
+    if (t === 'B' || t === 'STRONG' || t === 'TH') s.b = true; if (t === 'I' || t === 'EM') s.i = true; if (t === 'U' || t === 'INS') s.u = true; if (t === 'S' || t === 'STRIKE' || t === 'DEL') s.s = true;
+    if (t === 'SUP') s.va = 'superscript'; if (t === 'SUB') s.va = 'subscript'; if (t === 'CODE') s.font = 'Consolas';
+    if (t === 'FONT') { if (el.color) s.color = colorHex(el.color); if (el.face) s.font = el.face.split(',')[0].replace(/["']/g, ''); }
+    if (st.fontWeight === 'bold' || +st.fontWeight >= 600) s.b = true; if (st.fontWeight === 'normal' || (+st.fontWeight && +st.fontWeight < 600)) s.b = false;
+    if (st.fontStyle === 'italic') s.i = true; const td = st.textDecoration || st.textDecorationLine || ''; if (/underline/.test(td)) s.u = true; if (/line-through/.test(td)) s.s = true;
+    if (st.color) s.color = colorHex(st.color) || s.color; const bg = st.backgroundColor; if (bg) s.hl = colorHex(bg) || s.hl;
+    if (st.fontSize) s.size = sizePt(st.fontSize) || s.size; if (st.fontFamily) s.font = st.fontFamily.split(',')[0].replace(/["']/g, '').trim();
+    if (st.verticalAlign === 'super') s.va = 'superscript'; if (st.verticalAlign === 'sub') s.va = 'subscript';
+    return s;
+  };
+  const imgRun = async img => {
+    const d = await Kit.officeImage(img.src); if (!d) return '';
+    const n = media.length + 1, name = `image${n}.${d.ext}`; media.push({ name, data: d.data, rid: 'rIdImg' + n });
+    const nat = await Kit.imgSize(img.src); let w = /%$/.test(img.style.width) ? contentW * parseFloat(img.style.width) / 100 : (parseFloat(img.style.width) || Math.min(nat.w, contentW));
+    const hgt = w * (nat.h / (nat.w || 1)), cx = Math.round(w * 9525), cy = Math.round(hgt * 9525), id = docPrId++;
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Picture ${id}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  };
+  const runs = async (node, s) => {
+    let o = '';
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) { const t = c.nodeValue.replace(/\s+/g, m => m.includes(' ') ? m : ' '); if (t) o += t.split(' ').map(p => p ? `<w:r>${rPr(s)}<w:t xml:space="preserve">${x(p)}</w:t></w:r>` : '').join(`<w:r>${rPr(s)}<w:tab/></w:r>`); }
+      else if (c.nodeType === 1) {
+        if (c.tagName === 'BR') o += '<w:r><w:br/></w:r>';
+        else if (c.tagName === 'IMG') o += await imgRun(c);
+        else if (c.tagName === 'A' && c.getAttribute('href')) { const id = 'rIdL' + (links.length + 1); links.push({ id, url: c.getAttribute('href') }); o += `<w:hyperlink r:id="${id}">${await runs(c, { ...styleOf(c, s), link: true })}</w:hyperlink>`; }
+        else if (!/^(SCRIPT|STYLE)$/.test(c.tagName)) o += await runs(c, styleOf(c, s));
+      }
+    }
+    return o;
+  };
+  const pPr = (el, extra = '') => {
+    let o = extra; const st = el.style || {}, al = st.textAlign || el.getAttribute && el.getAttribute('align');
+    const jc = { center: 'center', right: 'right', justify: 'both', left: 'left' }[al]; if (jc) o += `<w:jc w:val="${jc}"/>`;
+    const ml = parseFloat(st.marginLeft) || parseFloat(st.paddingLeft) || 0, ti = parseFloat(st.textIndent) || 0;
+    if (ml || ti) o += `<w:ind${ml ? ` w:left="${Math.round(ml * 15)}"` : ''}${ti ? ` w:firstLine="${Math.round((/em/.test(st.textIndent) ? ti * 14.67 : ti) * 15)}"` : ''}/>`;
+    const lh = parseFloat(st.lineHeight); if (lh && lh < 5) o += `<w:spacing w:line="${Math.round(lh * 240)}" w:lineRule="auto"/>`;
+    return o;
+  };
+  // order inside pPr must be: pStyle, keepNext.., numPr, .., spacing, ind, jc  → build carefully
+  const para = async (el, style, s = {}, num = null) => {
+    let pre = ''; if (style) pre += `<w:pStyle w:val="${style}"/>`; if (num) pre += `<w:numPr><w:ilvl w:val="${num.lvl}"/><w:numId w:val="${num.id}"/></w:numPr>`;
+    const raw = pPr(el); const parts = { spacing: (/<w:spacing[^>]*\/>/.exec(raw) || [''])[0], ind: (/<w:ind[^>]*\/>/.exec(raw) || [''])[0], jc: (/<w:jc[^>]*\/>/.exec(raw) || [''])[0] };
+    const pp = pre + parts.spacing + (num ? '' : parts.ind) + parts.jc;
+    return `<w:p>${pp ? `<w:pPr>${pp}</w:pPr>` : ''}${await runs(el, styleOf(el, s))}</w:p>`;
+  };
+  const BLOCK = /^(P|DIV|H[1-6]|UL|OL|LI|TABLE|BLOCKQUOTE|PRE|HR|SECTION|ARTICLE|HEADER|FOOTER|FIGURE)$/;
+  const blocks = async (container, s = {}, list = null) => {
+    let o = '', inline = [];
+    const flush = async () => { if (!inline.length) return; const tmp = document.createElement('p'); inline.forEach(n => tmp.appendChild(n.cloneNode(true))); if (tmp.textContent.trim() || tmp.querySelector('img,br')) o += await para(tmp, null, s); inline = []; };
+    for (const el of [...container.childNodes]) {
+      if (el.nodeType !== 1 || !BLOCK.test(el.tagName)) { if (el.nodeType === 3 && !el.nodeValue.trim() && !inline.length) continue; inline.push(el); continue; }
+      await flush(); const t = el.tagName;
+      if (/^H[1-6]$/.test(t)) o += await para(el, 'Heading' + t[1], s);
+      else if (t === 'BLOCKQUOTE') o += $$(':scope>p', el).length ? (await Promise.all($$(':scope>p,:scope>div', el).map(p => para(p, 'Quote', s)))).join('') : await para(el, 'Quote', s);
+      else if (t === 'PRE') { for (const line of el.textContent.split('\n')) o += `<w:p><w:pPr><w:pStyle w:val="Code"/></w:pPr><w:r><w:t xml:space="preserve">${x(line)}</w:t></w:r></w:p>`; }
+      else if (t === 'HR') o += el.classList.contains('pb') ? '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' : '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="AAAAAA"/></w:pBdr></w:pPr></w:p>';
+      else if (t === 'UL' || t === 'OL') {
+        const lvl = list ? list.lvl + 1 : 0; let id = list && list.ordered === (t === 'OL') ? list.id : null;
+        if (!id) { id = ++numCount; nums.push({ id, ordered: t === 'OL' }); }
+        const ctx = { id, lvl: Math.min(lvl, 8), ordered: t === 'OL' };
+        for (const li of $$(':scope>li', el)) {
+          const sub = $$(':scope>ul,:scope>ol', li), clone = li.cloneNode(true); $$(':scope>ul,:scope>ol', clone).forEach(n => n.remove());
+          const hasBlock = [...clone.children].some(c => /^(P|DIV|H[1-6])$/.test(c.tagName));
+          if (hasBlock) { let first = true; for (const c of [...clone.children]) { o += await para(c, /^H[1-6]$/.test(c.tagName) ? 'Heading' + c.tagName[1] : null, s, first ? ctx : null); first = false; } }
+          else o += await para(clone, null, s, ctx);
+          for (const sl of sub) { const holder = document.createElement('div'); holder.appendChild(sl.cloneNode(true)); o += await blocks(holder, s, ctx); }
+        }
+      }
+      else if (t === 'LI') o += await para(el, null, s, list || { id: (nums.push({ id: ++numCount, ordered: false }), numCount), lvl: 0 });
+      else if (t === 'TABLE') o += await table(el, s);
+      else if (t === 'P' || t === 'FIGURE') o += await para(el, null, s);
+      else { const hasBlock = [...el.children].some(c => BLOCK.test(c.tagName)); o += hasBlock ? await blocks(el, styleOf(el, s), list) : await para(el, null, s); }
+    }
+    await flush(); return o;
+  };
+  const table = async (tbl, s) => {
+    const rows = $$(':scope>tbody>tr,:scope>thead>tr,:scope>tfoot>tr,:scope>tr', tbl); if (!rows.length) return '';
+    const cols = Math.max(...rows.map(r => [...r.children].reduce((a, c) => a + (+c.colSpan || 1), 0)));
+    const cw = Math.floor(9360 / cols); let o = `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(b => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="9AA4B2"/>`).join('')}</w:tblBorders><w:tblCellMar><w:left w:w="100" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${'<w:gridCol w:w="' + cw + '"/>'.repeat(cols)}</w:tblGrid>`;
+    for (const r of rows) {
+      o += '<w:tr>';
+      for (const c of r.children) {
+        const span = +c.colSpan || 1, bg = colorHex(c.style.backgroundColor);
+        let inner = await blocks(c, c.tagName === 'TH' ? { ...s, b: true } : s); if (!inner.includes('<w:p>') && !inner.includes('<w:p ')) inner += '<w:p/>';
+        if (/<\/w:tbl>$/.test(inner)) inner += '<w:p/>';
+        o += `<w:tc><w:tcPr><w:tcW w:w="${cw * span}" w:type="dxa"/>${span > 1 ? `<w:gridSpan w:val="${span}"/>` : ''}${bg ? `<w:shd w:val="clear" w:color="auto" w:fill="${bg}"/>` : ''}</w:tcPr>${inner}</w:tc>`;
+      }
+      o += '</w:tr>';
+    }
+    return o + '</w:tbl>';
+  };
+  status.textContent = 'Making .docx…';
+  let body = await blocks(paper); if (!body) body = '<w:p/>';
+  const pg = doc.page === 'a4' ? '<w:pgSz w:w="11906" w:h="16838"/>' : '<w:pgSz w:w="12240" w:h="15840"/>';
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>${body}<w:sectPr>${pg}<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const hd = (n, sz, col) => `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="80"/><w:outlineLvl w:val="${n - 1}"/></w:pPr><w:rPr><w:b/><w:color w:val="${col}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr></w:style>`;
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>${hd(1, 40, '1F3864')}${hd(2, 30, '2F5496')}${hd(3, 25, '1F3864')}${hd(4, 23, '2F5496')}${hd(5, 22, '2F5496')}${hd(6, 22, '1F3864')}<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:pBdr><w:left w:val="single" w:sz="18" w:space="8" w:color="B4C6E7"/></w:pBdr><w:ind w:left="360"/></w:pPr><w:rPr><w:i/><w:color w:val="444444"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:shd w:val="clear" w:color="auto" w:fill="F4F5F7"/></w:pPr><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720"/></w:pPr></w:style><w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="1D5FBF"/><w:u w:val="single"/></w:rPr></w:style></w:styles>`;
+  const lvls = ordered => Array.from({ length: 9 }, (_, i) => `<w:lvl w:ilvl="${i}"><w:start w:val="1"/><w:numFmt w:val="${ordered ? ['decimal', 'lowerLetter', 'lowerRoman'][i % 3] : 'bullet'}"/><w:lvlText w:val="${ordered ? `%${i + 1}.` : ['•', '◦', '▪'][i % 3]}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="${720 * (i + 1)}" w:hanging="360"/></w:pPr>${ordered ? '' : '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>'}</w:lvl>`).join('');
+  const numberingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="hybridMultilevel"/>${lvls(false)}</w:abstractNum><w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="hybridMultilevel"/>${lvls(true)}</w:abstractNum>${nums.map(n => `<w:num w:numId="${n.id}"><w:abstractNumId w:val="${n.ordered ? 1 : 0}"/>${n.ordered ? '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride>' : ''}</w:num>`).join('')}</w:numbering>`;
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="${R}/styles" Target="styles.xml"/><Relationship Id="rIdNum" Type="${R}/numbering" Target="numbering.xml"/>${media.map(m => `<Relationship Id="${m.rid}" Type="${R}/image" Target="media/${m.name}"/>`).join('')}${links.map(l => `<Relationship Id="${l.id}" Type="${R}/hyperlink" Target="${x(l.url)}" TargetMode="External"/>`).join('')}</Relationships>`;
+  const types = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="gif" ContentType="image/gif"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`;
+  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const core = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${x(title.value)}</dc:title><dc:creator>SanjivramOS Write</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`;
+  const blob = await Kit.zip([['[Content_Types].xml', types], ['_rels/.rels', rootRels], ['docProps/core.xml', core], ['word/document.xml', documentXml], ['word/styles.xml', stylesXml], ['word/numbering.xml', numberingXml], ['word/_rels/document.xml.rels', docRels], ...media.map(m => ['word/media/' + m.name, m.data])], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  window.__lastDocx = blob; counts();
+  Kit.download(blob, Kit.safeName(title.value) + '.docx');
+};
+
+// ---------- import ----------
+async function importFile() {
+  const f = await Kit.pick('.docx,.txt,.md,.html,.htm,.rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/html'); if (!f) return;
+  try {
+    const name = f.name.replace(/\.[^.]+$/, ''), ext = (f.name.split('.').pop() || '').toLowerCase();
+    let html;
+    if (ext === 'docx') html = await docxToHtml(await Kit.readAs(f, 'readAsArrayBuffer'));
+    else if (ext === 'doc') throw new Error('Old .doc files aren’t supported. Save it as .docx first.');
+    else if (ext === 'html' || ext === 'htm') { const d = new DOMParser().parseFromString(await Kit.readAs(f, 'readAsText'), 'text/html'); $$('script,style,iframe,object,embed,link,meta', d).forEach(n => n.remove()); $$('*', d.body).forEach(n => [...n.attributes].forEach(a => { if (/^on/i.test(a.name) || (a.name === 'href' && /^\s*javascript:/i.test(a.value))) n.removeAttribute(a.name); })); html = d.body.innerHTML; }
+    else { const t = await Kit.readAs(f, 'readAsText'); html = ext === 'md' ? mdToHtml(t) : t.split(/\r?\n/).map(l => `<p>${esc(l) || '<br>'}</p>`).join(''); }
+    openDoc({ id: Kit.uid(), name, html, page: 'letter' }, true); Kit.toast('Opened ' + f.name);
+  } catch (e) { Kit.toast('Couldn’t open that file: ' + e.message, 4000); console.error(e); }
+}
+window.importFile = importFile;
+const mdToHtml = t => {
+  const inl = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/`(.+?)`/g, '<code>$1</code>').replace(/\[(.+?)\]\((https?:[^)]+)\)/g, '<a href="$2">$1</a>');
+  let o = '', list = null;
+  for (const l of t.split(/\r?\n/)) {
+    const m = /^(#{1,3})\s+(.*)/.exec(l), b = /^\s*[-*]\s+(.*)/.exec(l), n = /^\s*\d+\.\s+(.*)/.exec(l);
+    const want = b ? 'ul' : n ? 'ol' : null; if (list && list !== want) { o += `</${list}>`; list = null; }
+    if (want && !list) { o += `<${want}>`; list = want; }
+    if (m) o += `<h${m[1].length}>${inl(m[2])}</h${m[1].length}>`; else if (b || n) o += `<li>${inl((b || n)[1])}</li>`; else if (l.trim()) o += `<p>${inl(l)}</p>`;
+  }
+  return o + (list ? `</${list}>` : '');
+};
+const docxToHtml = async buf => {
+  const files = await Kit.unzip(buf), main = 'word/document.xml';
+  if (!files.has(main)) throw new Error('No document inside — is it really a .docx?');
+  const dx = Kit.xml(files.get(main)), rels = Kit.rels(files, 'word/_rels/document.xml.rels');
+  const A = Kit.attr, kid = Kit.kid, kids = Kit.kids;
+  // styles: id → heading level / quote
+  const styleTag = {}, styleRun = {};
+  if (files.has('word/styles.xml')) Kit.all(Kit.xml(files.get('word/styles.xml')), 'style').forEach(s => {
+    const id = A(s, 'styleId'), nm = (A(kid(s, 'name'), 'val') || '').toLowerCase(); let m;
+    if ((m = /^heading (\d)$/.exec(nm))) styleTag[id] = 'h' + Math.min(3, +m[1]); else if (nm === 'title') styleTag[id] = 'h1'; else if (nm === 'subtitle') styleTag[id] = 'h2'; else if (/quote/.test(nm)) styleTag[id] = 'blockquote';
+    const ol = kid(kid(s, 'pPr'), 'outlineLvl'); if (!styleTag[id] && ol) styleTag[id] = 'h' + Math.min(3, +A(ol, 'val') + 1);
+  });
+  // numbering: numId → ilvl → ordered?
+  const numFmt = {};
+  if (files.has('word/numbering.xml')) {
+    const nx = Kit.xml(files.get('word/numbering.xml')), abs = {};
+    Kit.all(nx, 'abstractNum').forEach(a => { abs[A(a, 'abstractNumId')] = Object.fromEntries(kids(a, 'lvl').map(l => [A(l, 'ilvl'), A(kid(l, 'numFmt'), 'val')])); });
+    Kit.all(nx, 'num').forEach(n => { numFmt[A(n, 'numId')] = abs[A(kid(n, 'abstractNumId'), 'val')] || {}; });
+  }
+  const imgUrl = rid => { const r = rels[rid]; if (!r) return null; const p = Kit.resolve('word/document.xml', r.target), d = files.get(p); return d ? `data:${Kit.mimeOf(p)};base64,${Kit.b64(d)}` : null; };
+  const runHtml = r => {
+    const pr = kid(r, 'rPr'); let css = '', wrap = [];
+    if (pr) {
+      const on = n => { const e = kid(pr, n); return e && A(e, 'val') !== '0' && A(e, 'val') !== 'false'; };
+      if (on('b')) wrap.push('b'); if (on('i')) wrap.push('i'); if (kid(pr, 'u') && A(kid(pr, 'u'), 'val') !== 'none') wrap.push('u'); if (on('strike') || on('dstrike')) wrap.push('s');
+      const va = A(kid(pr, 'vertAlign'), 'val'); if (va === 'superscript') wrap.push('sup'); if (va === 'subscript') wrap.push('sub');
+      const col = A(kid(pr, 'color'), 'val'); if (col && /^[0-9a-f]{6}$/i.test(col) && col.toUpperCase() !== '000000') css += `color:#${col};`;
+      const sz = A(kid(pr, 'sz'), 'val'); if (sz && +sz !== 22) css += `font-size:${+sz / 2}pt;`;
+      const hl = A(kid(pr, 'highlight'), 'val'), shd = A(kid(pr, 'shd'), 'fill');
+      const HL = { yellow: '#ffff00', green: '#00ff00', cyan: '#00ffff', magenta: '#ff00ff', blue: '#0000ff', red: '#ff0000', darkBlue: '#000080', darkCyan: '#008080', darkGreen: '#008000', darkMagenta: '#800080', darkRed: '#800000', darkYellow: '#808000', darkGray: '#808080', lightGray: '#c0c0c0', black: '#000000' };
+      if (hl && HL[hl]) css += `background-color:${HL[hl]};`; else if (shd && /^[0-9a-f]{6}$/i.test(shd) && shd.toUpperCase() !== 'FFFFFF') css += `background-color:#${shd};`;
+      const font = A(kid(pr, 'rFonts'), 'ascii'); if (font && !/^(Calibri|Aptos)$/i.test(font)) css += `font-family:'${font.replace(/'/g, '')}';`;
+    }
+    let inner = '';
+    for (const c of r.children) {
+      const n = c.localName;
+      if (n === 't') inner += esc(c.textContent);
+      else if (n === 'tab') inner += ' ';
+      else if (n === 'br') inner += A(c, 'type') === 'page' ? '\u0000PB\u0000' : '<br>';
+      else if (n === 'drawing' || n === 'pict') {
+        const blip = Kit.all(c, 'blip')[0] || Kit.all(c, 'imagedata')[0]; const rid = blip && (A(blip, 'embed') || A(blip, 'id'));
+        const url = rid && imgUrl(rid); const ext = Kit.all(c, 'extent')[0];
+        if (url) { const w = ext ? Math.round(+A(ext, 'cx') / 9525) : 0; inner += `<img src="${url}"${w ? ` style="width:${Math.min(100, Math.round(w / 6.24))}%"` : ''}>`; }
+      }
+    }
+    if (!inner) return '';
+    let o = css ? `<span style="${css}">${inner}</span>` : inner;
+    for (const t of wrap.reverse()) o = `<${t}>${o}</${t}>`;
+    return o;
+  };
+  const paraInner = p => { let o = ''; for (const c of p.children) {
+    if (c.localName === 'r') o += runHtml(c);
+    else if (c.localName === 'hyperlink') { const r = rels[Kit.rid(c)]; const inner = kids(c, 'r').map(runHtml).join(''); o += r && /^https?:|^mailto:/i.test(r.target) ? `<a href="${esc(r.target)}">${inner}</a>` : inner; }
+    else if (c.localName === 'ins' || c.localName === 'smartTag' || c.localName === 'sdt' || c.localName === 'fldSimple') o += paraInner(c.localName === 'sdt' ? kid(c, 'sdtContent') || c : c);
+  } return o; };
+  const blocksOf = body => {
+    let o = '', stack = [];   // open lists: [{tag, lvl}]
+    const closeTo = lvl => { while (stack.length && stack[stack.length - 1].lvl >= lvl) o += `</li></${stack.pop().tag}>`; };
+    for (const el of body.children) {
+      if (el.localName === 'p') {
+        const pr = kid(el, 'pPr'), sid = A(kid(pr, 'pStyle'), 'val'), np = kid(pr, 'numPr');
+        let css = ''; const jc = A(kid(pr, 'jc'), 'val'); if (jc && jc !== 'left' && jc !== 'start') css += `text-align:${{ both: 'justify', center: 'center', right: 'right', end: 'right' }[jc] || 'left'};`;
+        let inner = paraInner(el); const pbs = inner.split('\u0000PB\u0000'); inner = pbs.pop();
+        pbs.forEach(seg => { if (seg) o += `<p>${seg}</p>`; o += '<hr class="pb">'; });
+        if (A(kid(pr, 'pageBreakBefore'), 'val') !== '0' && kid(pr, 'pageBreakBefore')) o += '<hr class="pb">';
+        if (np && A(kid(np, 'numId'), 'val') !== '0') {
+          const id = A(kid(np, 'numId'), 'val'), lvl = +(A(kid(np, 'ilvl'), 'val') || 0), fmt = (numFmt[id] || {})[lvl] || 'bullet', tag = fmt === 'bullet' || fmt === 'none' ? 'ul' : 'ol';
+          const top = stack[stack.length - 1];
+          if (top && top.lvl === lvl && top.tag === tag) o += `</li><li>${inner || '<br>'}`;
+          else if (top && top.lvl < lvl) { stack.push({ tag, lvl }); o += `<${tag}><li>${inner || '<br>'}`; }
+          else { closeTo(lvl); const t2 = stack[stack.length - 1]; if (t2 && t2.lvl === lvl && t2.tag === tag) o += `</li><li>${inner || '<br>'}`; else { stack.push({ tag, lvl }); o += `<${tag}><li>${inner || '<br>'}`; } }
+          continue;
+        }
+        closeTo(0);
+        const tag = styleTag[sid] || 'p';
+        if (!inner && tag === 'p') { if (!pbs.length) o += '<p><br></p>'; continue; }
+        o += `<${tag}${css ? ` style="${css}"` : ''}>${inner || '<br>'}</${tag}>`;
+      } else if (el.localName === 'tbl') {
+        closeTo(0); o += '<table><tbody>';
+        for (const tr of kids(el, 'tr')) { o += '<tr>'; for (const tc of kids(tr, 'tc')) { const span = A(kid(kid(tc, 'tcPr'), 'gridSpan'), 'val'), fill = A(kid(kid(tc, 'tcPr'), 'shd'), 'fill'); o += `<td${span > 1 ? ` colspan="${span}"` : ''}${fill && /^[0-9a-f]{6}$/i.test(fill) && fill.toUpperCase() !== 'FFFFFF' ? ` style="background-color:#${fill}"` : ''}>${blocksOf(tc) || '<br>'}</td>`; } o += '</tr>'; }
+        o += '</tbody></table>';
+      } else if (el.localName === 'sdt') { closeTo(0); const c = kid(el, 'sdtContent'); if (c) o += blocksOf(c); }
+    }
+    closeTo(0); return o;
+  };
+  const body = kid(dx.documentElement, 'body'); if (!body) throw new Error('Empty document');
+  return blocksOf(body) || '<p><br></p>';
+};
+window.__write = { exportDocx, docxToHtml, openDoc, paper, get doc() { return doc; } };
+</script></body></html>

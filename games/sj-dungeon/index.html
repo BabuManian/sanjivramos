@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deep Dungeon</title>
+<style>
+html,body{margin:0;height:100%;background:#0c0a09;color:#e7e5e4;font:13px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+#hud{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center}
+#hud b{color:#fff}
+.bar{width:110px;height:10px;background:#44403c;border-radius:5px;overflow:hidden;display:inline-block;vertical-align:middle}
+.bar i{display:block;height:100%;background:#ef4444;transition:width .15s}
+canvas{display:block;border-radius:6px;touch-action:none;background:#000}
+#log{width:min(96vw,640px);height:3.9em;overflow:hidden;line-height:1.3;color:#d6d3d1;font-size:12px}
+#log div:last-child{color:#fff}
+#pad{display:none;gap:14px;align-items:center}
+#pad.on{display:flex}
+.dp{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px}
+#pad button{border:none;border-radius:8px;background:#292524;color:#e7e5e4;font:inherit;font-size:18px;touch-action:manipulation}
+#pad button:active{background:#44403c}
+.side{display:flex;flex-direction:column;gap:6px}
+.side button{width:76px;height:44px;font-size:13px!important}
+</style></head><body>
+<div id="hud">
+  <span>HP <span class="bar"><i id="hpbar"></i></span> <b id="hp">30/30</b></span>
+  <span>Depth <b id="depth">1</b></span><span>Lvl <b id="lvl">1</b></span>
+  <span>⚔ <b id="atk">4</b></span><span>🛡 <b id="def">1</b></span><span>● <b id="gold">0</b></span><span>🧪 <b id="pots">1</b></span>
+</div>
+<canvas id="cv" width="640" height="384" aria-label="Dungeon map"></canvas>
+<div id="log" aria-live="polite"></div>
+<div id="pad">
+  <div class="dp">
+    <button data-m="-1,-1">↖</button><button data-m="0,-1">↑</button><button data-m="1,-1">↗</button>
+    <button data-m="-1,0">←</button><button data-m="0,0" title="Wait">·</button><button data-m="1,0">→</button>
+    <button data-m="-1,1">↙</button><button data-m="0,1">↓</button><button data-m="1,1">↘</button>
+  </div>
+  <div class="side"><button id="bq">Drink 🧪</button><button id="bs">Stairs ▼</button></div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("dungeon", { vs: { live: '#depth' }, title: "Deep Dungeon", lower: false, trophies: [{"id": "d5", "name": "Delver", "desc": "Reach floor 5", "icon": "🕯️"}, {"id": "dragon", "name": "Dragonslayer", "desc": "Slay the dragon", "icon": "🐉"}] });</script>
+<script>
+(() => {
+  const COLS = 40, ROWS = 24, TS = 16, FOV = 7, FINAL = 10;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const MONSTERS = [
+    { ch: 'r', name: 'rat', hp: 6, atk: 2, def: 0, xp: 2, col: '#a8a29e', min: 1 },
+    { ch: 'b', name: 'bat', hp: 5, atk: 3, def: 0, xp: 3, col: '#c084fc', min: 1, fast: true },
+    { ch: 'g', name: 'goblin', hp: 11, atk: 4, def: 1, xp: 5, col: '#4ade80', min: 2 },
+    { ch: 's', name: 'skeleton', hp: 15, atk: 6, def: 2, xp: 9, col: '#e7e5e4', min: 4 },
+    { ch: 'o', name: 'orc', hp: 22, atk: 7, def: 3, xp: 12, col: '#84cc16', min: 5 },
+    { ch: 'T', name: 'troll', hp: 36, atk: 9, def: 4, xp: 22, col: '#65a30d', min: 7 },
+    { ch: 'W', name: 'wraith', hp: 28, atk: 12, def: 3, xp: 28, col: '#94a3b8', min: 8, fast: true },
+  ];
+  const DRAGON = { ch: 'D', name: 'dragon', hp: 120, atk: 15, def: 6, xp: 100, col: '#f97316', boss: true };
+  let map, seen, vis, rooms, P, mons, items, depth, stairs, over = false, logLines = [], best = 0;
+  try { best = +localStorage.getItem('sj-dungeon-best') || 0; } catch {}
+
+  const R = n => Math.random() * n | 0;
+  const log = (s) => { logLines.push(s); if (logLines.length > 3) logLines.shift(); $('log').innerHTML = logLines.map(l => `<div>${l}</div>`).join(''); };
+  const at = (x, y) => (x < 0 || y < 0 || x >= COLS || y >= ROWS) ? '#' : map[y][x];
+  const monAt = (x, y) => mons.find(m => m.x === x && m.y === y && m.hp > 0);
+
+  function newGame() {
+    P = { x: 0, y: 0, hp: 30, max: 30, atk: 4, def: 1, lvl: 1, xp: 0, gold: 0, pots: 1 };
+    depth = 0; over = false; logLines = [];
+    descend();
+    log('You enter the dungeon. Find the stairs <b>▼</b> and go deeper. A dragon waits on depth ' + FINAL + '.');
+  }
+  function carve(x1, y1, x2, y2) { for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) map[y][x] = '.'; }
+  function descend() {
+    depth++;
+    map = Array.from({ length: ROWS }, () => Array(COLS).fill('#'));
+    seen = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+    rooms = [];
+    for (let tries = 0; tries < 200 && rooms.length < 10; tries++) {
+      const w = 4 + R(7), h = 3 + R(4), x = 1 + R(COLS - w - 2), y = 1 + R(ROWS - h - 2);
+      if (rooms.some(r => x <= r.x + r.w + 1 && x + w + 1 >= r.x && y <= r.y + r.h + 1 && y + h + 1 >= r.y)) continue;
+      rooms.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1) });
+    }
+    rooms.sort((a, b) => a.cx - b.cx);
+    rooms.forEach(r => carve(r.x, r.y, r.x + r.w - 1, r.y + r.h - 1));
+    for (let i = 1; i < rooms.length; i++) {
+      const a = rooms[i - 1], b = rooms[i];
+      if (Math.random() < 0.5) { carve(Math.min(a.cx, b.cx), a.cy, Math.max(a.cx, b.cx), a.cy); carve(b.cx, Math.min(a.cy, b.cy), b.cx, Math.max(a.cy, b.cy)); }
+      else { carve(a.cx, Math.min(a.cy, b.cy), a.cx, Math.max(a.cy, b.cy)); carve(Math.min(a.cx, b.cx), b.cy, Math.max(a.cx, b.cx), b.cy); }
+    }
+    // A couple of extra loops so it's not one long line.
+    for (let k = 0; k < 2 && rooms.length > 3; k++) { const a = rooms[R(rooms.length)], b = rooms[R(rooms.length)]; carve(Math.min(a.cx, b.cx), a.cy, Math.max(a.cx, b.cx), a.cy); carve(b.cx, Math.min(a.cy, b.cy), b.cx, Math.max(a.cy, b.cy)); }
+    const first = rooms[0], last = rooms[rooms.length - 1];
+    P.x = first.cx; P.y = first.cy;
+    stairs = depth < FINAL ? { x: last.cx, y: last.cy } : null;
+    mons = []; items = [];
+    const free = (r) => { for (let t = 0; t < 30; t++) { const x = r.x + R(r.w), y = r.y + R(r.h); if (!monAt(x, y) && !items.some(i => i.x === x && i.y === y) && !(x === P.x && y === P.y) && !(stairs && x === stairs.x && y === stairs.y)) return { x, y }; } return null; };
+    const pool = MONSTERS.filter(m => m.min <= depth);
+    const count = 3 + depth + R(3);
+    for (let i = 0; i < count; i++) {
+      const r = rooms[1 + R(rooms.length - 1)], p = free(r); if (!p) continue;
+      const base = pool[Math.max(0, pool.length - 1 - R(Math.min(pool.length, 3)))];
+      const k = 1 + (depth - base.min) * 0.08;
+      mons.push({ ...base, ...p, hp: Math.round(base.hp * k), max: Math.round(base.hp * k), atk: Math.round(base.atk * k), awake: false });
+    }
+    if (depth === FINAL) { const p = free(last) || { x: last.cx, y: last.cy }; mons.push({ ...DRAGON, ...p, max: DRAGON.hp, awake: false }); }
+    const nItems = 3 + R(3);
+    for (let i = 0; i < nItems; i++) {
+      const r = rooms[R(rooms.length)], p = free(r); if (!p) continue;
+      const roll = Math.random();
+      items.push({ ...p, kind: roll < 0.35 ? 'potion' : roll < 0.7 ? 'gold' : roll < 0.85 ? 'weapon' : 'armor' });
+    }
+    window.SJG && (SJG.score(depth, 'depth'), depth >= 5 && SJG.unlock('d5')); if (depth > best) { best = depth; try { localStorage.setItem('sj-dungeon-best', String(best)); } catch {} }
+    if (depth > 1) log(`You climb down to depth ${depth}.` + (depth === FINAL ? ' <b style="color:#f97316">You smell smoke…</b>' : ''));
+    computeFov(); hud();
+  }
+  function computeFov() {
+    vis = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+    for (let a = 0; a < 360; a += 1.5) {
+      const dx = Math.cos(a * Math.PI / 180), dy = Math.sin(a * Math.PI / 180);
+      let x = P.x + 0.5, y = P.y + 0.5;
+      for (let i = 0; i <= FOV; i++) {
+        const tx = Math.floor(x), ty = Math.floor(y);
+        if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) break;
+        vis[ty][tx] = true; seen[ty][tx] = true;
+        if (map[ty][tx] === '#') break;
+        x += dx; y += dy;
+      }
+    }
+  }
+  const hit = (a, d) => Math.max(1, a.atk + R(3) - 1 - d.def);
+  function attack(m) {
+    const d = hit(P, m); m.hp -= d; m.awake = true;
+    if (m.hp <= 0) {
+      log(`You slay the ${m.name}! (+${m.xp} xp)`);
+      P.xp += m.xp;
+      if (Math.random() < 0.25) items.push({ x: m.x, y: m.y, kind: Math.random() < 0.6 ? 'gold' : 'potion' });
+      while (P.xp >= P.lvl * 12) { P.xp -= P.lvl * 12; P.lvl++; P.max += 6; P.atk += 1; if (P.lvl % 2) P.def += 1; P.hp = Math.min(P.max, P.hp + 12); log(`<b style="color:#facc15">Level up! You are level ${P.lvl}.</b>`); }
+      if (m.boss) win();
+    } else log(`You hit the ${m.name} for ${d}.`);
+  }
+  function pickup() {
+    const it = items.find(i => i.x === P.x && i.y === P.y); if (!it) return;
+    items = items.filter(i => i !== it);
+    if (it.kind === 'potion') { P.pots++; log('You pick up a healing potion 🧪.'); }
+    else if (it.kind === 'gold') { const g = 5 + R(10) + depth * 3; P.gold += g; log(`You find ${g} gold.`); }
+    else if (it.kind === 'weapon') { P.atk += 1 + (depth > 5 ? 1 : 0); log('A sharper blade! ⚔ goes up.'); }
+    else { P.def += 1; log('Sturdier armour! 🛡 goes up.'); }
+  }
+  function act(dx, dy) {
+    if (over) return;
+    if (dx || dy) {
+      const nx = P.x + dx, ny = P.y + dy, m = monAt(nx, ny);
+      if (m) attack(m);
+      else if (at(nx, ny) !== '#') { P.x = nx; P.y = ny; pickup(); if (stairs && P.x === stairs.x && P.y === stairs.y) log('Stairs down. Press <b>Enter</b> or <b>></b> (or Stairs ▼) to descend.'); }
+      else return; // bumping a wall costs no turn
+    }
+    else if (P.hp < P.max && !mons.some(m => m.hp > 0 && vis[m.y][m.x])) P.hp = Math.min(P.max, P.hp + 1); // resting heals when nothing is in sight
+    monstersTurn(); end();
+  }
+  function quaff() {
+    if (over || !P.pots) { if (!over) log('No potions left.'); return; }
+    if (P.hp >= P.max) { log('You are already at full health.'); return; }
+    P.pots--; const h = 12 + P.lvl * 3; P.hp = Math.min(P.max, P.hp + h); log(`You drink a potion and heal ${h}.`);
+    monstersTurn(); end();
+  }
+  function useStairs() {
+    if (over) return;
+    if (stairs && P.x === stairs.x && P.y === stairs.y) descend();
+    else log(depth === FINAL ? 'There are no stairs here. Defeat the dragon!' : 'You need to stand on the stairs ▼.');
+  }
+  function monstersTurn() {
+    for (const m of mons) {
+      if (m.hp <= 0) continue;
+      const dist = Math.max(Math.abs(m.x - P.x), Math.abs(m.y - P.y));
+      if (vis[m.y]?.[m.x] && dist <= FOV) m.awake = true;
+      if (!m.awake) continue;
+      const moves = m.fast ? 2 : 1;
+      for (let k = 0; k < moves && m.hp > 0 && P.hp > 0; k++) {
+        const d = Math.max(Math.abs(m.x - P.x), Math.abs(m.y - P.y));
+        if (d === 1) {
+          const dmg = hit(m, P); P.hp -= dmg; log(`The ${m.name} hits you for ${dmg}.`);
+          if (P.hp <= 0) { lose(m); return; }
+          break;
+        }
+        // Step to the free neighbour closest to the player.
+        let bestS = null, bestD = Infinity;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          if (!ox && !oy) continue;
+          const nx = m.x + ox, ny = m.y + oy;
+          if (at(nx, ny) === '#' || monAt(nx, ny) || (nx === P.x && ny === P.y)) continue;
+          const nd = Math.hypot(nx - P.x, ny - P.y);
+          if (nd < bestD) { bestD = nd; bestS = [nx, ny]; }
+        }
+        if (bestS && bestD < Math.hypot(m.x - P.x, m.y - P.y)) { m.x = bestS[0]; m.y = bestS[1]; }
+      }
+    }
+    mons = mons.filter(m => m.hp > 0);
+  }
+  function lose(m) { over = true; P.hp = 0; log(`<b style="color:#ef4444">You were slain by a ${m.name} on depth ${depth}.</b> Press Enter or tap to start again.`); }
+  function win() { over = true; window.SJG && SJG.unlock('dragon'); log(`<b style="color:#facc15">You slew the dragon and won with ${P.gold} gold!</b> Press Enter or tap to play again.`); }
+  function end() { computeFov(); hud(); }
+  function hud() {
+    $('hp').textContent = `${Math.max(0, P.hp)}/${P.max}`; $('hpbar').style.width = Math.max(0, P.hp / P.max * 100) + '%';
+    $('depth').textContent = depth + (best > 1 ? ` (best ${best})` : ''); $('lvl').textContent = P.lvl; $('atk').textContent = P.atk; $('def').textContent = P.def; $('gold').textContent = P.gold; $('pots').textContent = P.pots;
+  }
+  const ITEM_GLYPH = { potion: ['!', '#f472b6'], gold: ['$', '#facc15'], weapon: ['/', '#38bdf8'], armor: [']', '#a3a3a3'] };
+  function draw() {
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.font = 'bold 14px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      if (!seen[y][x]) continue;
+      const v = vis[y][x], px = x * TS, py = y * TS;
+      if (map[y][x] === '#') {
+        // Only draw walls that touch a floor tile.
+        let edge = false; for (let oy = -1; oy <= 1 && !edge; oy++) for (let ox = -1; ox <= 1; ox++) if (at(x + ox, y + oy) === '.') { edge = true; break; }
+        if (!edge) continue;
+        ctx.fillStyle = v ? '#57534e' : '#292524'; ctx.fillRect(px, py, TS, TS);
+        ctx.fillStyle = v ? '#78716c' : '#3a3633'; ctx.fillRect(px, py, TS, 3);
+      } else {
+        ctx.fillStyle = v ? '#1c1917' : '#0c0a09'; ctx.fillRect(px, py, TS, TS);
+        ctx.fillStyle = v ? '#44403c' : '#1c1917'; ctx.fillRect(px + 7, py + 7, 2, 2);
+      }
+    }
+    const glyph = (ch, col, x, y) => { ctx.fillStyle = col; ctx.fillText(ch, x * TS + TS / 2, y * TS + TS / 2 + 1); };
+    if (stairs && seen[stairs.y][stairs.x]) glyph('▼', vis[stairs.y][stairs.x] ? '#fbbf24' : '#78716c', stairs.x, stairs.y);
+    for (const it of items) if (vis[it.y][it.x]) glyph(...ITEM_GLYPH[it.kind], it.x, it.y);
+    for (const m of mons) if (vis[m.y][m.x]) {
+      glyph(m.ch, m.col, m.x, m.y);
+      if (m.hp < m.max) { ctx.fillStyle = '#7f1d1d'; ctx.fillRect(m.x * TS + 1, m.y * TS, TS - 2, 2); ctx.fillStyle = '#ef4444'; ctx.fillRect(m.x * TS + 1, m.y * TS, (TS - 2) * m.hp / m.max, 2); }
+    }
+    glyph('@', over && P.hp <= 0 ? '#7f1d1d' : '#fde047', P.x, P.y);
+    if (over) {
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.font = 'bold 30px system-ui'; ctx.fillStyle = P.hp > 0 ? '#facc15' : '#ef4444';
+      ctx.fillText(P.hp > 0 ? 'Victory!' : 'You died', cv.width / 2, cv.height / 2 - 12);
+      ctx.font = '14px system-ui'; ctx.fillStyle = '#e7e5e4';
+      ctx.fillText(`Depth ${depth} · level ${P.lvl} · ${P.gold} gold — tap or press Enter`, cv.width / 2, cv.height / 2 + 18);
+    }
+  }
+  const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], k: [0, -1], j: [0, 1], h: [-1, 0], l: [1, 0], y: [-1, -1], u: [1, -1], b: [-1, 1], n: [1, 1], q: [-1, -1], e: [1, -1], z: [-1, 1], c: [1, 1], '.': [0, 0], ' ': [0, 0], Home: [-1, -1], PageUp: [1, -1], End: [-1, 1], PageDown: [1, 1] };
+  addEventListener('keydown', e => {
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (over && (key === 'Enter' || key === ' ')) { e.preventDefault(); newGame(); draw(); return; }
+    if (KEYS[key]) { e.preventDefault(); act(...KEYS[key]); }
+    else if (key === 'Enter' || key === '>') { e.preventDefault(); useStairs(); }
+    else if (key === 'p' || key === 'r') { quaff(); }
+    else return;
+    draw();
+  });
+  // Tap the map: step toward the tapped square.
+  cv.addEventListener('pointerdown', e => {
+    if (over) { newGame(); draw(); return; }
+    const r = cv.getBoundingClientRect();
+    const tx = Math.floor((e.clientX - r.left) * cv.width / r.width / TS), ty = Math.floor((e.clientY - r.top) * cv.height / r.height / TS);
+    if (tx === P.x && ty === P.y) { if (stairs && P.x === stairs.x && P.y === stairs.y) useStairs(); else act(0, 0); }
+    else act(Math.sign(tx - P.x), Math.sign(ty - P.y));
+    draw();
+  });
+  document.querySelectorAll('#pad [data-m]').forEach(b => b.addEventListener('click', () => { if (over) newGame(); else act(...b.dataset.m.split(',').map(Number)); draw(); }));
+  $('bq').onclick = () => { quaff(); draw(); };
+  $('bs').onclick = () => { useStairs(); draw(); };
+  if (matchMedia('(pointer: coarse)').matches) $('pad').classList.add('on');
+  addEventListener('touchstart', () => { $('pad').classList.add('on'); fit(); }, { once: true, passive: true });
+  function fit() {
+    const extra = $('hud').offsetHeight + $('log').offsetHeight + ($('pad').classList.contains('on') ? $('pad').offsetHeight : 0) + 36;
+    const s = Math.min((innerWidth - 12) / cv.width, (innerHeight - extra) / cv.height);
+    cv.style.width = Math.floor(cv.width * s) + 'px'; cv.style.height = Math.floor(cv.height * s) + 'px';
+  }
+  addEventListener('resize', fit);
+  newGame(); fit(); draw();
+})();
+</script>
+</body></html>

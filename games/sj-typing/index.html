@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Typing Test</title>
+<style>
+html,body{margin:0;min-height:100%;background:#1c1917;color:#e7e5e4;font:16px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px;box-sizing:border-box}
+#stats{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+#stats b{font-size:22px;font-variant-numeric:tabular-nums}
+#text{max-width:760px;font:20px/1.6 ui-monospace,Menlo,monospace;background:#292524;padding:18px;border-radius:12px;user-select:none}
+#text span.ok{color:#86efac}#text span.bad{color:#fca5a5;background:#7f1d1d55;border-radius:3px}
+#text span.cur{background:#facc15;color:#1c1917;border-radius:3px}
+#input{width:min(760px,100%);font:20px ui-monospace,monospace;padding:12px;border-radius:10px;border:1px solid #57534e;background:#0c0a09;color:#fff;box-sizing:border-box}
+button{background:#f59e0b;color:#1c1917;border:none;border-radius:8px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer}
+#res{min-height:24px;text-align:center}
+</style></head><body>
+<div id="stats">
+  <span>WPM <b id="wpm">0</b></span><span>Accuracy <b id="acc">100%</b></span><span>Time <b id="time">60</b>s</span><span>Best <b id="best">0</b></span>
+</div>
+<div id="text"></div>
+<input id="input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Click here and start typing…" aria-label="Type the text above">
+<div style="display:flex;gap:10px;align-items:center"><button id="again">New text</button><span style="opacity:.6;font-size:13px">60 seconds. Errors are shown in red.</span></div>
+<div id="res"></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("typing", { vs: { live: '#wpm' }, title: "Typing Test", lower: false, trophies: [{"id": "w40", "name": "Quick Fingers", "desc": "Type 40 WPM", "icon": "⌨️"}, {"id": "w70", "name": "Speed Typist", "desc": "Type 70 WPM", "icon": "🚀"}] });</script>
+<script>
+(() => {
+  const WORDS = 'the quick brown fox jumps over the lazy dog while a small boat drifts across the calm river toward the old stone bridge where children laugh and sing as the evening light turns golden and warm over quiet fields of wheat and clover near the village'.split(' ');
+  const $ = id => document.getElementById(id);
+  let target = '', started = 0, timer = null, done = false;
+  let best = 0; try { best = +localStorage.getItem('sj-typing-best') || 0; } catch {}
+  $('best').textContent = best;
+
+  function newText() {
+    const n = 42, out = [];
+    for (let i = 0; i < n; i++) out.push(WORDS[Math.random() * WORDS.length | 0]);
+    target = out.join(' ');
+    $('text').innerHTML = [...target].map((c, i) => `<span data-i="${i}">${c === ' ' ? '&nbsp;' : c}</span>`).join('');
+    reset();
+  }
+  function reset() {
+    clearInterval(timer); started = 0; done = false;
+    $('input').value = ''; $('input').disabled = false; $('input').focus();
+    $('wpm').textContent = 0; $('acc').textContent = '100%'; $('time').textContent = 60; $('res').textContent = '';
+    paint();
+  }
+  function paint() {
+    const typed = $('input').value, spans = $('text').children;
+    let good = 0;
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      s.className = '';
+      if (i < typed.length) { if (typed[i] === target[i]) { s.className = 'ok'; good++; } else s.className = 'bad'; }
+      else if (i === typed.length) s.className = 'cur';
+    }
+    // At least 5 seconds of typing counts, so one early keystroke can't show a huge WPM.
+    const elapsed = started ? Math.max(5, (Date.now() - started) / 1000) / 60 : 0;
+    const words = elapsed > 0 ? (good / 5) / elapsed : 0;
+    $('wpm').textContent = Math.round(words);
+    $('acc').textContent = typed.length ? Math.round(good / typed.length * 100) + '%' : '100%';
+    return typed.length;
+  }
+  function finish(msg) {
+    if (done) return; done = true;
+    clearInterval(timer); $('input').disabled = true;
+    const wpm = +$('wpm').textContent;
+    window.SJG && (SJG.score(wpm, 'wpm'), wpm >= 40 && SJG.unlock('w40'), wpm >= 70 && SJG.unlock('w70')); if (wpm > best) { best = wpm; try { localStorage.setItem('sj-typing-best', String(best)); } catch {} $('best').textContent = best; }
+    $('res').textContent = msg;
+  }
+  $('input').addEventListener('input', () => {
+    if (done) return;
+    if (!started) { started = Date.now(); timer = setInterval(() => {
+      const left = Math.max(0, 60 - Math.floor((Date.now() - started) / 1000));
+      $('time').textContent = left;
+      paint();
+      if (left === 0) finish('Time! Press New text to go again.');
+    }, 250); }
+    const typed = $('input').value;
+    paint();
+    if (typed.length >= target.length) finish('Finished! Press New text to go again.');
+  });
+  $('again').addEventListener('click', newText);
+  $('text').addEventListener('click', () => $('input').focus());
+  newText();
+})();
+</script>
+</body></html>

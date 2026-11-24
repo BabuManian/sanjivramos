@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simon</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0f172a;color:#e2e8f0;font:14px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px;box-sizing:border-box}
+#status{font-size:18px;min-height:26px}
+#pads{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:min(88vw,380px);aspect-ratio:1}
+.pad{border:none;border-radius:22px;cursor:pointer;opacity:.45;transition:opacity .12s,transform .12s;touch-action:manipulation}
+.pad.on{opacity:1;transform:scale(1.03)}
+.pad:disabled{cursor:default}
+#g{background:#16a34a}#r{background:#dc2626}#y{background:#eab308}#b{background:#2563eb}
+#pads.ready .pad{opacity:.85}
+.row{display:flex;gap:12px;align-items:center}
+button{background:#334155;color:#fff;border:none;border-radius:8px;padding:9px 16px;font:inherit;cursor:pointer}
+button.primary{background:#7c3aed}
+</style></head><body>
+<div>Score <b id="sc">0</b> · Best <b id="hi">0</b></div>
+<div id="status">Press Start</div>
+<div id="pads">
+  <button class="pad" id="g" data-k="0" aria-label="Green"></button>
+  <button class="pad" id="r" data-k="1" aria-label="Red"></button>
+  <button class="pad" id="y" data-k="2" aria-label="Yellow"></button>
+  <button class="pad" id="b" data-k="3" aria-label="Blue"></button>
+</div>
+<div class="row"><button class="primary" id="start">Start</button><span style="opacity:.6;font-size:12px">Keys: Q W A S</span></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("simon", { vs: { live: '#sc' }, title: "Simon", lower: false, trophies: [{"id": "s10", "name": "Good Ears", "desc": "Reach 10", "icon": "👂"}, {"id": "s20", "name": "Memory Master", "desc": "Reach 20", "icon": "🧠"}] });</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const pads = [$('g'), $('r'), $('y'), $('b')];
+  const FREQ = [392, 330, 262, 494];
+  const KEYS = { q: 0, w: 1, a: 2, s: 3 };
+  let ctx = null, seq = [], input = [], busy = true, playing = false, timers = [];
+  let hi = 0;
+  try { hi = +localStorage.getItem('sj-simon-hi') || 0; } catch {}
+  $('hi').textContent = hi;
+
+  function audio() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(k, ms = 320) {
+    const c = audio(); if (!c) return;
+    const o = c.createOscillator(), gn = c.createGain();
+    o.type = 'triangle'; o.frequency.value = FREQ[k];
+    gn.gain.setValueAtTime(0.0001, c.currentTime);
+    gn.gain.exponentialRampToValueAtTime(0.3, c.currentTime + 0.02);
+    gn.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + ms / 1000);
+    o.connect(gn).connect(c.destination); o.start(); o.stop(c.currentTime + ms / 1000 + 0.05);
+  }
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+  function light(k, ms = 380) {
+    pads[k].classList.add('on'); tone(k, ms);
+    later(() => pads[k].classList.remove('on'), ms);
+  }
+  function playSeq() {
+    busy = true; input = []; $('status').textContent = 'Watch…';
+    let i = 0;
+    const step = () => {
+      if (!playing) return;
+      if (i < seq.length) { light(seq[i]); i++; later(step, 560); }
+      else { busy = false; $('status').textContent = 'Your turn'; }
+    };
+    later(step, 500);
+  }
+  function start() {
+    clearTimers(); audio();
+    seq = []; playing = true; $('sc').textContent = 0;
+    seq.push(Math.random() * 4 | 0);
+    playSeq();
+  }
+  function gameOver() {
+    playing = false; busy = true;
+    const score = seq.length - 1;
+    window.SJG && (SJG.score(score), score >= 10 && SJG.unlock('s10'), score >= 20 && SJG.unlock('s20')); if (score > hi) { hi = score; try { localStorage.setItem('sj-simon-hi', String(hi)); } catch {} $('hi').textContent = hi; }
+    $('status').textContent = `Wrong! Score ${score}. Press Start`;
+    pads.forEach(p => p.classList.add('wrong'));
+    later(() => pads.forEach(p => p.classList.remove('wrong')), 400);
+  }
+  function press(k) {
+    if (!playing || busy) return;
+    light(k, 220);
+    input.push(k);
+    const n = input.length - 1;
+    if (input[n] !== seq[n]) { gameOver(); return; }
+    if (input.length === seq.length) {
+      busy = true; $('sc').textContent = seq.length;
+      $('status').textContent = 'Nice!';
+      seq.push(Math.random() * 4 | 0);
+      later(playSeq, 900);
+    }
+  }
+
+  pads.forEach((p, k) => p.addEventListener('pointerdown', e => { e.preventDefault(); press(k); }));
+  addEventListener('keydown', e => {
+    const k = KEYS[e.key.toLowerCase()];
+    if (k !== undefined && !e.repeat) press(k);
+    if (e.key === 'Enter' && !playing) start();
+  });
+  $('start').addEventListener('click', start);
+  $('status').textContent = 'Press Start';
+})();
+</script>
+</body></html>

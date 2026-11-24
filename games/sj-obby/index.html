@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Sky Obby</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1020;color:#f8fafc;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+#tags{position:fixed;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;z-index:3;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+#top{left:50%;top:10px;transform:translateX(-50%);text-align:center}
+#top b{display:block;font:800 22px system-ui}#top small{opacity:.85;font-weight:600}
+#stats{left:12px;top:12px;display:flex;flex-direction:column;gap:4px;font-weight:700;background:rgba(0,0,0,.3);padding:8px 12px;border-radius:12px}
+#room{right:12px;top:12px;background:rgba(0,0,0,.35);padding:8px 12px;border-radius:12px;font-size:13px;min-width:140px}
+#room:empty{display:none}
+#msg{left:50%;top:38%;transform:translate(-50%,-50%);font:900 46px system-ui;color:#fde047;opacity:0;transition:opacity .3s;text-align:center}
+#msg small{display:block;font-size:16px;color:#fff;font-weight:600}
+.panel{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(5,10,25,.55);backdrop-filter:blur(8px)}
+.panel[hidden]{display:none}
+.card{width:min(760px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:linear-gradient(180deg,rgba(30,41,82,.95),rgba(12,18,40,.95));border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+h1{margin:0;font:900 46px/1 system-ui;letter-spacing:1px;background:linear-gradient(90deg,#7dd3fc,#f0abfc,#fde047);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:0 0 10px;font:800 22px system-ui}
+.sub{opacity:.8;margin:8px 0 14px;line-height:1.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{padding:11px 18px;border-radius:14px;background:rgba(255,255,255,.1);font-weight:800}
+.btn.pri{background:linear-gradient(135deg,#22c55e,#0ea5e9);color:#fff;box-shadow:0 8px 24px rgba(14,165,233,.35)}
+.btn:disabled{opacity:.35}
+.worlds{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}
+.world{padding:12px;border-radius:16px;text-align:left;color:#fff;min-height:84px;position:relative;overflow:hidden}
+.world b{display:block;font-size:16px}.world small{opacity:.85}
+.world.lock{filter:grayscale(1);opacity:.5}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.item{padding:10px;border-radius:14px;background:rgba(255,255,255,.07);text-align:left}
+.item.on{outline:2px solid #22c55e}.item b{display:block}.item small{opacity:.75}
+.sw{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:6px;box-shadow:0 0 10px currentColor}
+#touch{position:fixed;right:14px;bottom:18px;z-index:4;display:none;gap:10px;align-items:flex-end}
+#touch.on{display:flex}
+#touch button{width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.2);font-weight:900;font-size:13px;touch-action:none}
+#touch button.on{background:rgba(34,197,94,.6)}
+#touch .sm{width:54px;height:54px}
+.keys{columns:2;font-size:13px;line-height:1.8;opacity:.85}.keys b{display:inline-block;min-width:70px;color:#7dd3fc}
+</style></head>
+<body>
+<canvas id="gl"></canvas><div id="tags"></div>
+<div class="hud" id="top"></div><div class="hud" id="stats"></div><div class="hud" id="room"></div><div class="hud" id="msg"></div>
+<div id="touch"><button class="sm" data-btn="menu">☰</button><button class="sm" data-btn="run">🏃</button><button data-btn="jump">JUMP</button></div>
+
+<div class="panel" id="menu"><div class="card">
+  <h1>SKY OBBY</h1>
+  <p class="sub">Forty floating stages across four worlds. Jump, dodge spinners and lasers, ride the movers — and touch every flag. Your custom character does the running; friends can join and race you online.</p>
+  <div class="btns"><button class="btn pri" id="bPlay">▶ Play</button><button class="btn" id="bRun">⏱ Speedrun from stage 1</button><button class="btn" id="bOnline">🌐 Play with friends</button><button class="btn" id="bShop">✨ Trails</button><button class="btn" id="bKeys">⌨ Controls</button><button class="btn" id="bLook">🧍 My character</button></div>
+  <div class="worlds" id="worlds"></div>
+  <div id="keys" hidden style="margin-top:12px"><div class="keys"><div><b>WASD</b> move</div><div><b>Space</b> jump (hold = higher)</div><div><b>Shift</b> run faster</div><div><b>Mouse</b> turn the camera (click to lock)</div><div><b>Wheel</b> zoom</div><div><b>R</b> back to the last flag</div><div><b>Esc</b> menu</div><div><b>Pad</b> stick + A</div></div><p style="opacity:.7;font-size:13px">Phone: left side = walk, right side = turn the camera, big button = jump.</p></div>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:12px;opacity:.85"><input type="checkbox" id="lowq"> Faster graphics (for older phones)</label>
+</div></div>
+<div class="panel" id="shop" hidden><div class="card"><h2>✨ Trails <small id="coinsShop" style="opacity:.8;font-size:15px"></small></h2><div class="shop" id="shopList"></div><div class="btns"><button class="btn" data-close>Back</button></div></div></div>
+<div class="panel" id="done" hidden><div class="card" style="text-align:center"><div id="doneText"></div><div class="btns" style="justify-content:center"><button class="btn pri" data-close>Keep playing</button><button class="btn" id="bMenu2">Menu</button></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script src="../sj-gamekit/obby3d.js"></script>
+<script src="../sj-gamekit/friends3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('obby', { title: 'Sky Obby', vs: false, trophies: [
+  { id: 's1', name: 'First Flag', desc: 'Reach stage 2', icon: '🚩' },
+  { id: 'w1', name: 'Above the Clouds', desc: 'Finish Cloud Isles (stage 10)', icon: '☁️' },
+  { id: 'w2', name: 'Sugar Rush', desc: 'Finish Candy Canyon (stage 20)', icon: '🍭' },
+  { id: 'w3', name: 'Fireproof', desc: 'Finish Lava Works (stage 30)', icon: '🌋' },
+  { id: 'w4', name: 'Star Walker', desc: 'Finish all 40 stages', icon: '🌟' },
+  { id: 'clean', name: 'Clean Run', desc: 'Finish a world without falling', icon: '🧼' },
+  { id: 'coins', name: 'Coin Collector', desc: 'Collect 100 coins', icon: '🪙' },
+  { id: 'friends', name: 'Party Obby', desc: 'Play online with a friend', icon: '🎉' },
+  { id: 'speed', name: 'Speedrunner', desc: 'Finish a world in under 4 minutes', icon: '⏱️' },
+] }) : null;
+const $ = id => document.getElementById(id), G3 = GL3D, { M } = G3;
+const TEST = /[?&]nogl\b/.test(location.search);
+let R = null; if (!TEST) { try { R = G3.create($('gl'), { maxDpr: 1.5 }); } catch (e) { console.warn(e); } }
+if (!R && !TEST) $('menu').querySelector('.sub').textContent = 'This browser can’t run WebGL, so Sky Obby can’t be drawn here. Try Chrome or Firefox with hardware acceleration on.';
+const IN = G3.Input($('gl')); IN.bindButtons($('touch'));
+const store = { get() { try { return Object.assign({ best: 0, coins: 0, taken: [], trails: ['none'], trail: 'none', times: {}, low: false }, JSON.parse(localStorage.getItem('sj-obby')) || {}); } catch { return { best: 0, coins: 0, taken: [], trails: ['none'], trail: 'none', times: {} }; } }, set(v) { try { localStorage.setItem('sj-obby', JSON.stringify(v)); } catch {} } };
+let SV = store.get();
+const look = () => window.SJLook ? SJLook.cached : null;
+
+/* =================== WORLDS =================== */
+const WORLDS = [
+  { name: 'Cloud Isles', sky: { skyTop: '#2563eb', skyHorizon: '#c7e0ff', skyGround: '#e0f2fe', clouds: 0.75, sun: [0.5, 0.8, 0.3], sunCol: [0.72, 0.68, 0.6], amb: [0.5, 0.52, 0.58], fog: [90, 230] }, cols: ['#f8fafc', '#bae6fd', '#a7f3d0', '#fde68a'], kill: '#ef4444', grad: 'linear-gradient(135deg,#60a5fa,#e0f2fe)' },
+  { name: 'Candy Canyon', sky: { skyTop: '#be185d', skyHorizon: '#fbcfe8', skyGround: '#fce7f3', clouds: 0.55, cloudCol: [1, 0.85, 0.95], sun: [-0.4, 0.7, 0.4], sunCol: [0.75, 0.62, 0.66], amb: [0.55, 0.45, 0.55], fog: [80, 220] }, cols: ['#f9a8d4', '#c4b5fd', '#fde68a', '#86efac'], kill: '#dc2626', grad: 'linear-gradient(135deg,#ec4899,#fde68a)' },
+  { name: 'Lava Works', sky: { skyTop: '#1c0a05', skyHorizon: '#c2410c', skyGround: '#7c2d12', clouds: 0.5, cloudCol: [0.25, 0.12, 0.1], sun: [0.2, 0.5, -0.6], sunCol: [0.75, 0.45, 0.3], amb: [0.42, 0.3, 0.28], sunGlow: [1, 0.5, 0.2], fog: [60, 190] }, cols: ['#57534e', '#78716c', '#a8a29e', '#44403c'], kill: '#f97316', grad: 'linear-gradient(135deg,#7c2d12,#f97316)' },
+  { name: 'Star Station', sky: { skyTop: '#020617', skyHorizon: '#312e81', skyGround: '#0f172a', stars: 1, clouds: 0, sun: [0.3, 0.6, 0.5], sunCol: [0.45, 0.5, 0.75], amb: [0.32, 0.34, 0.5], sunGlow: [0.6, 0.6, 1], fog: [80, 240] }, cols: ['#334155', '#4f46e5', '#0e7490', '#64748b'], kill: '#f43f5e', grad: 'linear-gradient(135deg,#020617,#6366f1)' },
+];
+const STAGES = 40;
+
+/* =================== COURSE =================== */
+let W = null, cps = [], stageCoins = [];
+function buildCourse() {
+  W = Obby3D.create({ R, input: IN, look, onDie, onCheckpoint, onCoin, onPower: () => {} });
+  const rng = G3.rng(20261124);
+  const FWD = [[0, -1], [-1, 0], [0, 1], [1, 0]], RIGHT = [[1, 0], [0, -1], [-1, 0], [0, 1]];
+  let ox = 0, oy = 10, oz = 0, h = 0;
+  cps = []; stageCoins = [];
+  for (let s = 0; s <= STAGES; s++) {
+    const w = WORLDS[Math.min(3, Math.floor(s / 10))], df = Math.min(1, (s % 10) / 9 * 0.6 + Math.floor(s / 10) * 0.14), chunk = s;
+    const f = FWD[h], r = RIGHT[h];
+    // local (u lateral, v forward) → world box
+    const wb = (u0, y0, v0, u1, y1, v1) => { const a = [ox + r[0] * u0 + f[0] * v0, oz + r[1] * u0 + f[1] * v0], b = [ox + r[0] * u1 + f[0] * v1, oz + r[1] * u1 + f[1] * v1]; return [Math.min(a[0], b[0]), y0, Math.min(a[1], b[1]), Math.max(a[0], b[0]), y1, Math.max(a[1], b[1])]; };
+    const lat = h % 2 === 0 ? 'x' : 'z', fwdAx = h % 2 === 0 ? 'z' : 'x';
+    const col = () => w.cols[(rng() * w.cols.length) | 0];
+    const add = (k, u, y, v, wd, dp, extra = {}, th = 0.8) => W.add(Object.assign({ k, b: wb(u - wd / 2, y - th, v, u + wd / 2, y, v + dp), col: k === 'kill' ? w.kill : extra.col || col(), chunk }, extra));
+    const coin = (u, y, v) => { const c = W.add({ k: 'coin', b: wb(u - 0.3, y + 0.9, v + 0.3, u + 0.3, y + 1.5, v + 0.9), chunk, id: s + ':' + stageCoins.length }); stageCoins.push(c); if (SV.taken.includes(c.id)) c.taken = true; };
+    // checkpoint pad
+    const cp = W.add({ k: 'cp', b: wb(-3, oy - 0.8, 0, 3, oy, 6), chunk, stage: s }); cps.push(cp);
+    if (s === STAGES) { add('solid', 0, oy, 6, 10, 8, { col: '#facc15' }); W.add({ k: 'power', b: wb(-0.5, oy + 0.6, 9.5, 0.5, oy + 1.6, 10.5), chunk, col: '#facc15', trophy: true }); break; }
+    let u = 0, y = oy, v = 6;
+    const nPieces = 3 + Math.min(3, Math.floor(s / 6)) + (rng() < 0.4 ? 1 : 0);
+    const pool = ['hops', 'beam', 'stairs', 'zigzag', 'tramp'].concat(s >= 2 ? ['movers', 'vanish'] : [], s >= 4 ? ['spinner', 'killfloor'] : [], s >= 7 ? ['conveyor', 'elevator'] : [], s >= 12 ? ['lasers'] : []);
+    for (let p = 0; p < nPieces; p++) {
+      const kind = pool[(rng() * pool.length) | 0];
+      const gap = 1.6 + df * 1.9;
+      switch (kind) {
+        case 'hops': { const n = 3 + (rng() * 3 | 0); for (let i = 0; i < n; i++) { v += gap; const sz = 2.6 - df * 1.0; y += (rng() - 0.4) * 1.0; u = Math.max(-3, Math.min(3, u + (rng() - 0.5) * 2)); add('solid', u, y, v, sz, sz); if (i === 1) coin(u, y, v + sz / 2 - 0.6); v += sz; } break; }
+        case 'beam': { v += gap * 0.8; const len = 7 + rng() * 4, wd = 1.0 - df * 0.45; add('solid', u, y, v, wd, len); coin(u, y, v + len / 2 - 0.6); v += len; break; }
+        case 'stairs': { for (let i = 0; i < 6; i++) { v += 0.7 + df * 0.9; y += 0.85; add('solid', u, y, v, 2, 1.6); v += 1.6; } break; }
+        case 'zigzag': { for (let i = 0; i < 5; i++) { v += 0.8 + df * 0.9; u = (i % 2 ? 1 : -1) * (1.7 + df * 0.5); add('solid', u, y, v, 2.2, 2.2); v += 2.2; } u = 0; v += 0.8; add('solid', u, y, v, 3, 3); v += 3; break; }
+        case 'tramp': { v += 1; add('solid', u, y, v, 4, 3); v += 3; W.add({ k: 'tramp', b: wb(u - 1.2, y - 0.6, v + 0.5, u + 1.2, y - 0.1, v + 2.9), chunk, power: 16 }); v += 3.4 + 1.2; y += 3.6; add('solid', u, y, v, 4, 4); coin(u, y + 1.2, v - 2.6); v += 4; break; }
+        case 'movers': { const n = 2 + (rng() * 2 | 0); for (let i = 0; i < n; i++) { v += gap * 0.85; W.add({ k: 'move', b: wb(u - 1.4, y - 0.6, v, u + 1.4, y, v + 2.8), chunk, axis: lat, amp: 2.2 + df * 1.3, speed: 1.0 + df * 0.75, phase: i * 1.9 + rng() }); v += 2.8; } v += gap * 0.8; add('solid', u, y, v, 3, 3); v += 3; break; }
+        case 'vanish': { const n = 4 + (rng() * 3 | 0); for (let i = 0; i < n; i++) { v += 1.1 + df * 0.8; W.add({ k: 'vanish', b: wb(u - 1.1, y - 0.5, v, u + 1.1, y, v + 2.2), chunk, col: '#fde68a' }); v += 2.2; } v += 1.2; add('solid', u, y, v, 3, 3); v += 3; break; }
+        case 'spinner': { v += gap * 0.7; const len = 9; add('solid', u, y, v, 7, len); W.add({ k: 'spin', b: wb(u - 0.1, y, v + len / 2 - 0.1, u + 0.1, y + 1.2, v + len / 2 + 0.1), chunk, len: 3.4, speed: 1.4 + df * 1.6, y: y + 0.55, phase: rng() * 6 }); coin(u + 2.4, y, v + 1); v += len; break; }
+        case 'killfloor': { v += gap * 0.7; const len = 10; add('solid', u, y, v, 5, len); for (let i = 1; i < 4; i++) W.add({ k: 'kill', b: wb(u - 2.5, y - 0.1, v + i * 2.4, u + 2.5, y + 0.22, v + i * 2.4 + 0.9 + df * 0.6), chunk, col: w.kill }); v += len; break; }
+        case 'conveyor': { v += gap * 0.7; const len = 10, dir = rng() < 0.5 ? 1 : -1; W.add({ k: 'conv', b: wb(u - 2, y - 0.6, v, u + 2, y, v + len), chunk, dir: lat === 'x' ? [r[0] * dir, r[1] * dir] : [r[0] * dir, r[1] * dir], speed: 2.4 + df * 2.4 }); coin(u, y, v + 4); v += len; break; }
+        case 'elevator': { v += gap * 0.7; W.add({ k: 'move', b: wb(u - 1.5, y - 0.6, v, u + 1.5, y, v + 3), chunk, axis: 'y', amp: 2.2, speed: 1.1, phase: 4.7 }); v += 3 + 1.4; y += 3.4; add('solid', u, y, v, 3.5, 3.5); v += 3.5; break; }
+        case 'lasers': { v += gap * 0.7; const len = 12; add('solid', u, y, v, 4.5, len); for (let i = 0; i < 3; i++) W.add({ k: 'laser', b: wb(u - 2.25, y, v + 2.5 + i * 3.3, u + 2.25, y + 2.2, v + 2.7 + i * 3.3), chunk, period: 2.4 - df * 0.6, on: 0.45, phase: i * 0.8 }); v += len; break; }
+      }
+    }
+    // next stage starts a little ahead; sometimes turn left/right (never back)
+    v += 1.6 + df;
+    const end = [ox + r[0] * u + f[0] * v, oz + r[1] * u + f[1] * v];
+    ox = end[0]; oz = end[1]; oy = y;
+    const turn = rng(); if (h === 0) h = turn < 0.25 ? 1 : turn < 0.5 ? 3 : 0; else h = 0;
+  }
+  W.build();
+}
+function stageAt() { return W.cpStage == null ? 0 : W.cpStage; }
+
+/* =================== PLAY STATE =================== */
+let running = false, paused = false, run = null, F = null, msgT = 0;
+function startAt(stage, speed) {
+  if (!R && !TEST) return;
+  if (!W) buildCourse();
+  const cp = cps[Math.max(0, Math.min(stage, SV.best, STAGES))];
+  W.cpStage = cp.stage; const c = cp.cur; W.place((c[0] + c[3]) / 2, c[4] + 0.05, (c[2] + c[5]) / 2);
+  W.trail = trailCol(SV.trail);
+  run = { t: 0, deaths: 0, worldDeaths: 0, worldT: 0, speed: !!speed, startStage: cp.stage };
+  const next = cps[Math.min(cp.stage + 1, STAGES)].cur, dx = (next[0] + next[3]) / 2 - W.P.x, dz = (next[2] + next[5]) / 2 - W.P.z;
+  W.cam.yaw = Math.atan2(-dx, -dz); W.P.face = W.P.yaw = W.cam.yaw;
+  $('menu').hidden = true; running = true; paused = false; closePanels();
+  $('touch').classList.toggle('on', IN.touch);
+  flash(`Stage ${cp.stage + 1}`, WORLDS[Math.min(3, Math.floor(cp.stage / 10))].name);
+}
+function onDie() { if (!run) return; run.deaths++; run.worldDeaths++; }
+function onCheckpoint(s) {
+  if (!run) return;
+  if (s > SV.best) { SV.best = s; store.set(SV); }
+  sfxWin(); flash(s >= STAGES ? 'YOU DID IT!' : `Stage ${s + 1}`, s >= STAGES ? 'All 40 stages!' : s % 10 === 0 ? WORLDS[Math.min(3, s / 10)].name : '');
+  if (s >= 1) kit && kit.unlock('s1');
+  if (s % 10 === 0 && s > run.startStage) {
+    const wi = s / 10 - 1; kit && kit.unlock(['w1', 'w2', 'w3', 'w4'][wi]);
+    if (run.worldDeaths === 0 && run.startStage <= s - 10) kit && kit.unlock('clean');
+    if (run.worldT < 240 && run.startStage <= s - 10) kit && kit.unlock('speed');
+    if (run.startStage <= s - 10) { const k = 'w' + wi; if (!SV.times[k] || run.worldT < SV.times[k]) { SV.times[k] = Math.round(run.worldT * 10) / 10; store.set(SV); } kit && kit.score(Math.round(run.worldT * 10) / 10, 'world' + (wi + 1)); }
+    run.worldT = 0; run.worldDeaths = 0;
+  }
+  if (s >= STAGES) { if (run.speed) kit && kit.score(Math.round(run.t), 'speedrun'); setTimeout(() => showDone(), 900); }
+  if (F) F.send(myState(), true);
+}
+function onCoin(c) { SV.coins++; if (c.id && !SV.taken.includes(c.id)) SV.taken.push(c.id); store.set(SV); if (SV.coins >= 100) kit && kit.unlock('coins'); }
+function sfxWin() { G3.tone(523, 0.08, 'square', 0.04); setTimeout(() => G3.tone(784, 0.14, 'square', 0.04), 90); }
+function flash(t, sub) { $('msg').innerHTML = `${t}${sub ? `<small>${sub}</small>` : ''}`; $('msg').style.opacity = 1; msgT = 1.8; }
+function showDone() { $('done').hidden = false; paused = true; if (document.pointerLockElement) document.exitPointerLock(); $('doneText').innerHTML = `<h2>🏆 Sky Obby complete!</h2><p class="sub">All forty stages${run.speed ? ` in <b>${fmt(run.t)}</b>` : ''}, with ${run.deaths} fall${run.deaths === 1 ? '' : 's'} this run. Coins: <b>${SV.coins}</b> — spend them on trails.</p>`; kit && kit.unlock('w4'); }
+const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}.${Math.floor(t * 10 % 10)}`;
+const myState = () => ({ x: W.P.x, y: W.P.y, z: W.P.z, yaw: W.P.yaw, spd: Math.min(1, Math.hypot(W.P.vx, W.P.vz) / 5), stage: stageAt(), label: 'Stage ' + (stageAt() + 1), dead: W.P.dead > 0 ? 1 : 0 });
+
+/* =================== LOOP =================== */
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) return;
+  const raw = IN.frame();
+  if (IN.hit('Escape') || IN.hit('Btnmenu')) { toMenu(); IN.endFrame(); return; }
+  if (paused) { IN.endFrame(); render(); return; }
+  if (IN.hit('KeyR')) W.die();
+  const inp = { mx: raw.mx, mz: raw.mz, run: raw.run || IN.down('run'), jump: IN.hit('Space') || IN.hit('Btnjump') || IN.hit('Tap') || IN.hit('KeyJ'), jumpHeld: IN.down('Space') || IN.down('jump') || IN.down('KeyJ'), lookX: raw.lookX, lookY: raw.lookY, wheel: raw.wheel };
+  step(dt, inp); render();
+  IN.endFrame();
+}
+let camC = null;
+function step(dt, inp) {
+  W.update(dt, inp); camC = W.camera(inp, dt);
+  run.t += dt; run.worldT += dt;
+  if (F) { F.send(myState()); F.update(dt); }
+  msgT -= dt; if (msgT <= 0) $('msg').style.opacity = 0;
+  hud();
+}
+function render() {
+  if (!R || !W || !camC) return;
+  const wi = Math.min(3, Math.floor(stageAt() / 10)), env = Object.assign({ view: SV.low ? 80 : 150 }, WORLDS[wi].sky);
+  W.render(camC, env, r => { if (F) F.draw(r); if (wi === 2) r.box(W.P.x - 300, W.spawn[1] - 40, W.P.z - 300, W.P.x + 300, W.spawn[1] - 38, W.P.z + 300, '#ea580c', 1, 1); });
+  if (F) F.tags(R, $('tags'));
+}
+let hudT = 0;
+function hud() {
+  if ((hudT -= 1) > 0) return; hudT = 6;
+  const s = stageAt();
+  $('top').innerHTML = `<b>Stage ${Math.min(s + 1, STAGES)} / ${STAGES}</b><small>${WORLDS[Math.min(3, Math.floor(s / 10))].name}</small>`;
+  $('stats').innerHTML = `<span>⏱ ${fmt(run.t)}</span><span>💀 ${run.deaths}</span><span>🪙 ${SV.coins}</span>`;
+  if (F) { const list = [{ name: 'You', stage: s }].concat(F.list().map(o => ({ name: o.name, stage: o.t.stage || 0 }))).sort((a, b) => b.stage - a.stage); $('room').innerHTML = `<b>🌐 Room ${F.net.room ? F.net.room.code : ''}</b>` + list.map((p, i) => `<div>${i + 1}. ${SJFriends.esc(p.name)} — ${p.stage + 1}</div>`).join(''); }
+}
+
+/* =================== MENUS =================== */
+function closePanels() { for (const id of ['shop', 'done']) $(id).hidden = true; paused = false; last = performance.now(); }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { closePanels(); if (!running) $('menu').hidden = false; });
+function toMenu() { running = false; $('menu').hidden = false; $('touch').classList.remove('on'); $('tags').innerHTML = ''; if (document.pointerLockElement) document.exitPointerLock(); renderWorlds(); }
+$('bMenu2').onclick = () => { closePanels(); toMenu(); };
+function renderWorlds() {
+  $('worlds').innerHTML = WORLDS.map((w, i) => { const open = SV.best >= i * 10, t = SV.times['w' + i]; return `<button class="world${open ? '' : ' lock'}" data-w="${i}" style="background:${w.grad}" ${open ? '' : 'disabled'}><b>${i + 1}. ${w.name}</b><small>Stages ${i * 10 + 1}–${i * 10 + 10}${t ? ` · best ${fmt(t)}` : ''}${open ? '' : ' · 🔒'}</small></button>`; }).join('');
+  $('worlds').querySelectorAll('[data-w]').forEach(b => b.onclick = () => startAt(+b.dataset.w * 10));
+  $('bPlay').textContent = SV.best > 0 ? `▶ Continue (stage ${Math.min(SV.best + 1, STAGES)})` : '▶ Play';
+}
+$('bPlay').onclick = () => startAt(SV.best);
+$('bRun').onclick = () => startAt(0, true);
+$('bKeys').onclick = () => { $('keys').hidden = !$('keys').hidden; };
+$('bLook').onclick = () => { location.href = '../sj-avatar/'; };
+$('lowq').checked = !!SV.low; if (R) R.quality = SV.low ? 'low' : 'high', R.scale = SV.low ? 0.65 : 1;
+$('lowq').onchange = () => { SV.low = $('lowq').checked; store.set(SV); if (R) { R.quality = SV.low ? 'low' : 'high'; R.scale = SV.low ? 0.65 : 1; } };
+const TRAILS = [['none', 'No trail', 0, null], ['sky', 'Sky sparkle', 15, [0.4, 0.75, 1]], ['mint', 'Mint', 25, [0.3, 1, 0.6]], ['fire', 'Fire', 40, [1, 0.45, 0.1]], ['gold', 'Gold dust', 60, [1, 0.85, 0.3]], ['violet', 'Violet', 80, [0.75, 0.4, 1]], ['rainbow', 'Rainbow', 120, 'rainbow']];
+function trailCol(id) { const t = TRAILS.find(x => x[0] === id); if (!t || !t[3]) return null; if (t[3] === 'rainbow') return p => { const h = (p[0] + p[2]) * 0.15 + performance.now() * 0.002; return [0.5 + 0.5 * Math.sin(h), 0.5 + 0.5 * Math.sin(h + 2.1), 0.5 + 0.5 * Math.sin(h + 4.2)]; }; return t[3]; }
+function renderShop() {
+  $('coinsShop').textContent = `🪙 ${SV.coins}`;
+  $('shopList').innerHTML = TRAILS.map(([id, name, price, c]) => { const own = SV.trails.includes(id), col = Array.isArray(c) ? `rgb(${c.map(v => v * 255 | 0)})` : c === 'rainbow' ? '#f0abfc' : '#64748b'; return `<button class="item${SV.trail === id ? ' on' : ''}" data-t="${id}"><b><span class="sw" style="background:${col};color:${col}"></span>${name}</b><small>${own ? (SV.trail === id ? 'Wearing' : 'Tap to wear') : `🪙 ${price}`}</small></button>`; }).join('');
+  $('shopList').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const t = TRAILS.find(x => x[0] === b.dataset.t); if (!SV.trails.includes(t[0])) { if (SV.coins < t[2]) { b.querySelector('small').textContent = `Need 🪙 ${t[2] - SV.coins} more`; return; } SV.coins -= t[2]; SV.trails.push(t[0]); } SV.trail = t[0]; store.set(SV); if (W) W.trail = trailCol(SV.trail); renderShop(); });
+}
+$('bShop').onclick = () => { renderShop(); $('menu').hidden = true; $('shop').hidden = false; };
+$('bOnline').onclick = async () => {
+  if (!(await SJFriends.available())) { alert('Online play needs SanjivramOS (open this game from the SanjivramOS desktop).'); return; }
+  try { F = await SJFriends.join({ game: 'obby', gameName: 'Sky Obby' }); } catch { return; }
+  kit && F.players().length > 1 && kit.unlock('friends');
+  F.on('join', () => kit && kit.unlock('friends'));
+  startAt(Math.min(SV.best, 0));
+};
+if (new URLSearchParams(location.search).get('join') || new URLSearchParams(location.search).get('online')) setTimeout(() => $('bOnline').click(), 600);
+if (window.SJLook) SJLook.get();
+renderWorlds();
+document.addEventListener('visibilitychange', () => { if (document.hidden && running) last = performance.now(); });
+requestAnimationFrame(frame);
+// test hooks
+window.__obby = { get W() { return W; }, get run() { return run; }, get SV() { return SV; }, startAt, step: (n, dt = 1 / 60, inp = {}) => { for (let i = 0; i < n; i++) step(dt, Object.assign({ mx: 0, mz: 0, run: false, jump: false, jumpHeld: false, lookX: 0, lookY: 0, wheel: 0 }, typeof inp === 'function' ? inp(i) : inp)); return { x: W.P.x, y: W.P.y, z: W.P.z, stage: stageAt(), dead: W.P.dead, ground: W.P.ground }; }, cps: () => cps, buildCourse };
+})();
+</script>
+</body></html>

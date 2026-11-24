@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game Maker</title>
+<link rel="stylesheet" href="maker.css">
+</head><body>
+<div id="app">
+  <header id="top">
+    <b class="logo">🧩 Game Maker</b>
+    <nav id="tabs"><button data-v="create" class="on">🛠 Create</button><button data-v="browse">🎮 Play games</button><button data-v="mine">📁 My games</button></nav>
+    <span class="sp"></span>
+    <span id="who"></span>
+    <button id="mute" class="ghost" title="Sound">🔊</button>
+  </header>
+
+  <!-- ============ CREATE ============ -->
+  <section id="v-create" class="view">
+    <div id="toolbar">
+      <input id="title" maxlength="60" placeholder="Name your game" aria-label="Game name">
+      <span class="grp" id="levelTabs"></span>
+      <span class="grp">
+        <button data-tool="pen" class="tool on" title="Draw (B)">✏️</button>
+        <button data-tool="erase" class="tool" title="Erase (E)">🧽</button>
+        <button data-tool="rect" class="tool" title="Fill a box (R)">⬛</button>
+        <button data-tool="fill" class="tool" title="Paint bucket (F)">🪣</button>
+        <button data-tool="pan" class="tool" title="Move around (hold Space)">✋</button>
+      </span>
+      <span class="grp"><button id="undo" title="Undo (Ctrl+Z)">↶</button><button id="redo" title="Redo (Ctrl+Y)">↷</button><button id="zoomOut" title="Zoom out">−</button><button id="zoomIn" title="Zoom in">+</button></span>
+      <span class="sp"></span>
+      <button id="testBtn" class="pri">▶ Play test</button>
+      <button id="pubBtn" class="pub">🌐 Publish</button>
+    </div>
+    <div id="work">
+      <aside id="palette"></aside>
+      <div id="editWrap"><canvas id="ed"></canvas></div>
+      <aside id="settings"></aside>
+    </div>
+    <div id="hintBar">Pick a block on the left, then click or drag on the grid to place it. Right-click erases. Set the rules on the right. Press ▶ to try it.</div>
+  </section>
+
+  <!-- ============ BROWSE ============ -->
+  <section id="v-browse" class="view" hidden>
+    <div class="bar"><input id="q" placeholder="Search games, makers…" aria-label="Search games"><select id="sort" aria-label="Sort"><option value="new">Newest</option><option value="top">Most liked</option><option value="plays">Most played</option></select><button id="raceJoin">🏁 Join a race</button><button id="refresh">↻</button></div>
+    <div id="gallery" class="cards"></div>
+  </section>
+
+  <!-- ============ MINE ============ -->
+  <section id="v-mine" class="view" hidden>
+    <div class="bar"><button id="newGame" class="pri">＋ New game</button><button id="importBtn">Import file</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
+    <h3>Drafts on this device</h3><div id="drafts" class="cards"></div>
+    <h3>Published by you</h3><div id="published" class="cards"></div>
+  </section>
+</div>
+
+<!-- game runtime -->
+<div id="play" hidden>
+  <canvas id="pc"></canvas>
+  <div id="hud"><span id="hLeft"></span><span class="sp"></span><span id="hRight"></span><button id="exitPlay" title="Exit (Esc)">✕</button></div>
+  <div id="ghostList"></div>
+  <div id="sign" hidden></div>
+  <div id="banner"></div>
+  <div class="tc" id="tcL">◀</div><div class="tc" id="tcR">▶</div><div class="tc" id="tcU">▲</div><div class="tc" id="tcD">▼</div><div class="tc" id="tcA">⤒</div><div class="tc" id="tcB">✦</div>
+  <div id="endCard" hidden><div class="card"><h2 id="eTitle"></h2><p id="eInfo"></p><div id="eBoard"></div><div class="row" id="eBtns"></div></div></div>
+</div>
+
+<!-- dialogs -->
+<div class="modal" id="dlg" hidden><div class="card" id="dlgCard"></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script src="engine.js"></script>
+<script src="maker.js"></script>
+</body></html>

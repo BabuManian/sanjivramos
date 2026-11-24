@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gravity Run</title>
+<style>
+html,body{margin:0;height:100%;background:#020617;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+canvas{display:block;border-radius:8px;touch-action:none;cursor:pointer}
+</style></head><body>
+<canvas id="cv" width="640" height="360" aria-label="Gravity Run"></canvas>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("gravity", { vs: {}, title: "Gravity Run", lower: false, trophies: [{"id": "s1000", "name": "Gravity Defier", "desc": "Score 1000", "icon": "🌀"}] });</script>
+<script>
+(() => {
+  const VW = 640, VH = 360, TOP = 44, BOT = 316, PW = 22;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  let state = 'title', p, camX, speed, obs, gaps, orbs, genX, score, orbCount, trail, sparks, best = 0, buffer = 0, t = 0, deadT = 0;
+  try { best = +localStorage.getItem('sj-gravity-best') || 0; } catch {}
+
+  function reset() {
+    p = { x: 120, y: BOT - PW, vy: 0, dir: 1, ground: true, rot: 0 };
+    camX = 0; speed = 250; obs = []; gaps = { floor: [], ceil: [] }; orbs = []; genX = 700; score = 0; orbCount = 0; trail = []; sparks = [];
+  }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // Lays out the next stretch of course. Each pattern can be cleared with one or two flips.
+  function generate() {
+    while (genX < camX + VW + 300) {
+      const gapSpace = 170 + Math.max(0, 140 - (speed - 250) * 0.35) + rnd(0, 90);
+      const kind = Math.random() * (speed > 330 ? 7 : 5) | 0;
+      if (kind === 0) { // floor spikes
+        const n = 1 + (Math.random() * 3 | 0);
+        for (let i = 0; i < n; i++) obs.push({ x: genX + i * 22, y: BOT - 20, w: 22, h: 20, spike: 1 });
+        orbs.push({ x: genX + n * 11, y: TOP + 40 });
+        genX += n * 22;
+      } else if (kind === 1) { // ceiling spikes
+        const n = 1 + (Math.random() * 3 | 0);
+        for (let i = 0; i < n; i++) obs.push({ x: genX + i * 22, y: TOP, w: 22, h: 20, spike: -1 });
+        orbs.push({ x: genX + n * 11, y: BOT - 40 });
+        genX += n * 22;
+      } else if (kind === 2) { // gap in floor
+        const w = rnd(70, 130); gaps.floor.push([genX, genX + w]); genX += w;
+      } else if (kind === 3) { // gap in ceiling
+        const w = rnd(70, 130); gaps.ceil.push([genX, genX + w]); genX += w;
+      } else if (kind === 4) { // tall pillar from one side
+        const fromFloor = Math.random() < 0.5, h = rnd(110, 160);
+        obs.push({ x: genX, y: fromFloor ? BOT - h : TOP, w: 30, h });
+        orbs.push({ x: genX + 15, y: fromFloor ? TOP + 24 : BOT - 24 });
+        genX += 30;
+      } else if (kind === 5) { // floor gap followed by ceiling spikes: flip, then flip back
+        const w = rnd(80, 110); gaps.floor.push([genX, genX + w]);
+        for (let i = 0; i < 3; i++) obs.push({ x: genX + w + 120 + i * 22, y: TOP, w: 22, h: 20, spike: -1 });
+        genX += w + 186;
+      } else { // middle block: stay on either side
+        obs.push({ x: genX, y: (TOP + BOT) / 2 - 30, w: 50, h: 60 });
+        orbs.push({ x: genX + 25, y: TOP + 20 }, { x: genX + 25, y: BOT - 20 });
+        genX += 50;
+      }
+      genX += gapSpace;
+    }
+  }
+  const hasSurface = (list, x) => !list.some(([a, b]) => x + 3 >= a && x + PW - 3 <= b);
+
+  function flip() {
+    if (state !== 'play') { if (state === 'title' || (state === 'dead' && deadT > 0.5)) { reset(); state = 'play'; } return; }
+    if (p.ground) { p.dir = -p.dir; p.ground = false; p.vy = p.dir * 120; }
+    else buffer = 0.12;
+  }
+  function die() {
+    state = 'dead'; deadT = 0;
+    for (let i = 0; i < 30; i++) sparks.push({ x: p.x + PW / 2, y: p.y + PW / 2, vx: rnd(-300, 300), vy: rnd(-300, 300), life: rnd(0.4, 0.9) });
+    const s = Math.floor(score);
+    window.SJG && (SJG.score(s), s >= 1000 && SJG.unlock('s1000')); if (s > best) { best = s; try { localStorage.setItem('sj-gravity-best', String(best)); } catch {} }
+  }
+  function update(dt) {
+    t += dt;
+    sparks.forEach(s => { s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; });
+    sparks = sparks.filter(s => s.life > 0);
+    if (state === 'dead') { deadT += dt; return; }
+    if (state !== 'play') return;
+    speed = Math.min(560, speed + 5 * dt);
+    camX += speed * dt; score += speed * dt / 12;
+    generate();
+    const wx = camX + p.x;
+    buffer -= dt;
+    p.vy += 2400 * p.dir * dt; p.vy = Math.max(-900, Math.min(900, p.vy));
+    p.y += p.vy * dt; p.ground = false;
+    if (p.dir > 0 && p.y + PW >= BOT && p.y + PW - p.vy * dt <= BOT + 1 && hasSurface(gaps.floor, wx)) { p.y = BOT - PW; p.vy = 0; p.ground = true; }
+    if (p.dir < 0 && p.y <= TOP && p.y - p.vy * dt >= TOP - 1 && hasSurface(gaps.ceil, wx)) { p.y = TOP; p.vy = 0; p.ground = true; }
+    if (p.ground && buffer > 0) { buffer = 0; flip(); }
+    p.rot += (p.ground ? 0 : 9 * p.dir) * dt;
+    if (p.ground) p.rot = Math.round(p.rot / (Math.PI / 2)) * (Math.PI / 2);
+    if (p.y > VH + 30 || p.y < -30 - PW) { die(); return; }
+    for (const o of obs) {
+      if (o.x > wx + PW || o.x + o.w < wx) continue;
+      const inset = o.spike ? 5 : 1;
+      if (wx + PW - inset > o.x + inset && wx + inset < o.x + o.w - inset && p.y + PW - inset > o.y + inset && p.y + inset < o.y + o.h - inset) { die(); return; }
+    }
+    for (const o of orbs) if (!o.got && Math.hypot(o.x - (wx + PW / 2), o.y - (p.y + PW / 2)) < 20) { o.got = true; orbCount++; score += 25; for (let i = 0; i < 8; i++) sparks.push({ x: p.x + PW / 2, y: p.y + PW / 2, vx: rnd(-160, 160), vy: rnd(-160, 160), life: 0.4, c: '#fde047' }); }
+    trail.push({ x: wx, y: p.y }); if (trail.length > 14) trail.shift();
+    const cut = camX - 100;
+    obs = obs.filter(o => o.x + o.w > cut); orbs = orbs.filter(o => o.x > cut && !o.got);
+    gaps.floor = gaps.floor.filter(g => g[1] > cut); gaps.ceil = gaps.ceil.filter(g => g[1] > cut);
+  }
+  function surface(y, h, list) {
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0, y, VW, h);
+    ctx.fillStyle = '#22d3ee';
+    const edge = y === 0 ? y + h - 3 : y;
+    ctx.fillRect(0, edge, VW, 3);
+    for (const [a, b] of list) { const x = a - camX; ctx.fillStyle = '#020617'; ctx.fillRect(x, y, b - a, h); }
+  }
+  function draw() {
+    ctx.fillStyle = '#020617'; ctx.fillRect(0, 0, VW, VH);
+    // Scrolling grid backdrop.
+    ctx.strokeStyle = 'rgba(56,189,248,.08)'; ctx.lineWidth = 1;
+    const off = (camX * 0.5) % 40;
+    for (let x = -off; x < VW; x += 40) { ctx.beginPath(); ctx.moveTo(x, TOP); ctx.lineTo(x, BOT); ctx.stroke(); }
+    for (let y = TOP; y < BOT; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(VW, y); ctx.stroke(); }
+    if (p) {
+      surface(0, TOP, gaps.ceil); surface(BOT, VH - BOT, gaps.floor);
+      for (const o of obs) {
+        const x = o.x - camX; if (x > VW || x + o.w < 0) continue;
+        if (o.spike) {
+          ctx.fillStyle = '#f43f5e'; ctx.beginPath();
+          if (o.spike > 0) { ctx.moveTo(x, o.y + o.h); ctx.lineTo(x + o.w / 2, o.y); ctx.lineTo(x + o.w, o.y + o.h); }
+          else { ctx.moveTo(x, o.y); ctx.lineTo(x + o.w / 2, o.y + o.h); ctx.lineTo(x + o.w, o.y); }
+          ctx.fill();
+        } else {
+          ctx.fillStyle = '#1e1b4b'; ctx.fillRect(x, o.y, o.w, o.h);
+          ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, o.y + 1, o.w - 2, o.h - 2);
+        }
+      }
+      for (const o of orbs) {
+        const x = o.x - camX; if (x < -10 || x > VW + 10) continue;
+        ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(x, o.y + Math.sin(t * 5 + o.x) * 3, 6, 0, 7); ctx.fill();
+      }
+      if (state === 'play' || state === 'title') {
+        trail.forEach((tr, i) => { ctx.fillStyle = `rgba(34,211,238,${i / trail.length * 0.35})`; ctx.fillRect(tr.x - camX + 4, tr.y + 4, PW - 8, PW - 8); });
+        ctx.save(); ctx.translate(p.x + PW / 2, p.y + PW / 2); ctx.rotate(p.rot);
+        ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 14;
+        ctx.fillStyle = '#22d3ee'; ctx.fillRect(-PW / 2, -PW / 2, PW, PW);
+        ctx.shadowBlur = 0; ctx.fillStyle = '#083344'; ctx.fillRect(-PW / 2 + 5, -PW / 2 + 5, PW - 10, PW - 10);
+        ctx.restore();
+      }
+      sparks.forEach(s => { ctx.globalAlpha = Math.min(1, s.life * 2); ctx.fillStyle = s.c || '#22d3ee'; ctx.fillRect(s.x - 2, s.y - 2, 4, 4); });
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'left';
+      ctx.fillText(`${Math.floor(score)}`, 14, 28);
+      ctx.textAlign = 'right'; ctx.fillStyle = '#fde047'; ctx.fillText(`● ${orbCount}   Best ${best}`, VW - 14, 28);
+    }
+    if (state !== 'play') {
+      ctx.fillStyle = 'rgba(2,6,23,.65)'; ctx.fillRect(0, 0, VW, VH);
+      ctx.textAlign = 'center'; ctx.fillStyle = '#22d3ee'; ctx.font = 'bold 36px system-ui';
+      ctx.fillText(state === 'title' ? 'GRAVITY RUN' : 'CRASHED', VW / 2, VH / 2 - 18);
+      ctx.fillStyle = '#e2e8f0'; ctx.font = '15px system-ui';
+      ctx.fillText(state === 'title' ? 'Tap, click or press Space to flip gravity' : `Score ${Math.floor(score)} · best ${best}`, VW / 2, VH / 2 + 14);
+      ctx.fillText(state === 'title' ? 'Dodge spikes and blocks, don’t fall through the gaps' : 'Tap or press Space to run again', VW / 2, VH / 2 + 38);
+    }
+  }
+  addEventListener('keydown', e => { if ([' ', 'ArrowUp', 'ArrowDown', 'w', 'W', 's', 'S', 'Enter'].includes(e.key)) { e.preventDefault(); if (!e.repeat) flip(); } });
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); flip(); });
+  function fit() {
+    const s = Math.min(innerWidth / VW, innerHeight / VH);
+    cv.style.width = Math.floor(VW * s) + 'px'; cv.style.height = Math.floor(VH * s) + 'px';
+  }
+  addEventListener('resize', fit); fit();
+  let last = performance.now();
+  function frame(now) {
+    let dt = Math.min(0.05, (now - last) / 1000); last = now;
+    while (dt > 0) { const h = Math.min(dt, 1 / 120); update(h); dt -= h; }
+    draw(); requestAnimationFrame(frame);
+  }
+  reset(); requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

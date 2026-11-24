@@ -1,0 +1,9 @@
+{
+  "autoconnect": true,
+  "resize": "remote",
+  "reconnect": true,
+  "reconnect_delay": 3000,
+  "quality": 6,
+  "compression": 2,
+  "path": "vnc"
+}

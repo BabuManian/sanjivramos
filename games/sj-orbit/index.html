@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orbit Hopper</title>
+<style>
+html,body{margin:0;height:100%;background:#020617;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden;user-select:none}
+#wrap{height:100%;display:flex;align-items:center;justify-content:center}
+#stage{position:relative;height:100%;max-width:100%;aspect-ratio:9/14}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+#ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;background:rgba(2,6,23,.72)}
+#ov[hidden]{display:none}
+h1{margin:0;font-size:32px;color:#fcd34d}
+p{margin:6px 0 12px;opacity:.85}
+button{border:none;background:#f59e0b;color:#1c1917;border-radius:999px;padding:10px 22px;font:inherit;font-weight:700;cursor:pointer;margin:3px}
+button.alt{background:#1e293b;color:#e2e8f0}
+.skins{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:320px;margin:8px auto}
+.skin{width:38px;height:38px;border-radius:50%;border:3px solid transparent;cursor:pointer;position:relative;padding:0}
+.skin.on{border-color:#fff}.skin.lock{opacity:.3;cursor:not-allowed}
+.skin span{position:absolute;inset:auto 0 -16px;font-size:10px;color:#cbd5e1}
+#mute{position:absolute;right:6px;top:6px;background:rgba(30,41,59,.7);color:#fff;padding:4px 8px;font-size:14px;border-radius:8px}
+.hint{font-size:12px;opacity:.6}
+</style></head><body>
+<div id="wrap"><div id="stage"><canvas id="c" width="450" height="700"></canvas><button id="mute">🔊</button>
+<div id="ov"><div>
+  <h1>🪐 Orbit Hopper</h1>
+  <p id="msg">Tap to let go of your planet.<br>Fly to the next one and keep climbing.</p>
+  <button id="go">Play</button><button class="alt" id="daily">Daily run</button>
+  <div class="skins" id="skins"></div>
+  <p class="hint" id="info"></p>
+</div></div>
+</div></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>
+(() => {
+  const W = 450, H = 700, cv = document.getElementById('c'), g = cv.getContext('2d'), $ = id => document.getElementById(id);
+  const kit = window.SJG ? SJG.init('orbit', { vs: { live: () => window.__orbit && __orbit().score }, title: 'Orbit Hopper', trophies: [
+    { id: 'p10', name: 'Liftoff', desc: 'Reach 10 planets', icon: '🚀' },
+    { id: 'p50', name: 'Star Sailor', desc: 'Reach 50 planets', icon: '⛵' },
+    { id: 'p100', name: 'Galaxy Brain', desc: 'Reach 100 planets', icon: '🌌' },
+    { id: 'stars100', name: 'Stargazer', desc: 'Collect 100 stars in total', icon: '⭐' },
+    { id: 'perfect10', name: 'Smooth Operator', desc: '10 perfect captures in a row', icon: '🎯' },
+    { id: 'daily', name: 'Daily Pilot', desc: 'Finish a daily run', icon: '📅' },
+    { id: 'skins', name: 'Collector', desc: 'Unlock every comet skin', icon: '🎨' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  const SKINS = [
+    { name: 'Comet', col: '#fde68a', cost: 0 }, { name: 'Ice', col: '#7dd3fc', cost: 25 }, { name: 'Rose', col: '#f9a8d4', cost: 60 },
+    { name: 'Lime', col: '#bef264', cost: 120 }, { name: 'Plasma', col: '#c084fc', cost: 200 }, { name: 'Ember', col: '#fb923c', cost: 300 }, { name: 'Rainbow', col: 'rainbow', cost: 500 },
+  ];
+  const store = { get(k, d) { try { const v = JSON.parse(localStorage.getItem('sj-orbit.' + k)); return v === null ? d : v; } catch { return d; } }, set(k, v) { try { localStorage.setItem('sj-orbit.' + k, JSON.stringify(v)); } catch {} } };
+  let totalStars = store.get('stars', 0), skin = store.get('skin', 0);
+
+  let rnd = Math.random, planets, ship, cam, score, stars, collect, state = 'menu', perfect, trail, daily = false, parts, t0;
+  function planetAt(i, prev) {
+    const r = 22 + rnd() * 26, gap = 150 + rnd() * 70 + Math.min(i, 60) * 1.2;
+    const x = 70 + rnd() * (W - 140), y = prev ? prev.y - gap : H - 140;
+    const types = i < 3 ? ['normal'] : i < 10 ? ['normal', 'normal', 'fast'] : ['normal', 'fast', 'moving', 'crumble', 'reverse', 'small'];
+    const type = types[rnd() * types.length | 0];
+    const p = { i, x, y, bx: x, r: type === 'small' ? 16 : r, type, orbit: (type === 'small' ? 16 : r) + 26 + rnd() * 10, spin: (type === 'fast' ? 3.4 : 2.1) * (type === 'reverse' ? -1 : 1) * (1 + Math.min(i, 80) * .006), hue: rnd() * 360, ring: rnd() < .3, life: type === 'crumble' ? 2.6 : Infinity, mv: rnd() * 6 };
+    if (i > 0 && rnd() < .6) { const n = 1 + (rnd() * 3 | 0); for (let k = 0; k < n; k++) collect.push({ x: (prev.x + x) / 2 + (rnd() - .5) * 120, y: (prev.y + y) / 2 + (rnd() - .5) * 60, got: false }); }
+    return p;
+  }
+  function start(isDaily) {
+    daily = isDaily; rnd = isDaily && kit ? SJG.rng(SJG.daySeed()) : Math.random;
+    collect = []; planets = []; parts = []; trail = [];
+    for (let i = 0; i < 6; i++) planets.push(planetAt(i, planets[i - 1]));
+    const p0 = planets[0];
+    ship = { on: p0, a: -Math.PI / 2, x: 0, y: 0, vx: 0, vy: 0, free: 0 };
+    cam = p0.y - H + 160; score = 0; stars = 0; perfect = 0; t0 = performance.now();
+    state = 'play'; $('ov').hidden = true; sfx('click');
+  }
+  function release() {
+    if (state !== 'play' || !ship.on) return;
+    const p = ship.on, sp = p.spin * p.orbit;
+    ship.vx = -Math.sin(ship.a) * sp; ship.vy = Math.cos(ship.a) * sp;
+    if (p.type === 'moving') ship.vx += Math.cos(p.mv) * 60;
+    const boost = 1.18; ship.vx *= boost; ship.vy *= boost;
+    ship.prev = p; ship.on = null; ship.free = 0; sfx('jump');
+  }
+  function capture(p) {
+    const dx = ship.x - p.x, dy = ship.y - p.y, d = Math.hypot(dx, dy);
+    ship.on = p; ship.a = Math.atan2(dy, dx);
+    // orbit direction follows the ship's motion
+    const tangential = (-Math.sin(ship.a) * ship.vx + Math.cos(ship.a) * ship.vy);
+    if (Math.sign(tangential) !== Math.sign(p.spin) && p.type !== 'reverse') p.spin *= -1;
+    const isPerfect = Math.abs(d - p.orbit) < 12;
+    if (isPerfect) { perfect++; score += 2; floatT('Perfect!', p.x, p.y - p.orbit - 10); if (perfect >= 10) kit && kit.unlock('perfect10'); } else perfect = 0;
+    if (p.i > (ship.best || 0)) {
+      ship.best = p.i; score += 1;
+      if (p.i >= 10) kit && kit.unlock('p10'); if (p.i >= 50) kit && kit.unlock('p50'); if (p.i >= 100) kit && kit.unlock('p100');
+    }
+    while (planets.length < p.i + 6 - planets[0].i + 1 || planets[planets.length - 1].i < p.i + 5) planets.push(planetAt(planets[planets.length - 1].i + 1, planets[planets.length - 1]));
+    sfx('pop');
+    for (let i = 0; i < 14; i++) { const a = Math.random() * 7; parts.push({ x: ship.x, y: ship.y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, life: .5, col: `hsl(${p.hue},80%,70%)` }); }
+  }
+  const floats = [];
+  function floatT(s, x, y) { floats.push({ s, x, y, life: 1 }); }
+  function die() {
+    if (state !== 'play') return;
+    state = 'over'; sfx('lose');
+    for (let i = 0; i < 40; i++) { const a = Math.random() * 7; parts.push({ x: ship.x, y: ship.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, life: .8, col: '#fde68a' }); }
+    totalStars += stars; store.set('stars', totalStars);
+    if (totalStars >= 100) kit && kit.unlock('stars100');
+    const res = kit ? kit.score(score, daily ? 'daily-' + SJG.daySeed() : 'main') : { isBest: false };
+    if (daily) { kit && kit.unlock('daily'); kit && kit.score(score, 'daily'); }
+    setTimeout(() => { $('msg').innerHTML = `${daily ? 'Daily run' : 'Run'} over — <b>${score}</b> points${res.isBest ? ' (new best!)' : ''}<br>⭐ ${stars} stars collected`; $('go').textContent = 'Play again'; renderSkins(); $('ov').hidden = false; }, 800);
+  }
+
+  let last = 0;
+  function frame(ts) {
+    const dt = Math.min(.033, (ts - last) / 1000 || 0); last = ts;
+    if (state === 'play') update(dt);
+    else if (parts) for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+    draw(ts / 1000);
+    requestAnimationFrame(frame);
+  }
+  function update(dt) {
+    for (const p of planets) {
+      if (p.type === 'moving') { p.mv += dt * 1.2; p.x = p.bx + Math.sin(p.mv) * 70; }
+    }
+    if (ship.on) {
+      const p = ship.on;
+      ship.a += p.spin * dt;
+      ship.x = p.x + Math.cos(ship.a) * p.orbit; ship.y = p.y + Math.sin(ship.a) * p.orbit;
+      if (p.type === 'crumble') { p.life -= dt; if (p.life <= 0) { p.dead = true; release(); } }
+    } else {
+      ship.free += dt;
+      // weak pull toward nearby planets
+      for (const p of planets) {
+        if (p.dead || p === ship.prev && ship.free < .35) continue;
+        const dx = p.x - ship.x, dy = p.y - ship.y, d = Math.hypot(dx, dy);
+        if (d < p.orbit + 70) { const f = 12000 / Math.max(d * d, 400); ship.vx += dx / d * f * dt * 60; ship.vy += dy / d * f * dt * 60; }
+        if (d < p.orbit + 14 && d > p.r) { capture(p); break; }
+        if (d <= p.r) { die(); return; }
+      }
+      ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+      if (ship.x < -30 || ship.x > W + 30 || ship.y > cam + H + 40 || ship.free > 5) die();
+    }
+    // stars
+    for (const s of collect) if (!s.got && Math.hypot(s.x - ship.x, s.y - ship.y) < 18) { s.got = true; stars++; score += 1; sfx('coin'); }
+    // camera follows upward
+    const target = (ship.on ? ship.on.y : ship.y) - H * .62;
+    cam += (target - cam) * Math.min(1, dt * 2.5);
+    trail.push(ship.x, ship.y); if (trail.length > 50) trail.splice(0, 2);
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0) parts.splice(i, 1); }
+    for (let i = floats.length - 1; i >= 0; i--) { floats[i].y -= 30 * dt; floats[i].life -= dt; if (floats[i].life <= 0) floats.splice(i, 1); }
+    planets = planets.filter(p => p.y - cam < H + 200 || p === ship.on);
+    collect = collect.filter(s => s.y - cam < H + 100);
+  }
+  const bg = Array.from({ length: 140 }, () => [Math.random() * W, Math.random() * H * 3, Math.random()]);
+  function skinCol(t) { const s = SKINS[skin]; return s.col === 'rainbow' ? `hsl(${(t * 120) % 360},90%,65%)` : s.col; }
+  function draw(t) {
+    g.fillStyle = '#020617'; g.fillRect(0, 0, W, H);
+    for (const [x, y, z] of bg) { const yy = ((y - (cam || 0) * z * .3) % (H * 3) + H * 3) % (H * 3); if (yy < H) { g.fillStyle = `rgba(226,232,240,${.2 + z * .6})`; g.fillRect(x, yy, 1 + z, 1 + z); } }
+    if (!planets) return;
+    g.save(); g.translate(0, -cam);
+    for (const s of collect) if (!s.got) { g.fillStyle = '#fde047'; star(s.x, s.y, 7 + Math.sin(t * 5 + s.x) * 1.5); }
+    for (const p of planets) {
+      if (p.dead) continue;
+      g.strokeStyle = `hsla(${p.hue},70%,70%,.25)`; g.setLineDash([3, 6]); g.lineWidth = 1.5; g.beginPath(); g.arc(p.x, p.y, p.orbit, 0, 7); g.stroke(); g.setLineDash([]);
+      const gr = g.createRadialGradient(p.x - p.r * .4, p.y - p.r * .4, p.r * .1, p.x, p.y, p.r);
+      gr.addColorStop(0, `hsl(${p.hue},70%,72%)`); gr.addColorStop(1, `hsl(${p.hue},60%,30%)`);
+      g.fillStyle = gr; g.beginPath(); g.arc(p.x, p.y, p.r, 0, 7); g.fill();
+      if (p.ring) { g.strokeStyle = `hsla(${p.hue + 40},80%,75%,.7)`; g.lineWidth = 3; g.beginPath(); g.ellipse(p.x, p.y, p.r * 1.6, p.r * .45, -.3, 0, 7); g.stroke(); }
+      if (p.type === 'crumble') { g.fillStyle = '#fff'; g.font = 'bold 12px system-ui'; g.textAlign = 'center'; g.fillText(p.life === Infinity ? '' : Math.max(0, p.life).toFixed(1), p.x, p.y + 4); g.strokeStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.moveTo(p.x - p.r * .6, p.y - p.r * .3); g.lineTo(p.x, p.y + p.r * .2); g.lineTo(p.x + p.r * .5, p.y - p.r * .5); g.stroke(); }
+      if (p.type === 'fast' || p.type === 'reverse') { g.fillStyle = 'rgba(255,255,255,.8)'; g.font = '14px system-ui'; g.textAlign = 'center'; g.fillText(p.type === 'fast' ? '»' : '↺', p.x, p.y + 5); }
+    }
+    g.strokeStyle = skinCol(t); g.globalAlpha = .4; g.lineWidth = 3; g.beginPath(); for (let i = 0; i < trail.length; i += 2) i ? g.lineTo(trail[i], trail[i + 1]) : g.moveTo(trail[i], trail[i + 1]); g.stroke(); g.globalAlpha = 1;
+    if (state === 'play' && ship.on) {   // aim guide: where you'd fly if you let go now
+      const p = ship.on, dir = Math.sign(p.spin), tx = -Math.sin(ship.a) * dir, ty = Math.cos(ship.a) * dir;
+      g.setLineDash([2, 7]); g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(ship.x, ship.y); g.lineTo(ship.x + tx * 90, ship.y + ty * 90); g.stroke(); g.setLineDash([]);
+    }
+    if (state === 'play') { g.fillStyle = skinCol(t); g.shadowColor = g.fillStyle; g.shadowBlur = 14; g.beginPath(); g.arc(ship.x, ship.y, 7, 0, 7); g.fill(); g.shadowBlur = 0; }
+    for (const p of parts) if (p.life > 0) { g.globalAlpha = Math.min(1, p.life * 2); g.fillStyle = p.col; g.fillRect(p.x - 2, p.y - 2, 4, 4); } g.globalAlpha = 1;
+    g.font = 'bold 14px system-ui'; g.textAlign = 'center'; for (const f of floats) { g.globalAlpha = f.life; g.fillStyle = '#a7f3d0'; g.fillText(f.s, f.x, f.y); } g.globalAlpha = 1;
+    g.restore();
+    if (state !== 'menu') {
+      g.fillStyle = '#fff'; g.font = 'bold 28px system-ui'; g.textAlign = 'center'; g.fillText(score, W / 2, 44);
+      g.font = '14px system-ui'; g.fillStyle = '#fde047'; g.textAlign = 'left'; g.fillText('⭐ ' + stars, 12, 26);
+      if (daily) { g.fillStyle = '#93c5fd'; g.fillText('Daily', 12, 46); }
+      if (perfect >= 2) { g.fillStyle = '#a7f3d0'; g.textAlign = 'center'; g.fillText(`Perfect ×${perfect}`, W / 2, 66); }
+    }
+  }
+  function star(x, y, r) { g.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.fill(); }
+
+  function renderSkins() {
+    const owned = store.get('owned', [0]);
+    if (owned.length === SKINS.length) kit && kit.unlock('skins');
+    $('skins').innerHTML = SKINS.map((s, i) => `<button class="skin${i === skin ? ' on' : ''}${owned.includes(i) ? '' : totalStars >= s.cost ? '' : ' lock'}" data-i="${i}" title="${s.name}${owned.includes(i) ? '' : ' — ' + s.cost + ' ⭐'}" style="background:${s.col === 'rainbow' ? 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)' : s.col}"><span>${owned.includes(i) ? s.name : s.cost + '⭐'}</span></button>`).join('');
+    $('info').textContent = `⭐ ${totalStars} stars banked` + (kit && kit.best() ? ` · Best ${kit.best()}` : '') + (kit && kit.best('daily-' + SJG.daySeed()) !== null ? ` · Today ${kit.best('daily-' + SJG.daySeed())}` : '');
+  }
+  $('skins').onclick = e => {
+    const b = e.target.closest('.skin'); if (!b) return;
+    const i = +b.dataset.i, owned = store.get('owned', [0]);
+    if (!owned.includes(i)) { if (totalStars < SKINS[i].cost) return; totalStars -= SKINS[i].cost; store.set('stars', totalStars); owned.push(i); store.set('owned', owned); sfx('coin'); }
+    skin = i; store.set('skin', i); renderSkins();
+  };
+  renderSkins();
+  const act = e => { if (state === 'play') { e.preventDefault(); release(); } };
+  cv.addEventListener('pointerdown', act);
+  addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'Enter') { if (state === 'play') { e.preventDefault(); release(); } else if (!$('ov').hidden && state !== 'play') { e.preventDefault(); start(false); } } });
+  $('go').onclick = () => start(false);
+  $('daily').onclick = () => start(true);
+  $('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+  if (kit && kit.muted) $('mute').textContent = '🔇';
+  window.__orbit = () => ({ state, score, onPlanet: ship && ship.on && ship.on.i, release, start });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

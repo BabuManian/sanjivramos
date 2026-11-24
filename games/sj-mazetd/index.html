@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maze Defense</title>
+<style>
+html,body{margin:0;height:100%;background:#111827;color:#e5e7eb;font:13px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+canvas{display:block;border-radius:8px;touch-action:none;cursor:crosshair}
+#bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;max-width:900px}
+.stat{background:#1f2937;border-radius:6px;padding:6px 10px;white-space:nowrap}
+.stat b{color:#fff}
+button,select{font:inherit;border:none;border-radius:6px;padding:7px 10px;cursor:pointer;background:#374151;color:#e5e7eb}
+button:disabled{opacity:.45;cursor:default}
+button.tw{display:flex;flex-direction:column;align-items:center;line-height:1.15;min-width:56px;padding:5px 8px}
+button.tw small{opacity:.8}
+button.tw.sel{outline:2px solid #34d399;background:#4b5563}
+button.go{background:#10b981;color:#022c22;font-weight:700}
+#info{display:flex;gap:6px;align-items:center}
+#info[hidden]{display:none}
+</style></head><body>
+<canvas id="cv" width="640" height="384" aria-label="Maze Defense map"></canvas>
+<div id="bar">
+  <select id="lvl" aria-label="Level"></select>
+  <span class="stat">♥ <b id="lives">20</b></span><span class="stat">● <b id="gold">0</b></span><span class="stat">Wave <b id="wave">0</b></span>
+  <span id="towers" style="display:contents"></span>
+  <span id="info"></span>
+  <button id="speed">1×</button>
+  <button class="go" id="next">Start wave 1</button>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("mazetd", { vs: { live: '#wave', final: false }, title: "Maze Defense", lower: false, trophies: [{"id": "clear", "name": "Architect", "desc": "Clear a level", "icon": "🧱"}] });</script>
+<script>
+(() => {
+  const S = 32, COLS = 20, ROWS = 12, VW = COLS * S, VH = ROWS * S;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), $ = id => document.getElementById(id);
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  // Levels: spawns on the left, exits on the right (some have two of each), random rocks, a wave goal.
+  const LEVELS = Array.from({ length: 15 }, (_, i) => {
+    const two = i >= 4 && i % 3 !== 0, top = i >= 9 && i % 2 === 0;
+    return {
+      name: ['Open Field', 'Boulders', 'Crossing', 'The Pass', 'Twin Gates', 'Rock Garden', 'Split', 'Badlands', 'Gauntlet', 'Four Winds', 'Stone Maze', 'Fortress', 'Labyrinth', 'Chaos', 'Endgame'][i],
+      seed: 100 + i * 17, rocks: 6 + i * 3, goal: 12 + i * 2, gold: 160 + i * 15,
+      spawns: two ? [[0, 3], [0, 8]] : [[0, 5]], exits: top ? [[19, 2], [19, 9]] : two ? [[19, 5], [19, 6]] : [[19, 6]],
+    };
+  });
+  const TYPES = {
+    wall:   { name: 'Wall',   cost: 5,   range: 0,   rate: 0,   dmg: 0,  color: '#9ca3af', desc: 'Blocks the path. Use walls to build a maze.' },
+    gun:    { name: 'Gun',    cost: 40,  range: 90,  rate: 0.35, dmg: 8, color: '#a3e635', speed: 560, desc: 'Fast shots' },
+    splash: { name: 'Mortar', cost: 80,  range: 110, rate: 1.4, dmg: 26, color: '#fb923c', speed: 260, splash: 44, ground: true, desc: 'Splash (ground only)' },
+    slow:   { name: 'Ice',    cost: 60,  range: 80,  rate: 0.9, dmg: 3,  color: '#67e8f9', speed: 400, slow: 1, desc: 'Slows' },
+    laser:  { name: 'Laser',  cost: 110, range: 100, rate: 0,   dmg: 34, color: '#f472b6', beam: 1, desc: 'Constant beam, ramps up on one target' },
+    tesla:  { name: 'Tesla',  cost: 100, range: 80,  rate: 0.9, dmg: 14, color: '#fde047', chain: 3, desc: 'Chains to 3 more' },
+    sniper: { name: 'Sniper', cost: 120, range: 230, rate: 2.0, dmg: 70, color: '#c084fc', speed: 1000, desc: 'Long range' },
+  };
+  const ENEMY = {
+    grunt: { hp: 30, speed: 42, gold: 4, r: 8, color: '#ef4444' },
+    fast:  { hp: 18, speed: 85, gold: 3, r: 7, color: '#facc15' },
+    tank:  { hp: 130, speed: 26, gold: 10, r: 11, color: '#64748b' },
+    fly:   { hp: 40, speed: 55, gold: 6, r: 8, color: '#c4b5fd', fly: 1 },
+    boss:  { hp: 900, speed: 22, gold: 80, r: 15, color: '#7c3aed' },
+  };
+  let L, li = 0, rocks, grid, dist, gold, lives, wave, towers, enemies, shots, fx, queue, spawnT, waveOn, picked = 'wall', sel = null, hover = null, speed = 1, over = false, won = false, unlocked = 1, bestW = {};
+  try { unlocked = +localStorage.getItem('sj-mazetd-unlocked') || 1; bestW = JSON.parse(localStorage.getItem('sj-mazetd-best') || '{}'); } catch {}
+  const key = (c, r) => r * COLS + c;
+  const isExit = (c, r) => L.exits.some(e => e[0] === c && e[1] === r);
+  const isSpawn = (c, r) => L.spawns.some(e => e[0] === c && e[1] === r);
+  // Distance from every cell to the nearest exit (BFS). Enemies walk downhill on this.
+  function flow(block) {
+    const d = new Int16Array(COLS * ROWS).fill(-1), q = [];
+    for (const [c, r] of L.exits) { d[key(c, r)] = 0; q.push([c, r]); }
+    for (let h = 0; h < q.length; h++) {
+      const [c, r] = q[h];
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+        const k = key(nc, nr); if (d[k] !== -1 || grid[k] || k === block) continue;
+        d[k] = d[key(c, r)] + 1; q.push([nc, nr]);
+      }
+    }
+    return d;
+  }
+  function loadLevel(i) {
+    li = i; L = LEVELS[i];
+    const rand = rng(L.seed);
+    grid = new Uint8Array(COLS * ROWS); rocks = new Set();
+    for (let k = 0, tries = 0; k < L.rocks && tries < 500; tries++) {
+      const c = 2 + (rand() * (COLS - 4) | 0), r = rand() * ROWS | 0, kk = key(c, r);
+      if (grid[kk]) continue;
+      grid[kk] = 2; dist = flow(-1);
+      if (L.spawns.some(([sc, sr]) => dist[key(sc, sr)] < 0)) { grid[kk] = 0; continue; }
+      rocks.add(kk); k++;
+    }
+    dist = flow(-1);
+    gold = L.gold; lives = 20; wave = 0; towers = []; enemies = []; shots = []; fx = []; queue = []; spawnT = 0; waveOn = false; over = false; won = false; sel = null;
+    $('lvl').value = i; ui();
+  }
+  function canPlace(c, r) {
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
+    const k = key(c, r);
+    if (grid[k] || isExit(c, r) || isSpawn(c, r)) return false;
+    if (enemies.some(e => !e.fly && Math.floor(e.x / S) === c && Math.floor(e.y / S) === r)) return false;
+    const d = flow(k);
+    if (L.spawns.some(([sc, sr]) => d[key(sc, sr)] < 0)) return false;
+    // enemies already on the field must still have a way out
+    return !enemies.some(e => !e.fly && d[key(Math.floor(e.x / S), Math.floor(e.y / S))] < 0);
+  }
+  function buildWave(n) {
+    const q = [], count = 8 + Math.round(n * 1.6);
+    for (let i = 0; i < count; i++) {
+      let t = 'grunt';
+      if (n >= 2 && i % 3 === 1) t = 'fast';
+      if (n >= 4 && i % 5 === 3) t = 'fly';
+      if (n >= 5 && i % 6 === 4) t = 'tank';
+      q.push(t);
+    }
+    if (n % 8 === 0) q.push('boss');
+    return q;
+  }
+  function startWave() { if (waveOn || over) return; wave++; queue = buildWave(wave); waveOn = true; spawnT = 0; sel = null; ui(); }
+  function spawn(type) {
+    const b = ENEMY[type], k = Math.pow(1.17, wave - 1), [sc, sr] = L.spawns[Math.random() * L.spawns.length | 0];
+    enemies.push({ type, x: sc * S + S / 2 - S, y: sr * S + S / 2, hp: b.hp * k, max: b.hp * k, speed: b.speed, gold: b.gold, r: b.r, color: b.color, fly: b.fly, slowT: 0 });
+  }
+  const stats = t => { const b = TYPES[t.type], m = 1 + (t.lvl - 1) * 0.6; return { ...b, dmg: b.dmg * m, range: b.range * (1 + (t.lvl - 1) * 0.12), rate: b.rate * (1 - (t.lvl - 1) * 0.1), chain: (b.chain || 0) + t.lvl - 1 }; };
+  const upCost = t => Math.round(TYPES[t.type].cost * 0.8 * t.lvl);
+  function stepEnemy(e, dt) {
+    const sp = e.speed * (e.slowT > 0 ? 0.5 : 1) * dt; e.slowT -= dt;
+    if (e.fly) { // flyers go straight for the nearest exit
+      const ex = L.exits.reduce((a, b) => Math.hypot(b[0] * S - e.x, b[1] * S - e.y) < Math.hypot(a[0] * S - e.x, a[1] * S - e.y) ? b : a);
+      const tx = ex[0] * S + S / 2 + S, ty = ex[1] * S + S / 2, dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy);
+      if (d < sp) { e.x = tx; e.y = ty; } else { e.x += dx / d * sp; e.y += dy / d * sp; }
+      if (e.x > VW) leak(e);
+      return;
+    }
+    let c = Math.floor(e.x / S), r = Math.floor(e.y / S);
+    if (c < 0) { e.x += sp; return; } // still walking in from the edge
+    if (isExit(c, r)) { e.x += sp; if (e.x > VW) leak(e); return; }
+    // pick the neighbour that is closest to an exit
+    let best = null, bd = dist[key(c, r)];
+    if (bd < 0) bd = 1e9;
+    for (const [dc, dr] of [[1, 0], [0, 1], [0, -1], [-1, 0]]) {
+      const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+      const d = dist[key(nc, nr)]; if (d >= 0 && d < bd) { bd = d; best = [nc, nr]; }
+    }
+    const tx = best ? best[0] * S + S / 2 : c * S + S / 2, ty = best ? best[1] * S + S / 2 : r * S + S / 2;
+    const cx = c * S + S / 2, cy = r * S + S / 2;
+    // move to the centre of this cell first when turning, then toward the next
+    const offAxis = best && ((best[0] !== c && Math.abs(e.y - cy) > 1) || (best[1] !== r && Math.abs(e.x - cx) > 1));
+    const gx = offAxis ? cx : tx, gy = offAxis ? cy : ty, dx = gx - e.x, dy = gy - e.y, d = Math.hypot(dx, dy);
+    if (d <= sp) { e.x = gx; e.y = gy; } else { e.x += dx / d * sp; e.y += dy / d * sp; }
+  }
+  function leak(e) { e.dead = true; e.leaked = true; lives -= e.type === 'boss' ? 5 : 1; if (lives <= 0) { lives = 0; over = true; } ui(); }
+  function damage(e, amt) { if (e.dead) return; e.hp -= amt; if (e.hp <= 0) { e.dead = true; gold += e.gold; fx.push({ text: '+' + e.gold, x: e.x, y: e.y, t: 0.7 }); ui(); } }
+  function update(dt) {
+    if (over) return;
+    if (waveOn) {
+      spawnT -= dt; if (queue.length && spawnT <= 0) { spawn(queue.shift()); spawnT = Math.max(0.3, 0.75 - wave * 0.02); }
+      if (!queue.length && !enemies.length) {
+        waveOn = false; gold += 15 + wave * 2;
+        if (wave > (bestW[li] || 0)) { window.SJG && SJG.score(wave, 'level' + (li + 1)); bestW[li] = wave; try { localStorage.setItem('sj-mazetd-best', JSON.stringify(bestW)); } catch {} }
+        if (!won && wave >= L.goal) { window.SJG && SJG.unlock('clear'); won = true; unlocked = Math.max(unlocked, Math.min(LEVELS.length, li + 2)); try { localStorage.setItem('sj-mazetd-unlocked', String(unlocked)); } catch {} fillSelect(); fx.push({ text: `🏆 Level cleared! Keep going or pick the next level`, x: VW / 2, y: VH / 2, t: 3, big: 1 }); }
+        ui();
+      }
+    }
+    enemies.forEach(e => stepEnemy(e, dt));
+    for (const t of towers) {
+      if (t.type === 'wall') continue;
+      const st = stats(t); t.cd -= dt;
+      let target = null, td = 1e9;
+      if (t.type === 'laser' && t.lock && !t.lock.dead && Math.hypot(t.lock.x - t.x, t.lock.y - t.y) <= st.range) target = t.lock;
+      else for (const e of enemies) { if (e.dead || (st.ground && e.fly)) continue; const d = Math.hypot(e.x - t.x, e.y - t.y); if (d <= st.range && d < td) { td = d; target = e; } }
+      if (t.type === 'laser') {
+        if (target !== t.lock) { t.lock = target; t.ramp = 0; }
+        if (target) { t.ramp = Math.min(3, t.ramp + dt); damage(target, st.dmg * (0.4 + t.ramp * 0.5) * dt); t.angle = Math.atan2(target.y - t.y, target.x - t.x); }
+        continue;
+      }
+      if (target) t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+      if (target && t.cd <= 0) {
+        t.cd = st.rate;
+        if (t.type === 'tesla') {
+          const hit = [target]; let lastE = target;
+          for (let k = 0; k < st.chain; k++) { let nx = null, nd = 60; for (const e of enemies) if (!e.dead && !hit.includes(e)) { const d = Math.hypot(e.x - lastE.x, e.y - lastE.y); if (d < nd) { nd = d; nx = e; } } if (!nx) break; hit.push(nx); lastE = nx; }
+          fx.push({ bolt: [{ x: t.x, y: t.y }, ...hit.map(e => ({ x: e.x, y: e.y }))], t: 0.12 });
+          hit.forEach((e, i) => damage(e, st.dmg * (i ? 0.7 : 1)));
+        } else shots.push({ x: t.x, y: t.y, target, tx: target.x, ty: target.y, st, type: t.type });
+      }
+    }
+    for (const s of shots) {
+      if (s.target && !s.target.dead) { s.tx = s.target.x; s.ty = s.target.y; }
+      const dx = s.tx - s.x, dy = s.ty - s.y, d = Math.hypot(dx, dy), step = s.st.speed * dt;
+      if (d <= step) {
+        s.done = true;
+        if (s.st.splash) { fx.push({ ring: s.st.splash, x: s.tx, y: s.ty, t: 0.25 }); for (const e of enemies) if (!e.fly && Math.hypot(e.x - s.tx, e.y - s.ty) < s.st.splash) damage(e, s.st.dmg); }
+        else if (s.target && !s.target.dead) { if (s.st.slow) s.target.slowT = 1.5; damage(s.target, s.st.dmg); }
+      } else { s.x += dx / d * step; s.y += dy / d * step; }
+    }
+    shots = shots.filter(s => !s.done); enemies = enemies.filter(e => !e.dead);
+    fx.forEach(f => { f.t -= dt; if (f.text && !f.big) f.y -= 25 * dt; }); fx = fx.filter(f => f.t > 0);
+  }
+  function draw() {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      ctx.fillStyle = (r + c) % 2 ? '#1f3a2c' : '#22402f'; ctx.fillRect(c * S, r * S, S, S);
+    }
+    // path preview: shortest route from each spawn
+    ctx.fillStyle = 'rgba(253,224,71,.12)';
+    for (const [sc, sr] of L.spawns) {
+      let c = sc, r = sr, n = 0;
+      while (n++ < 400 && dist[key(c, r)] > 0) {
+        ctx.fillRect(c * S + 10, r * S + 10, S - 20, S - 20);
+        let nx = null, bd = dist[key(c, r)];
+        for (const [dc, dr] of [[1, 0], [0, 1], [0, -1], [-1, 0]]) { const a = c + dc, b = r + dr; if (a < 0 || b < 0 || a >= COLS || b >= ROWS) continue; const d = dist[key(a, b)]; if (d >= 0 && d < bd) { bd = d; nx = [a, b]; } }
+        if (!nx) break; [c, r] = nx;
+      }
+    }
+    for (const k of rocks) { const c = k % COLS, r = (k / COLS) | 0; ctx.fillStyle = '#57534e'; ctx.beginPath(); ctx.roundRect(c * S + 3, r * S + 3, S - 6, S - 6, 8); ctx.fill(); ctx.fillStyle = '#78716c'; ctx.beginPath(); ctx.roundRect(c * S + 6, r * S + 5, S - 16, S - 18, 6); ctx.fill(); }
+    for (const [c, r] of L.spawns) { ctx.fillStyle = '#b91c1c'; ctx.fillRect(c * S, r * S, 6, S); ctx.fillStyle = 'rgba(239,68,68,.25)'; ctx.fillRect(c * S, r * S, S, S); }
+    for (const [c, r] of L.exits) { ctx.fillStyle = '#2563eb'; ctx.fillRect(c * S + S - 6, r * S, 6, S); ctx.fillStyle = 'rgba(59,130,246,.25)'; ctx.fillRect(c * S, r * S, S, S); }
+    if (hover && picked && !waveOn || hover && picked) {
+      const ok = canPlaceCached(hover.c, hover.r) && gold >= TYPES[picked].cost;
+      ctx.fillStyle = ok ? 'rgba(255,255,255,.25)' : 'rgba(239,68,68,.35)'; ctx.fillRect(hover.c * S, hover.r * S, S, S);
+      if (TYPES[picked].range) { ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(hover.c * S + S / 2, hover.r * S + S / 2, TYPES[picked].range, 0, 7); ctx.stroke(); }
+    }
+    if (sel && sel.type !== 'wall') { ctx.strokeStyle = 'rgba(52,211,153,.8)'; ctx.beginPath(); ctx.arc(sel.x, sel.y, stats(sel).range, 0, 7); ctx.stroke(); }
+    for (const t of towers) {
+      const b = TYPES[t.type];
+      if (t.type === 'wall') { ctx.fillStyle = '#6b7280'; ctx.fillRect(t.c * S + 1, t.r * S + 1, S - 2, S - 2); ctx.fillStyle = '#9ca3af'; ctx.fillRect(t.c * S + 1, t.r * S + 1, S - 2, 5); continue; }
+      ctx.fillStyle = '#374151'; ctx.fillRect(t.c * S + 2, t.r * S + 2, S - 4, S - 4);
+      ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(t.x, t.y, 9, 0, 7); ctx.fill();
+      ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.angle || 0); ctx.fillStyle = '#111827'; ctx.fillRect(3, -2.5, t.type === 'sniper' ? 15 : 11, 5); ctx.restore();
+      for (let i = 0; i < t.lvl; i++) { ctx.fillStyle = '#34d399'; ctx.fillRect(t.c * S + 4 + i * 6, t.r * S + S - 7, 4, 4); }
+      if (t.type === 'laser' && t.lock && !t.lock.dead) { ctx.strokeStyle = `rgba(244,114,182,${0.5 + t.ramp * 0.15})`; ctx.lineWidth = 2 + t.ramp; ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.lock.x, t.lock.y); ctx.stroke(); ctx.lineWidth = 1; }
+    }
+    for (const e of enemies) {
+      if (e.fly) { ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 10, e.r, e.r * 0.4, 0, 0, 7); ctx.fill(); }
+      ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill();
+      if (e.slowT > 0) { ctx.strokeStyle = '#67e8f9'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; }
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(e.x - 10, e.y - e.r - 6, 20, 3); ctx.fillStyle = '#4ade80'; ctx.fillRect(e.x - 10, e.y - e.r - 6, 20 * Math.max(0, e.hp / e.max), 3);
+    }
+    for (const s of shots) { ctx.fillStyle = TYPES[s.type].color; ctx.beginPath(); ctx.arc(s.x, s.y, s.type === 'splash' ? 4 : 2.5, 0, 7); ctx.fill(); }
+    for (const f of fx) {
+      if (f.ring) { ctx.strokeStyle = `rgba(251,146,60,${f.t * 4})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, f.ring * (1.2 - f.t * 2), 0, 7); ctx.stroke(); ctx.lineWidth = 1; }
+      else if (f.bolt) { ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2; ctx.beginPath(); f.bolt.forEach((p, i) => i ? ctx.lineTo(p.x + (Math.random() - 0.5) * 6, p.y + (Math.random() - 0.5) * 6) : ctx.moveTo(p.x, p.y)); ctx.stroke(); ctx.lineWidth = 1; }
+      else { ctx.font = `bold ${f.big ? 18 : 11}px system-ui`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(f.text, f.x + 1, f.y + 1); ctx.fillStyle = f.big ? '#fff' : '#facc15'; ctx.fillText(f.text, f.x, f.y); }
+    }
+    if (over || (!wave && !waveOn)) {
+      ctx.fillStyle = 'rgba(17,24,39,.55)'; ctx.fillRect(0, 0, VW, VH);
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = 'bold 26px system-ui';
+      ctx.fillText(over ? 'Overrun!' : `Level ${li + 1}: ${L.name}`, VW / 2, VH / 2 - 14);
+      ctx.font = '14px system-ui';
+      ctx.fillText(over ? `You reached wave ${wave}. Press Retry.` : `Build walls and towers to make a long maze, then survive ${L.goal} waves.`, VW / 2, VH / 2 + 14);
+      if (!over) ctx.fillText('Enemies always take the shortest open path — you just can’t seal it off.', VW / 2, VH / 2 + 36);
+    }
+  }
+  let ccKey = '', ccVal = false;
+  function canPlaceCached(c, r) { const k = c + ',' + r + ',' + towers.length + ',' + enemies.length; if (k !== ccKey) { ccKey = k; ccVal = canPlace(c, r); } return ccVal; }
+  function ui() {
+    $('lives').textContent = lives; $('gold').textContent = gold; $('wave').textContent = `${wave}/${L.goal}`;
+    $('next').textContent = over ? 'Retry' : waveOn ? `Wave ${wave}…` : `Start wave ${wave + 1}`; $('next').disabled = waveOn && !over;
+    document.querySelectorAll('button.tw').forEach(b => { b.disabled = gold < TYPES[b.dataset.t].cost; b.classList.toggle('sel', picked === b.dataset.t); });
+    const info = $('info');
+    if (sel) {
+      const uc = upCost(sel), canUp = sel.type !== 'wall' && sel.lvl < 3;
+      info.hidden = false;
+      info.innerHTML = `<span class="stat">${TYPES[sel.type].name}${sel.type !== 'wall' ? ' L' + sel.lvl : ''}</span>` + (canUp ? `<button id="up" ${gold < uc ? 'disabled' : ''}>Upgrade ● ${uc}</button>` : '') + `<button id="sell">Sell ● ${Math.round(sel.spent * 0.7)}</button>`;
+      if (canUp) $('up').onclick = () => { if (gold >= uc) { gold -= uc; sel.spent += uc; sel.lvl++; ui(); } };
+      $('sell').onclick = () => { gold += Math.round(sel.spent * 0.7); grid[key(sel.c, sel.r)] = 0; towers = towers.filter(t => t !== sel); sel = null; dist = flow(-1); ui(); };
+    } else { info.hidden = true; info.innerHTML = ''; }
+  }
+  for (const [k, t] of Object.entries(TYPES)) {
+    const b = document.createElement('button'); b.className = 'tw'; b.dataset.t = k; b.title = t.desc;
+    b.innerHTML = `<span style="color:${t.color}">■ ${t.name}</span><small>● ${t.cost}</small>`;
+    b.onclick = () => { picked = picked === k ? null : k; sel = null; ui(); };
+    $('towers').appendChild(b);
+  }
+  function cellAt(e) { const r = cv.getBoundingClientRect(); return { c: Math.floor((e.clientX - r.left) * VW / r.width / S), r: Math.floor((e.clientY - r.top) * VH / r.height / S) }; }
+  let dragging = false;
+  function place(c, r) {
+    if (!picked || gold < TYPES[picked].cost || !canPlace(c, r)) return false;
+    gold -= TYPES[picked].cost; grid[key(c, r)] = 1;
+    towers.push({ type: picked, c, r, x: c * S + S / 2, y: r * S + S / 2, lvl: 1, cd: 0, spent: TYPES[picked].cost });
+    dist = flow(-1); ui(); return true;
+  }
+  cv.addEventListener('pointerdown', e => {
+    if (over) return;
+    const { c, r } = cellAt(e);
+    const t = towers.find(t => t.c === c && t.r === r);
+    if (t) { sel = sel === t ? null : t; ui(); return; }
+    sel = null; if (place(c, r) && picked === 'wall') dragging = true; ui();
+  });
+  cv.addEventListener('pointermove', e => { hover = cellAt(e); if (dragging && e.buttons) place(hover.c, hover.r); });
+  addEventListener('pointerup', () => { dragging = false; });
+  cv.addEventListener('pointerleave', () => { hover = null; });
+  cv.addEventListener('contextmenu', e => { e.preventDefault(); picked = null; sel = null; ui(); });
+  $('next').onclick = () => { if (over) loadLevel(li); else startWave(); };
+  $('speed').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; $('speed').textContent = speed + '×'; };
+  $('lvl').onchange = () => loadLevel(+$('lvl').value);
+  function fillSelect() { $('lvl').innerHTML = ''; LEVELS.forEach((l, i) => { const o = document.createElement('option'); o.value = i; o.disabled = i + 1 > unlocked; o.textContent = `${i + 1}. ${l.name}` + ((bestW[i] || 0) >= l.goal ? ' ✓' : i + 1 > unlocked ? ' 🔒' : ''); $('lvl').appendChild(o); }); $('lvl').value = li; }
+  addEventListener('keydown', e => {
+    if (e.key === ' ') { e.preventDefault(); if (over) loadLevel(li); else startWave(); }
+    else if (e.key === 'Escape') { picked = null; sel = null; ui(); }
+    else if (/^[1-7]$/.test(e.key)) { picked = Object.keys(TYPES)[+e.key - 1]; sel = null; ui(); }
+  });
+  function fit() { const s = Math.min((innerWidth - 16) / VW, (innerHeight - $('bar').offsetHeight - 24) / VH); cv.style.width = Math.floor(VW * s) + 'px'; cv.style.height = Math.floor(VH * s) + 'px'; }
+  addEventListener('resize', fit);
+  window.__maze = () => ({ wave, lives, gold, enemies: enemies.length, towers: towers.length, over, path: dist[key(L.spawns[0][0], L.spawns[0][1])] });
+  let last = performance.now();
+  function frame(t) { const dt = Math.min(0.05, (t - last) / 1000); last = t; for (let i = 0; i < speed; i++) update(dt); draw(); requestAnimationFrame(frame); }
+  fillSelect(); loadLevel(Math.min(unlocked, LEVELS.length) - 1); fit(); requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

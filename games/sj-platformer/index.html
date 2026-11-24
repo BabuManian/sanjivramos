@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Quest</title>
+<style>
+html,body{margin:0;height:100%;background:#0b1020;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+canvas{display:block;image-rendering:pixelated;border-radius:6px;touch-action:none}
+#touch{position:fixed;left:0;right:0;bottom:10px;display:none;justify-content:space-between;padding:0 12px;pointer-events:none}
+#touch.on{display:flex}
+#touch div{display:flex;gap:10px}
+#touch button{pointer-events:auto;width:64px;height:64px;border-radius:50%;border:none;background:rgba(255,255,255,.18);color:#fff;font-size:26px;touch-action:none}
+#touch button.on{background:rgba(255,255,255,.38)}
+</style></head><body>
+<canvas id="cv" width="640" height="360" aria-label="Pixel Quest"></canvas>
+<div id="touch"><div><button data-k="left" aria-label="Left">◀</button><button data-k="right" aria-label="Right">▶</button></div><div><button data-k="jump" aria-label="Jump">⤒</button></div></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("platformer", { vs: { mode: 'time' }, title: "Pixel Quest", lower: false, trophies: [{"id": "beat", "name": "Quest Complete", "desc": "Beat all 10 levels", "icon": "🚩"}, {"id": "lives", "name": "Still Kicking", "desc": "Finish with 3+ lives", "icon": "❤️"}] });</script>
+<script>
+(() => {
+  const T = 24, VW = 640, VH = 360;
+  // # ground   = one-way platform   ^ spikes   o coin   B spring   X crumbling block   E walker   P start   F flag
+  const LEVELS = [
+    { name: 'First Steps', sky: ['#7dd3fc', '#e0f2fe'], map: [
+      '',
+      '',
+      '                                    o o o',
+      '                                   =======',
+      '                     o o',
+      '                    =====                       o   o',
+      '           o o                    o            =======',
+      '          =====                  ===',
+      '',
+      '  P                      E                 E         ^^^       o     F',
+      '#################   ##########   ###############  #######  ############',
+      '#################   ##########   ###############  #######  ############',
+    ] },
+    { name: 'Spring Valley', sky: ['#fde68a', '#fef3c7'], map: [
+      '                    o o o                        o o o',
+      '',
+      '                   =======                      =======',
+      '',
+      '                                    o',
+      '             o o                   ===                 o o',
+      '            =====                                     =====',
+      '',
+      '                            o                                                   ',
+      '  P       E        B       ###     ^^^      B      E   ^^^      B      E        F',
+      '##############  ######## ######  ######## ######  ########### #####  ############',
+      '##############  ######## ######  ######## ######  ########### #####  ############',
+    ] },
+    { name: 'Sky Steps', sky: ['#c4b5fd', '#ede9fe'], map: [
+      '',
+      '                                                               o o',
+      '                                                              =====',
+      '',
+      '                o o                                            o o',
+      '               =====',
+      '                                        o o                    ===',
+      '        o o                     o       ===                          o',
+      '       =====   ====            ===                        ===       ===',
+      '  P                     E                E   ===    ^                         F',
+      '#####                #######         #######     #######                  #######',
+      '#####                #######         #######     #######                  #######',
+    ] },
+    { name: 'Blob Fortress', sky: ['#fca5a5', '#fee2e2'], map: [
+      '',
+      '                                                  o o o o',
+      '                   o o o                         #########',
+      '                  #######              E',
+      '                                     =====              ',
+      '         o                  E                    E           o o',
+      '        ===          ##############          ##########     =====',
+      '                                                                         o',
+      '                                                                        ===   F',
+      '  P        E    ^^       E        E   ^^        E   E   ^^    E  E            ##',
+      '#####################  ######################  ####################  #########',
+      '#####################  ######################  ####################  #########',
+    ] },
+    { name: 'The Last Climb', sky: ['#1e293b', '#475569'], map: [
+      '                                                                           o o   F',
+      '                                                                          =========',
+      '',
+      '                     o o o',
+      '                    =====                                             ===',
+      '',
+      '                           o',
+      '                          ===                                     ===',
+      '',
+      '  P             E B         E  ^^^     E        E  ^^^      E',
+      '##########   #########  ############ ######   ######### ########',
+      '##########   #########  ############ ######   ######### ########',
+    ] },
+    { name: 'Crumble Bridge', sky: ['#86efac', '#dcfce7'], map: [
+      '',
+      '',
+      '',
+      '                                                                o o',
+      '                                                                XX',
+      '                          o',
+      '                     o         o                            XX',
+      '           o    o        XXX                                       ===',
+      '                    XXX       XXX                      ===',
+      '  P       XXX  XXX                 XXXX      E ^  E                         E     F',
+      '#########                                ############                  ###############',
+      '#########                                ############                  ###############',
+    ] },
+    { name: 'Spike Gauntlet', sky: ['#fdba74', '#ffedd5'], map: [
+      '',
+      '                                                                     o o o',
+      '',
+      '',
+      '',
+      '                                  o         o',
+      '                             o   ===   o   ===',
+      '                            ===       ===',
+      '',
+      '  P     ^^^   ^^^         ^^^^^^^^^^^^^^^^^^^^            E   ^^  E   B   ^^^   E       F',
+      '#####################   ###########################   #####################################',
+      '#####################   ###########################   #####################################',
+    ] },
+    { name: 'Underground', sky: ['#334155', '#64748b'], map: [
+      '#################################################################################################',
+      '          ##                  ##                    ##',
+      '          ##                  ##                    ##',
+      '          ##                  ##                    ##',
+      '          ##                  ##                    ##',
+      '          ##           o      ##                    ##                      o o',
+      '                      ===     ##                o                          =====',
+      '                                               ###',
+      '             o o                                                                        o o o',
+      '  P     E                E  ^      E              E    E           ^^^  E       E     E      F',
+      '################   ######################   #################   #################################',
+      '################   ######################   #################   #################################',
+    ] },
+    { name: 'Bounce House', sky: ['#f0abfc', '#fae8ff'], map: [
+      '',
+      '                                     o o',
+      '               o o        o o       =====       o o',
+      '              =====      =====                 =====',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '  P        B          B          B          B               E  ^  E      F',
+      '########  ###        ###        ###        ###        ######################',
+      '########  ###        ###        ###        ###        ######################',
+    ] },
+    { name: "Dragon's Peak", sky: ['#0f172a', '#7c2d12'], map: [
+      '',
+      '',
+      '                             o',
+      '                        o   XXX   o',
+      '                       XXX       XXX   o',
+      '                                      XXX   o                                 o',
+      '                                           XXX   o                       XX  ===',
+      '                                                XXX   o',
+      '                                                     XXX             ===         XX',
+      '  P   E          E  B                                          E                     ===     ^^ E  F',
+      '###########   #########                                     #######                       ###########',
+      '###########   #########                                     #######                       ###########',
+    ] },
+  ];
+
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const keys = { left: false, right: false, jump: false };
+  let jumpPressed = false;
+  let map, W, H, player, enemies, particles, levelIdx = 0, lives = 3, coins = 0, levelCoins = 0, state = 'title', stateT = 0, camX = 0, time = 0, levelTime = 0, best = null;
+  try { best = JSON.parse(localStorage.getItem('sj-platformer-best') || 'null'); } catch {}
+
+  function tile(c, r) { return (r < 0 || r >= H || c < 0 || c >= W) ? ' ' : map[r][c]; }
+  function solid(c, r) { if (c < 0 || c >= W) return true; const t = tile(c, r); return t === '#' || t === 'B' || t === 'X'; }
+  let crumbles = new Map(); // "c,r" -> seconds left before an X block falls
+
+  function load(i) {
+    const rows = LEVELS[i].map.slice();
+    while (rows.length < 15) rows.unshift('');
+    W = Math.max(...rows.map(r => r.length)) + 1; H = rows.length;
+    map = rows.map(r => r.padEnd(W, ' ').split(''));
+    enemies = []; particles = []; levelCoins = 0; levelTime = 0; crumbles = new Map();
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const ch = map[r][c];
+      if (ch === 'P') { player = { x: c * T + 4, y: r * T + T - 22, w: 16, h: 22, vx: 0, vy: 0, onGround: false, coyote: 0, buffer: 0, face: 1, sx: c * T + 4, sy: r * T + T - 22 }; map[r][c] = ' '; }
+      else if (ch === 'E') { enemies.push({ x: c * T + 2, y: r * T + T - 18, w: 20, h: 18, vx: -45, vy: 0, onGround: false, dead: 0 }); map[r][c] = ' '; }
+    }
+    camX = Math.max(0, player.x - VW / 2);
+  }
+
+  function collideX(o) {
+    const top = Math.floor(o.y / T), bot = Math.floor((o.y + o.h - 0.01) / T);
+    if (o.vx > 0) {
+      const c = Math.floor((o.x + o.w) / T);
+      for (let r = top; r <= bot; r++) if (solid(c, r)) { o.x = c * T - o.w; return true; }
+    } else if (o.vx < 0) {
+      const c = Math.floor(o.x / T);
+      for (let r = top; r <= bot; r++) if (solid(c, r)) { o.x = (c + 1) * T; return true; }
+    }
+    return false;
+  }
+  function collideY(o, prevBottom) {
+    const l = Math.floor(o.x / T), rr = Math.floor((o.x + o.w - 0.01) / T);
+    o.onGround = false; o.landed = null;
+    if (o.vy > 0) {
+      const row = Math.floor((o.y + o.h) / T);
+      for (let c = l; c <= rr; c++) {
+        const t = tile(c, row);
+        if (solid(c, row) || (t === '=' && prevBottom <= row * T + 0.5)) {
+          o.y = row * T - o.h; o.vy = 0; o.onGround = true; o.landed = t; return;
+        }
+      }
+    } else if (o.vy < 0) {
+      const row = Math.floor(o.y / T);
+      for (let c = l; c <= rr; c++) if (solid(c, row)) { o.y = (row + 1) * T; o.vy = 0; return; }
+    }
+  }
+  const overlap = (a, x, y, w, h) => a.x < x + w && a.x + a.w > x && a.y < y + h && a.y + a.h > y;
+  function burst(x, y, color, n = 10) {
+    for (let i = 0; i < n; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 240, vy: -Math.random() * 260, life: 0.6, color });
+  }
+
+  function die() {
+    if (state !== 'play') return;
+    burst(player.x + 8, player.y + 11, '#f87171', 18);
+    lives--; state = lives > 0 ? 'dead' : 'over'; stateT = 0;
+    coins -= levelCoins; levelCoins = 0;
+  }
+
+  function update(dt) {
+    time += dt; stateT += dt;
+    particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 900 * dt; p.life -= dt; });
+    particles = particles.filter(p => p.life > 0);
+    if (state === 'dead') { if (stateT > 1.1) { load(levelIdx); state = 'play'; } return; }
+    if (state === 'clear') {
+      if (stateT > 1.6) {
+        levelIdx++;
+        if (levelIdx >= LEVELS.length) {
+          state = 'won'; stateT = 0;
+          const run = { coins, lives };
+          window.SJG && (SJG.score(coins, 'coins'), SJG.unlock('beat'), lives >= 3 && SJG.unlock('lives')); if (!best || coins > best.coins) { best = run; try { localStorage.setItem('sj-platformer-best', JSON.stringify(best)); } catch {} }
+        } else { load(levelIdx); state = 'play'; }
+      }
+      return;
+    }
+    if (state !== 'play') { if (jumpPressed) { jumpPressed = false; start(); } return; }
+    levelTime += dt;
+    const p = player;
+    // Horizontal movement with acceleration and friction.
+    const acc = p.onGround ? 1900 : 1300, maxV = 185;
+    if (keys.left && !keys.right) { p.vx -= acc * dt; p.face = -1; }
+    else if (keys.right && !keys.left) { p.vx += acc * dt; p.face = 1; }
+    else { const f = (p.onGround ? 1700 : 500) * dt; p.vx = Math.abs(p.vx) <= f ? 0 : p.vx - Math.sign(p.vx) * f; }
+    p.vx = Math.max(-maxV, Math.min(maxV, p.vx));
+    // Jump buffer + coyote time make jumps feel forgiving.
+    if (jumpPressed) { p.buffer = 0.12; jumpPressed = false; }
+    p.buffer -= dt; p.coyote = p.onGround ? 0.1 : p.coyote - dt;
+    if (p.buffer > 0 && p.coyote > 0) { p.vy = -600; p.buffer = 0; p.coyote = 0; p.onGround = false; }
+    const g = p.vy < 0 && !keys.jump ? 3800 : 1800; // let go early = shorter jump
+    p.vy = Math.min(p.vy + g * dt, 900);
+    p.x += p.vx * dt; if (collideX(p)) p.vx = 0;
+    const prevBottom = p.y + p.h;
+    p.y += p.vy * dt; collideY(p, prevBottom);
+    if (p.landed === 'B') { p.vy = -920; p.onGround = false; burst(p.x + 8, p.y + p.h, '#f43f5e', 6); }
+    // Crumbling blocks give way shortly after you stand on them.
+    if (p.onGround) {
+      const row = Math.floor((p.y + p.h + 1) / T);
+      for (let c = Math.floor(p.x / T); c <= Math.floor((p.x + p.w - 0.01) / T); c++)
+        if (tile(c, row) === 'X' && !crumbles.has(c + ',' + row)) crumbles.set(c + ',' + row, 0.45);
+    }
+    for (const [k, left] of crumbles) {
+      if (left - dt > 0) { crumbles.set(k, left - dt); continue; }
+      const [c, r] = k.split(',').map(Number);
+      map[r][c] = ' '; crumbles.delete(k); burst(c * T + 12, r * T + 12, '#a16207', 8);
+    }
+    if (p.y > H * T + 40) { die(); return; }
+    // Tiles the player touches.
+    const c0 = Math.floor(p.x / T), c1 = Math.floor((p.x + p.w) / T), r0 = Math.floor(p.y / T), r1 = Math.floor((p.y + p.h) / T);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const t = tile(c, r);
+      if (t === 'o' && overlap(p, c * T + 5, r * T + 5, 14, 14)) { map[r][c] = ' '; coins++; levelCoins++; burst(c * T + 12, r * T + 12, '#facc15', 6); }
+      else if (t === '^' && overlap(p, c * T + 4, r * T + 12, 16, 12)) { die(); return; }
+      else if (t === 'F' && overlap(p, c * T + 8, r * T - T * 2, 8, T * 3)) { state = 'clear'; stateT = 0; burst(c * T + 12, r * T, '#4ade80', 24); return; }
+    }
+    // Enemies.
+    for (const e of enemies) {
+      if (e.dead) { e.dead += dt; continue; }
+      e.vy = Math.min(e.vy + 1800 * dt, 900);
+      e.x += e.vx * dt; if (collideX(e)) e.vx = -e.vx;
+      const pb = e.y + e.h; e.y += e.vy * dt; collideY(e, pb);
+      if (e.onGround) {
+        // Turn around at ledges.
+        const ahead = Math.floor((e.vx > 0 ? e.x + e.w + 1 : e.x - 1) / T), below = Math.floor((e.y + e.h + 1) / T);
+        const t = tile(ahead, below);
+        if (!solid(ahead, below) && t !== '=') e.vx = -e.vx;
+      }
+      if (e.y > H * T + 40) e.dead = 9;
+      if (overlap(p, e.x, e.y, e.w, e.h)) {
+        if (p.vy > 0 && p.y + p.h - e.y < 14) { e.dead = 0.001; p.vy = keys.jump ? -560 : -380; burst(e.x + 10, e.y + 9, '#a855f7', 10); }
+        else { die(); return; }
+      }
+    }
+    enemies = enemies.filter(e => e.dead < 0.5);
+    camX += (Math.max(0, Math.min(W * T - VW, p.x - VW / 2 + 8)) - camX) * Math.min(1, dt * 8);
+  }
+
+  function start() {
+    if (state === 'title' || state === 'over' || state === 'won') { levelIdx = 0; lives = 3; coins = 0; load(0); state = 'play'; }
+  }
+
+  function drawBg() {
+    const L = LEVELS[levelIdx];
+    const g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, L.sky[0]); g.addColorStop(1, L.sky[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+    // Two parallax hill layers.
+    [[0.2, 250, 'rgba(255,255,255,.35)', 60], [0.45, 290, 'rgba(255,255,255,.5)', 40]].forEach(([k, base, col, amp]) => {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, VH);
+      for (let x = 0; x <= VW; x += 16) { const wx = x + camX * k; ctx.lineTo(x, base - Math.sin(wx / 90) * amp * 0.5 - Math.sin(wx / 37) * amp * 0.2); }
+      ctx.lineTo(VW, VH); ctx.fill();
+    });
+  }
+  function drawTiles() {
+    const c0 = Math.floor(camX / T), c1 = Math.min(W - 1, c0 + Math.ceil(VW / T) + 1);
+    for (let r = 0; r < H; r++) for (let c = c0; c <= c1; c++) {
+      const t = map[r][c], x = Math.round(c * T - camX), y = r * T;
+      if (t === '#') {
+        ctx.fillStyle = '#92400e'; ctx.fillRect(x, y, T, T);
+        ctx.fillStyle = '#78350f'; ctx.fillRect(x + 4, y + 10, 4, 4); ctx.fillRect(x + 15, y + 17, 4, 4);
+        if (tile(c, r - 1) !== '#') { ctx.fillStyle = '#22c55e'; ctx.fillRect(x, y, T, 7); ctx.fillStyle = '#16a34a'; ctx.fillRect(x, y + 6, T, 2); }
+      } else if (t === '=') {
+        ctx.fillStyle = '#b45309'; ctx.fillRect(x, y, T, 8); ctx.fillStyle = '#d97706'; ctx.fillRect(x, y, T, 3);
+        ctx.fillStyle = '#78350f'; ctx.fillRect(x + T - 2, y, 2, 8);
+      } else if (t === '^') {
+        ctx.fillStyle = '#cbd5e1';
+        for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x + k * 8, y + T); ctx.lineTo(x + k * 8 + 4, y + 10); ctx.lineTo(x + k * 8 + 8, y + T); ctx.fill(); }
+      } else if (t === 'o') {
+        const bob = Math.sin(time * 4 + c) * 2, sq = Math.abs(Math.cos(time * 3 + c));
+        ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.ellipse(x + 12, y + 12 + bob, 7 * sq + 1, 8, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#fef08a'; ctx.fillRect(x + 11, y + 7 + bob, 2, 10 * sq > 2 ? 10 : 0);
+      } else if (t === 'X') {
+        const shake = crumbles.has(c + ',' + r) ? (Math.random() - 0.5) * 3 : 0;
+        ctx.fillStyle = '#a16207'; ctx.fillRect(x + shake, y, T, T);
+        ctx.fillStyle = '#ca8a04'; ctx.fillRect(x + shake, y, T, 4);
+        ctx.strokeStyle = '#713f12'; ctx.lineWidth = 2; ctx.beginPath();
+        ctx.moveTo(x + shake + 6, y + 4); ctx.lineTo(x + shake + 11, y + 13); ctx.lineTo(x + shake + 8, y + 22);
+        ctx.moveTo(x + shake + 18, y + 6); ctx.lineTo(x + shake + 14, y + 15); ctx.stroke();
+      } else if (t === 'B') {
+        ctx.fillStyle = '#475569'; ctx.fillRect(x + 2, y + 12, T - 4, 12);
+        ctx.fillStyle = '#f43f5e'; ctx.fillRect(x, y + 6, T, 7);
+        ctx.fillStyle = '#94a3b8'; ctx.fillRect(x + 6, y + 13, 3, 11); ctx.fillRect(x + 15, y + 13, 3, 11);
+      } else if (t === 'F') {
+        ctx.fillStyle = '#e2e8f0'; ctx.fillRect(x + 10, y - T * 2, 4, T * 3);
+        ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(x + 12, y - T * 2, 4, 0, 7); ctx.fill();
+        const wave = Math.sin(time * 6) * 3;
+        ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.moveTo(x + 14, y - T * 2 + 4); ctx.lineTo(x + 36, y - T * 2 + 12 + wave); ctx.lineTo(x + 14, y - T * 2 + 20); ctx.fill();
+      }
+    }
+  }
+  function drawPlayer() {
+    if (state === 'dead' || state === 'over') return;
+    const p = player, x = Math.round(p.x - camX), y = Math.round(p.y);
+    const squash = p.onGround ? 0 : Math.max(-3, Math.min(3, p.vy / 200));
+    ctx.fillStyle = '#2563eb'; ctx.fillRect(x, y - squash, p.w, p.h + squash);
+    ctx.fillStyle = '#60a5fa'; ctx.fillRect(x, y - squash, p.w, 5);
+    ctx.fillStyle = '#fff'; const ex = p.face > 0 ? 8 : 2;
+    ctx.fillRect(x + ex, y + 6 - squash, 5, 6);
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(x + ex + (p.face > 0 ? 2 : 1), y + 8 - squash, 2, 3);
+    if (p.onGround && Math.abs(p.vx) > 20) { const s = Math.sin(time * 20) * 2; ctx.fillStyle = '#1e3a8a'; ctx.fillRect(x + 2, y + p.h - 3 + s, 5, 3); ctx.fillRect(x + 9, y + p.h - 3 - s, 5, 3); }
+  }
+  function drawEnemies() {
+    for (const e of enemies) {
+      const x = Math.round(e.x - camX), y = Math.round(e.y);
+      if (e.dead) { ctx.fillStyle = '#7e22ce'; ctx.fillRect(x, y + e.h - 5, e.w, 5); continue; }
+      const b = Math.abs(Math.sin(time * 8 + e.x)) * 2;
+      ctx.fillStyle = '#a855f7'; ctx.beginPath(); ctx.roundRect(x, y + b, e.w, e.h - b, [9, 9, 3, 3]); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(x + 4, y + 5 + b, 4, 5); ctx.fillRect(x + 12, y + 5 + b, 4, 5);
+      ctx.fillStyle = '#000'; const lx = e.vx < 0 ? 0 : 2; ctx.fillRect(x + 4 + lx, y + 7 + b, 2, 3); ctx.fillRect(x + 12 + lx, y + 7 + b, 2, 3);
+    }
+  }
+  function text(s, x, y, size = 16, align = 'center', col = '#fff') {
+    ctx.font = `bold ${size}px system-ui, sans-serif`; ctx.textAlign = align;
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillText(s, x + 2, y + 2);
+    ctx.fillStyle = col; ctx.fillText(s, x, y);
+  }
+  function overlay(title, sub, sub2) {
+    ctx.fillStyle = 'rgba(2,6,23,.6)'; ctx.fillRect(0, 0, VW, VH);
+    text(title, VW / 2, VH / 2 - 20, 34);
+    if (sub) text(sub, VW / 2, VH / 2 + 16, 16);
+    if (sub2) text(sub2, VW / 2, VH / 2 + 42, 13, 'center', '#cbd5e1');
+  }
+  function draw() {
+    drawBg(); drawTiles(); drawEnemies(); drawPlayer();
+    particles.forEach(p => { ctx.globalAlpha = Math.max(0, p.life / 0.6); ctx.fillStyle = p.color; ctx.fillRect(p.x - camX - 2, p.y - 2, 4, 4); });
+    ctx.globalAlpha = 1;
+    if (state !== 'title') {
+      text(`Level ${levelIdx + 1}: ${LEVELS[Math.min(levelIdx, LEVELS.length - 1)].name}`, 12, 24, 14, 'left');
+      text(`● ${coins}`, VW - 110, 24, 15, 'left', '#facc15');
+      text('♥'.repeat(Math.max(0, lives)), VW - 12, 24, 16, 'right', '#f87171');
+    }
+    if (state === 'title') overlay('Pixel Quest', 'Press Space or ⤒ to start', '←/→ or A/D to run · Space/W/↑ to jump · stomp the blobs · reach the flag');
+    else if (state === 'over') overlay('Game over', `You collected ${coins} coins`, 'Press Space or ⤒ to try again');
+    else if (state === 'won') overlay('You beat Pixel Quest!', `${coins} coins · ${lives} ${lives === 1 ? 'life' : 'lives'} left`, best ? `Best run: ${best.coins} coins · press Space to play again` : '');
+    else if (state === 'clear') text('Level clear!', VW / 2, VH / 2, 30);
+  }
+
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    acc += Math.min(0.1, (now - last) / 1000); last = now;
+    const STEP = 1 / 120;
+    while (acc >= STEP) { update(STEP); acc -= STEP; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  const KEYMAP = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ' ': 'jump', ArrowUp: 'jump', w: 'jump', W: 'jump', z: 'jump', Z: 'jump' };
+  addEventListener('keydown', e => {
+    const k = KEYMAP[e.key]; if (!k) return;
+    e.preventDefault();
+    if (k === 'jump' && !keys.jump) jumpPressed = true;
+    keys[k] = true;
+  });
+  addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k) keys[k] = false; });
+  addEventListener('blur', () => { keys.left = keys.right = keys.jump = false; });
+
+  // On-screen buttons for touch screens.
+  const touch = document.getElementById('touch');
+  if (matchMedia('(pointer: coarse)').matches) touch.classList.add('on');
+  addEventListener('touchstart', () => { touch.classList.add('on'); fit(); }, { once: true, passive: true });
+  touch.querySelectorAll('button').forEach(b => {
+    const k = b.dataset.k;
+    const on = e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); if (k === 'jump' && !keys.jump) jumpPressed = true; keys[k] = true; b.classList.add('on'); };
+    const off = () => { keys[k] = false; b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
+  });
+  cv.addEventListener('pointerdown', () => { if (state !== 'play') jumpPressed = true; });
+
+  function fit() {
+    const pad = touch.classList.contains('on') ? 84 : 12;
+    const s = Math.min(innerWidth / VW, (innerHeight - pad) / VH);
+    cv.style.width = Math.floor(VW * s) + 'px'; cv.style.height = Math.floor(VH * s) + 'px';
+  }
+  addEventListener('resize', fit); fit();
+  load(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

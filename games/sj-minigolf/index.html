@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini Golf</title>
+<style>
+html,body{margin:0;height:100%;background:#14532d;color:#ecfdf5;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+header{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:center}
+header b{color:#fff}
+canvas{display:block;border-radius:10px;touch-action:none;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+button{font:inherit;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;background:#166534;color:#ecfdf5}
+#card{display:none;position:fixed;inset:0;background:rgba(5,46,22,.9);align-items:center;justify-content:center;flex-direction:column;gap:12px;text-align:center;padding:16px}
+#card.on{display:flex}
+#card table{border-collapse:collapse;font-variant-numeric:tabular-nums}
+#card td,#card th{padding:4px 8px;border:1px solid #166534}
+#card button{background:#4ade80;color:#052e16;font-weight:700;padding:10px 18px}
+</style></head><body>
+<header>
+  <span>Hole <b id="hole">1</b>/9</span><span>Par <b id="par">2</b></span><span>Strokes <b id="strokes">0</b></span><span>Total <b id="total">0</b></span>
+  <button id="restart" title="Restart this hole (+1 stroke)">↺ Hole</button>
+</header>
+<canvas id="cv" width="640" height="400" aria-label="Mini golf course"></canvas>
+<div style="opacity:.75">Drag back from anywhere and let go to putt. The further you pull, the harder the shot.</div>
+<div id="card"><h2 style="margin:0">Round complete</h2><div id="tbl"></div><div id="sum"></div><button id="again">Play again</button></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("minigolf", { vs: { live: '#total' }, title: "Mini Golf", lower: true, trophies: [{"id": "par", "name": "Par for the Course", "desc": "Finish at or under par", "icon": "⛳"}, {"id": "pro", "name": "Golf Pro", "desc": "Finish 5 under par", "icon": "🏌️"}] });</script>
+<script>
+(() => {
+  const VW = 640, VH = 400, R = 6, HOLE_R = 10;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = id => document.getElementById(id);
+  // walls/sand/water: [x, y, w, h]
+  const HOLES = [
+    { par: 2, start: [90, 200], hole: [550, 200], walls: [], sand: [], water: [] },
+    { par: 3, start: [90, 200], hole: [550, 200], walls: [[300, 0, 26, 300]], sand: [], water: [] },
+    { par: 3, start: [80, 80], hole: [560, 320], walls: [[200, 0, 22, 270], [420, 130, 22, 270]], sand: [], water: [] },
+    { par: 3, start: [80, 320], hole: [560, 80], walls: [[180, 200, 120, 18]], sand: [[300, 110, 150, 170]], water: [] },
+    { par: 2, start: [80, 200], hole: [560, 200], walls: [], sand: [], water: [[210, 0, 220, 160], [210, 245, 220, 155]] },
+    { par: 3, start: [80, 200], hole: [530, 200], walls: [[470, 140, 110, 16], [470, 248, 110, 16], [564, 140, 16, 124], [250, 100, 40, 40], [330, 260, 40, 40], [330, 60, 40, 40]], sand: [], water: [] },
+    { par: 3, start: [80, 100], hole: [80, 300], walls: [[0, 190, 520, 20]], sand: [[560, 160, 80, 80]], water: [] },
+    { par: 3, start: [70, 200], hole: [580, 200], walls: [[160, 90, 30, 30], [160, 280, 30, 30], [250, 185, 30, 30], [340, 90, 30, 30], [340, 280, 30, 30], [430, 185, 30, 30], [500, 120, 30, 30], [500, 250, 30, 30]], sand: [], water: [] },
+    { par: 4, start: [70, 60], hole: [560, 340], walls: [[150, 0, 22, 310], [300, 90, 22, 310], [450, 0, 22, 310]], sand: [[172, 330, 128, 70]], water: [[362, 150, 50, 60]] },
+  ];
+  const BORDER = 12;
+  let idx = 0, H, ball, strokes = 0, scores = [], aim = null, sunk = 0, msg = null, best = null;
+  try { best = +localStorage.getItem('sj-golf-best') || null; } catch {}
+
+  function load(i) {
+    idx = i; H = HOLES[i]; strokes = 0; sunk = 0; aim = null;
+    ball = { x: H.start[0], y: H.start[1], vx: 0, vy: 0, lastX: H.start[0], lastY: H.start[1], scale: 1 };
+    hud();
+  }
+  function hud() {
+    $('hole').textContent = idx + 1; $('par').textContent = H.par; $('strokes').textContent = strokes;
+    $('total').textContent = scores.reduce((a, b) => a + b, 0) + strokes;
+  }
+  const moving = () => Math.hypot(ball.vx, ball.vy) > 0.5;
+  const inRect = (x, y, [rx, ry, rw, rh]) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh;
+
+  function collideRect(rx, ry, rw, rh) {
+    const cx = Math.max(rx, Math.min(ball.x, rx + rw)), cy = Math.max(ry, Math.min(ball.y, ry + rh));
+    let dx = ball.x - cx, dy = ball.y - cy, d = Math.hypot(dx, dy);
+    if (d >= R) return;
+    if (d === 0) { // centre inside the rect: push out along the shortest side
+      const opts = [[ball.x - rx, -1, 0], [rx + rw - ball.x, 1, 0], [ball.y - ry, 0, -1], [ry + rh - ball.y, 0, 1]].sort((a, b) => a[0] - b[0])[0];
+      dx = opts[1]; dy = opts[2]; d = 1;
+      ball.x += dx * (opts[0] + R); ball.y += dy * (opts[0] + R);
+    } else { ball.x = cx + dx / d * R; ball.y = cy + dy / d * R; }
+    const nx = dx / d, ny = dy / d, vn = ball.vx * nx + ball.vy * ny;
+    if (vn < 0) { ball.vx -= 1.8 * vn * nx; ball.vy -= 1.8 * vn * ny; }
+  }
+  function step(dt) {
+    if (sunk) { sunk += dt; ball.scale = Math.max(0, 1 - sunk * 3); if (sunk > 1.2) next(); return; }
+    if (msg) { msg.t -= dt; if (msg.t <= 0) msg = null; }
+    if (!moving()) { ball.vx = ball.vy = 0; return; }
+    const sub = 4, h = dt / sub;
+    for (let k = 0; k < sub; k++) {
+      ball.x += ball.vx * h; ball.y += ball.vy * h;
+      [[0, 0, VW, BORDER], [0, VH - BORDER, VW, BORDER], [0, 0, BORDER, VH], [VW - BORDER, 0, BORDER, VH], ...H.walls].forEach(w => collideRect(...w));
+    }
+    const sand = H.sand.some(s => inRect(ball.x, ball.y, s));
+    const sp = Math.hypot(ball.vx, ball.vy);
+    const decel = (sand ? 520 : 120) * dt + sp * (sand ? 2.2 : 0.55) * dt;
+    if (sp <= decel || sp < 4) { ball.vx = ball.vy = 0; }
+    else { ball.vx *= (sp - decel) / sp; ball.vy *= (sp - decel) / sp; }
+    // Hole: falls in if slow enough, otherwise lips out with a nudge.
+    const hd = Math.hypot(ball.x - H.hole[0], ball.y - H.hole[1]);
+    if (hd < HOLE_R) {
+      if (sp < 330) { sunk = 0.001; ball.vx = ball.vy = 0; ball.x = H.hole[0]; ball.y = H.hole[1]; flash(strokes === 1 ? 'Hole in one!' : name(strokes - H.par)); }
+      else { ball.vx += (ball.x - H.hole[0]) * 4; ball.vy += (ball.y - H.hole[1]) * 4; }
+    }
+    if (H.water.some(w => inRect(ball.x, ball.y, w))) {
+      strokes++; ball.x = ball.lastX; ball.y = ball.lastY; ball.vx = ball.vy = 0; flash('Splash! +1'); hud();
+    }
+  }
+  function name(d) { return ({ '-3': 'Albatross!', '-2': 'Eagle!', '-1': 'Birdie!', 0: 'Par', 1: 'Bogey', 2: 'Double bogey' })[d] || `+${d}`; }
+  function flash(t) { msg = { text: t, t: 1.4 }; }
+  function next() {
+    scores.push(strokes);
+    if (idx + 1 < HOLES.length) load(idx + 1);
+    else finish();
+  }
+  function finish() {
+    const total = scores.reduce((a, b) => a + b, 0), par = HOLES.reduce((a, h) => a + h.par, 0);
+    window.SJG && (SJG.score(total), total <= par && SJG.unlock('par'), total <= par - 5 && SJG.unlock('pro')); if (!best || total < best) { best = total; try { localStorage.setItem('sj-golf-best', String(best)); } catch {} }
+    $('tbl').innerHTML = '<table><tr><th>Hole</th>' + HOLES.map((_, i) => `<th>${i + 1}</th>`).join('') + '<th>Total</th></tr>'
+      + '<tr><td>Par</td>' + HOLES.map(h => `<td>${h.par}</td>`).join('') + `<td>${par}</td></tr>`
+      + '<tr><td>You</td>' + scores.map(s => `<td>${s}</td>`).join('') + `<td><b>${total}</b></td></tr></table>`;
+    const d = total - par;
+    $('sum').textContent = `${d === 0 ? 'Even par' : d < 0 ? d + ' under par' : '+' + d + ' over par'} · best round ${best}`;
+    $('card').classList.add('on');
+  }
+  function draw() {
+    // Green with stripes.
+    for (let i = 0; i < VW; i += 40) { ctx.fillStyle = (i / 40) % 2 ? '#22c55e' : '#16a34a'; ctx.fillRect(i, 0, 40, VH); }
+    H.sand.forEach(([x, y, w, h]) => { ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 18); ctx.fill(); });
+    H.water.forEach(([x, y, w, h]) => {
+      ctx.fillStyle = '#0ea5e9'; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+      const t = performance.now() / 600;
+      for (let yy = y + 14; yy < y + h; yy += 18) { ctx.beginPath(); for (let xx = x + 6; xx < x + w - 6; xx += 6) ctx.lineTo(xx, yy + Math.sin(xx / 14 + t) * 2); ctx.stroke(); }
+    });
+    ctx.fillStyle = '#78350f';
+    [[0, 0, VW, BORDER], [0, VH - BORDER, VW, BORDER], [0, 0, BORDER, VH], [VW - BORDER, 0, BORDER, VH]].forEach(w => ctx.fillRect(...w));
+    H.walls.forEach(([x, y, w, h]) => { ctx.fillStyle = '#92400e'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#b45309'; ctx.fillRect(x, y, w, 4); });
+    // Hole and flag.
+    ctx.fillStyle = '#052e16'; ctx.beginPath(); ctx.arc(H.hole[0], H.hole[1], HOLE_R, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e5e7eb'; ctx.fillRect(H.hole[0] - 1, H.hole[1] - 38, 2, 38);
+    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(H.hole[0] + 1, H.hole[1] - 38); ctx.lineTo(H.hole[0] + 20, H.hole[1] - 31); ctx.lineTo(H.hole[0] + 1, H.hole[1] - 24); ctx.fill();
+    // Aim line.
+    if (aim && !moving() && !sunk) {
+      const dx = aim.sx - aim.x, dy = aim.sy - aim.y, d = Math.min(150, Math.hypot(dx, dy));
+      if (d > 4) {
+        const a = Math.atan2(dy, dx), p = d / 150;
+        ctx.strokeStyle = `hsl(${120 - p * 120} 90% 55%)`; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(ball.x + Math.cos(a) * (30 + p * 120), ball.y + Math.sin(a) * (30 + p * 120)); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(ball.x - 20, ball.y + 14, 40, 5);
+        ctx.fillStyle = `hsl(${120 - p * 120} 90% 55%)`; ctx.fillRect(ball.x - 20, ball.y + 14, 40 * p, 5);
+      }
+    }
+    // Ball with shadow.
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.arc(ball.x + 2, ball.y + 2, R * ball.scale, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x, ball.y, R * ball.scale, 0, 7); ctx.fill();
+    if (msg) {
+      ctx.font = 'bold 30px system-ui'; ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillText(msg.text, VW / 2 + 2, 62);
+      ctx.fillStyle = '#fff'; ctx.fillText(msg.text, VW / 2, 60);
+    }
+  }
+  function pos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * VW / r.width, y: (e.clientY - r.top) * VH / r.height }; }
+  cv.addEventListener('pointerdown', e => {
+    if (moving() || sunk) return;
+    const p = pos(e); aim = { sx: p.x, sy: p.y, x: p.x, y: p.y }; cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', e => { if (aim) { const p = pos(e); aim.x = p.x; aim.y = p.y; } });
+  const release = () => {
+    if (!aim) return;
+    const dx = aim.sx - aim.x, dy = aim.sy - aim.y, d = Math.min(150, Math.hypot(dx, dy));
+    aim = null;
+    if (d < 6 || moving() || sunk) return;
+    const power = d / 150 * 760;
+    ball.lastX = ball.x; ball.lastY = ball.y;
+    ball.vx = dx / Math.hypot(dx, dy) * power; ball.vy = dy / Math.hypot(dx, dy) * power;
+    strokes++; hud();
+  };
+  cv.addEventListener('pointerup', release);
+  cv.addEventListener('pointercancel', () => { aim = null; });
+  $('restart').onclick = () => { if (sunk) return; const s = strokes + 1; load(idx); strokes = s; hud(); };
+  $('again').onclick = () => { $('card').classList.remove('on'); scores = []; load(0); };
+
+  function fit() {
+    const s = Math.min((innerWidth - 16) / VW, (innerHeight - 100) / VH);
+    cv.style.width = Math.floor(VW * s) + 'px'; cv.style.height = Math.floor(VH * s) + 'px';
+  }
+  addEventListener('resize', fit); fit();
+  let last = performance.now();
+  function frame(now) { step(Math.min(0.033, (now - last) / 1000)); last = now; draw(); requestAnimationFrame(frame); }
+  load(0); requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

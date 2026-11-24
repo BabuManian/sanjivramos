@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sudoku</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0f172a;color:#e2e8f0;font:14px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px;box-sizing:border-box}
+header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+#grid{display:grid;grid-template-columns:repeat(9,1fr);width:min(92vw,450px);aspect-ratio:1;border:2px solid #64748b;border-radius:6px;overflow:hidden;background:#1e293b}
+.c{border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-size:clamp(16px,4.5vw,24px);cursor:pointer;background:none;color:#93c5fd;padding:0;font-family:inherit}
+.c:nth-child(3n){border-right:2px solid #64748b}
+.c:nth-child(9n){border-right:2px solid #64748b}
+.c:nth-child(n+19):nth-child(-n+27),.c:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid #64748b}
+.c.given{color:#f1f5f9;font-weight:700;cursor:default}
+.c.sel{background:#1d4ed8}
+.c.hl{background:#334155}
+.c.bad{color:#f87171}
+.pad{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;width:min(92vw,450px)}
+button{background:#334155;color:#fff;border:none;border-radius:8px;padding:9px 12px;font:inherit;cursor:pointer}
+button.primary{background:#2563eb}
+#msg{min-height:22px}
+</style></head><body>
+<header>
+  <select id="lvl" aria-label="Difficulty"><option value="36">Easy</option><option value="46" selected>Medium</option><option value="54">Hard</option></select>
+  <button class="primary" id="new">New puzzle</button>
+  <button id="check">Check</button>
+  <span>Time <b id="tm">0:00</b></span>
+</header>
+<div id="grid"></div>
+<div class="pad" id="pad"></div>
+<div style="display:flex;gap:8px"><button id="erase">Erase</button><button id="hint">Hint</button></div>
+<div id="msg"></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("sudoku", { vs: { mode: 'time' }, title: "Sudoku", lower: false, trophies: [{"id": "solved", "name": "Solver", "desc": "Solve a puzzle", "icon": "🔢"}] });</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const gridEl = $('grid'), padEl = $('pad');
+  let sol = [], puz = [], cur = [], sel = -1, t0 = 0, timer = null, won = false;
+  const cells = [];
+
+  for (let i = 0; i < 81; i++) {
+    const b = document.createElement('button'); b.className = 'c'; b.dataset.i = i; gridEl.appendChild(b); cells.push(b);
+  }
+  for (let d = 1; d <= 9; d++) {
+    const b = document.createElement('button'); b.className = 'pad-n'; b.textContent = d; b.dataset.d = d;
+    b.style.cssText = 'padding:10px 0;font-size:18px';
+    padEl.appendChild(b);
+  }
+
+  // Full valid grid by backtracking, then remove cells while the puzzle keeps one solution.
+  function solveCount(g, limit = 2) {
+    const i = g.indexOf(0);
+    if (i < 0) return 1;
+    const r = i / 9 | 0, c = i % 9; let n = 0;
+    for (let v = 1; v <= 9 && n < limit; v++) if (ok(g, r, c, v)) { g[i] = v; n += solveCount(g, limit - n); g[i] = 0; }
+    return n;
+  }
+  function ok(g, r, c, v) {
+    for (let k = 0; k < 9; k++) {
+      if (g[r * 9 + k] === v || g[k * 9 + c] === v) return false;
+      const br = Math.floor(r / 3) * 3 + Math.floor(k / 3), bc = Math.floor(c / 3) * 3 + k % 3;
+      if (g[br * 9 + bc] === v) return false;
+    }
+    return true;
+  }
+  function fill(g) {
+    const i = g.indexOf(0); if (i < 0) return true;
+    const r = i / 9 | 0, c = i % 9;
+    const order = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - .5);
+    for (const v of order) if (ok(g, r, c, v)) { g[i] = v; if (fill(g)) return true; g[i] = 0; }
+    return false;
+  }
+  function make(holes) {
+    const g = Array(81).fill(0); fill(g); const s = g.slice();
+    const idx = [...Array(81).keys()].sort(() => Math.random() - .5);
+    let removed = 0;
+    for (const i of idx) {
+      if (removed >= holes) break;
+      const keep = g[i]; g[i] = 0;
+      if (solveCount(g.slice()) === 1) removed++; else g[i] = keep;
+    }
+    return { puz: g, sol: s };
+  }
+
+  function render() {
+    const sr = sel >= 0 ? sel / 9 | 0 : -1, sc = sel >= 0 ? sel % 9 : -1, sv = sel >= 0 ? cur[sel] : 0;
+    cells.forEach((b, i) => {
+      const r = i / 9 | 0, c = i % 9, v = cur[i];
+      b.textContent = v || '';
+      b.className = 'c' + (puz[i] ? ' given' : '');
+      if (i === sel) b.classList.add('sel');
+      else if (sel >= 0 && (r === sr || c === sc || (Math.floor(r / 3) === Math.floor(sr / 3) && Math.floor(c / 3) === Math.floor(sc / 3)))) b.classList.add('hl');
+      if (v && v !== sol[i]) b.classList.add('bad');
+      if (sv && v === sv && i !== sel) b.classList.add('hl');
+    });
+  }
+  function tick() { const s = Math.floor((Date.now() - t0) / 1000); $('tm').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function newGame() {
+    const p = make(+$('lvl').value);
+    puz = p.puz; sol = p.sol; cur = puz.slice(); sel = -1; won = false;
+    t0 = Date.now(); clearInterval(timer); timer = setInterval(tick, 500); tick();
+    $('msg').textContent = ''; render();
+  }
+  function setVal(v) {
+    if (sel < 0 || puz[sel] || won) return;
+    cur[sel] = v; render();
+    if (cur.every((x, i) => x === sol[i])) { won = true; clearInterval(timer); window.SJG && (SJG.unlock('solved'), SJG.stat('solved'), SJG.score(SJG.getStat('solved'), 'solved')); $('msg').textContent = 'Solved in ' + $('tm').textContent + '!'; }
+  }
+  gridEl.addEventListener('click', e => {
+    const b = e.target.closest('.c'); if (!b) return;
+    sel = +b.dataset.i; render();
+  });
+  padEl.addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) setVal(+b.dataset.d); });
+  $('erase').addEventListener('click', () => setVal(0));
+  $('new').addEventListener('click', newGame);
+  $('check').addEventListener('click', () => {
+    const bad = cur.filter((v, i) => v && v !== sol[i]).length, empty = cur.filter(v => !v).length;
+    $('msg').textContent = bad ? `${bad} wrong cell${bad > 1 ? 's' : ''} (shown in red).` : empty ? `No mistakes so far. ${empty} left to fill.` : 'Looks good!';
+    render();
+  });
+  $('hint').addEventListener('click', () => {
+    const empties = [...Array(81).keys()].filter(i => !puz[i] && cur[i] !== sol[i]);
+    if (!empties.length) return;
+    const i = empties[Math.random() * empties.length | 0];
+    cur[i] = sol[i]; sel = i; render(); setVal(cur[i]);
+  });
+  addEventListener('keydown', e => {
+    if (/^[1-9]$/.test(e.key)) setVal(+e.key);
+    else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') setVal(0);
+    else if (sel >= 0 && e.key.startsWith('Arrow')) {
+      const d = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.key];
+      const n = sel + d;
+      if (n >= 0 && n < 81 && !((d === -1 && sel % 9 === 0) || (d === 1 && sel % 9 === 8))) { sel = n; render(); }
+      e.preventDefault();
+    }
+  });
+  newGame();
+})();
+</script>
+</body></html>

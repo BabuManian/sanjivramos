@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon Soccer</title>
+<style>
+html,body{margin:0;height:100%;background:#05070f;color:#e8ecf4;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#wrap{position:relative;height:100%;display:flex;align-items:center;justify-content:center}
+canvas{display:block;max-width:100%;max-height:100%;touch-action:none}
+#hud{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;font-weight:700;font-size:20px;background:rgba(10,14,28,.6);backdrop-filter:blur(8px);padding:5px 16px;border-radius:999px;pointer-events:none}
+#hud .b{color:#38bdf8}#hud .r{color:#fb7185}#hud .t{font:600 15px ui-monospace,monospace;opacity:.85}
+#net{position:absolute;top:10px;right:12px;font-size:12px;opacity:.7}
+#menu{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(4,6,14,.72);backdrop-filter:blur(10px)}
+#menu[hidden]{display:none}
+.card{width:min(460px,calc(100% - 28px));background:rgba(20,26,44,.9);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.card h1{margin:0;font-size:30px;letter-spacing:1px;background:linear-gradient(90deg,#38bdf8,#a78bfa,#fb7185);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card p{opacity:.75;margin:6px 0 14px}
+.row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}.row label{min-width:86px;opacity:.75}
+button,select{font:inherit;color:inherit;border:none;cursor:pointer}
+select{background:rgba(255,255,255,.08);padding:8px 10px;border-radius:10px}select option{background:#141a2c}
+.btn{background:rgba(255,255,255,.08);padding:10px 16px;border-radius:12px;font-weight:600;transition:transform .1s,filter .15s}
+.btn:active{transform:scale(.97)}.btn.pri{background:#3b6cff;color:#fff}.btn.pri:hover{filter:brightness(1.1)}
+.hint{font-size:12px;opacity:.55;margin-top:10px}
+#touch{position:absolute;inset:0;pointer-events:none;display:none}
+#touch.on{display:block}
+#stick{position:absolute;left:24px;bottom:24px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.12);pointer-events:auto}
+#knob{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.25)}
+#kickB,#sprintB{position:absolute;right:24px;bottom:30px;width:86px;height:86px;border-radius:50%;background:rgba(56,189,248,.3);border:2px solid rgba(56,189,248,.6);pointer-events:auto;font-weight:700}
+#sprintB{right:124px;bottom:20px;width:64px;height:64px;background:rgba(250,204,21,.2);border-color:rgba(250,204,21,.5);font-size:12px}
+#pause{position:absolute;top:8px;left:10px;padding:6px 10px;font-size:13px}
+#banner{position:absolute;top:40%;left:0;right:0;text-align:center;font-size:44px;font-weight:800;letter-spacing:2px;pointer-events:none;text-shadow:0 0 24px currentColor;opacity:0;transition:opacity .25s}
+</style></head><body>
+<div id="wrap"><canvas id="c" width="1100" height="680"></canvas>
+  <div id="hud"><span class="b" id="sb">0</span><span class="t" id="tm">3:00</span><span class="r" id="sr">0</span></div>
+  <div id="net"></div><button class="btn" id="pause">⏸ Menu</button>
+  <div id="banner"></div>
+  <div id="touch"><div id="stick"><div id="knob"></div></div><button id="sprintB">Sprint</button><button id="kickB">KICK</button></div>
+  <div id="menu"><div class="card">
+    <h1>⚽ NEON SOCCER</h1><p id="mtext">Fast arcade football. Dribble, pass, shoot and outplay the CPU — or your friends on the same network.</p>
+    <div class="row"><label>Mode</label><select id="mode"><option value="cpu">vs CPU</option><option value="local">2 players (one keyboard)</option><option value="online">Online / LAN</option></select></div>
+    <div class="row"><label>Team size</label><select id="size"><option value="1">1 v 1</option><option value="2">2 v 2</option><option value="3" selected>3 v 3</option><option value="4">4 v 4</option></select></div>
+    <div class="row"><label>CPU skill</label><select id="skill"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">Legend</option></select></div>
+    <div class="row"><label>Match</label><select id="len"><option value="90">1:30</option><option value="180" selected>3:00</option><option value="300">5:00</option></select><select id="arena"><option value="0">Neon Bowl</option><option value="1">Ice Rink (slippery)</option><option value="2">Pinball (bumpers)</option></select></div>
+    <div class="row"><label>Your player</label><select id="balls"><option value="default">Default</option><option value="pfp">My profile picture</option><option value="custom">Custom image…</option></select><input type="file" id="ballfile" accept="image/*" hidden><span id="ballmsg" style="font-size:12px;opacity:.7;cursor:pointer;max-width:220px"></span></div>
+    <div class="row" style="margin-top:14px"><button class="btn pri" id="go">Kick off</button><button class="btn" id="resume" hidden>Resume</button></div>
+    <div class="hint">Move: WASD / arrows / stick · Kick: Space (hold for power) · Sprint: Shift · Pass to a teammate by kicking toward them. Player 2 (one keyboard): arrows + Enter / right Shift. Your player shows your picture — online, everyone sees each other’s.</div>
+  </div></div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+  const cv = document.getElementById('c'), g = cv.getContext('2d'), $ = id => document.getElementById(id);
+  const W = 1100, H = 680, FX = 70, FY = 60, FW = W - 140, FH = H - 120, GOAL = 190, PR = 17, BR = 10;
+  const kit = window.SJG ? SJG.init('soccer', { vs: false, title: 'Neon Soccer', trophies: [
+    { id: 'goal', name: 'GOOOAL!', desc: 'Score a goal', icon: '⚽' },
+    { id: 'win', name: 'Champion', desc: 'Win a match vs CPU', icon: '🏆' },
+    { id: 'legend', name: 'Legendary', desc: 'Beat Legend CPUs', icon: '🌟' },
+    { id: 'hat', name: 'Hat-trick', desc: 'Score 3 goals in one match', icon: '🎩' },
+    { id: 'clean', name: 'Clean Sheet', desc: 'Win without conceding', icon: '🧤' },
+    { id: 'online', name: 'Online Winner', desc: 'Win an online match', icon: '🌐' },
+    { id: 'long', name: 'Screamer', desc: 'Score from your own half', icon: '🚀' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  const ARENAS = [{ fric: .9, wall: .8, col: '#38bdf8' }, { fric: .975, wall: .9, col: '#a5f3fc', bumpers: [] }, { fric: .9, wall: 1.05, col: '#f0abfc', bumpers: [[W / 2, FY + 120, 34], [W / 2, FY + FH - 120, 34], [FX + 260, H / 2, 26], [FX + FW - 260, H / 2, 26]] }];
+  let st = null, cfg = {}, running = false, paused = false, net = null, role = 'solo', myIdx = 0, myIdx2 = -1;
+  const keys = {};
+
+  /* ---------------- simulation (host / single player) ---------------- */
+  function newMatch(c) {
+    cfg = c;
+    const players = [];
+    for (let t = 0; t < 2; t++) for (let i = 0; i < c.size; i++) players.push({ team: t, i, x: 0, y: 0, vx: 0, vy: 0, ctrl: 'cpu', name: '', stamina: 1, kickT: 0, charge: 0, face: t ? Math.PI : 0, goals: 0, uid: null });
+    st = { players, ball: { x: W / 2, y: H / 2, vx: 0, vy: 0, last: -1, lastT: 0 }, score: [0, 0], time: c.len, phase: 'kickoff', phaseT: 1.2, arena: c.arena, tick: 0, kicker: 0 };
+    kickoff(Math.random() < .5 ? 0 : 1);
+  }
+  function formation(p) {
+    const n = cfg.size, side = p.team ? -1 : 1, baseX = p.team ? FX + FW : FX;
+    const slots = { 1: [[.28, .5]], 2: [[.15, .5], [.35, .5]], 3: [[.1, .5], [.3, .28], [.3, .72]], 4: [[.08, .5], [.25, .3], [.25, .7], [.4, .5]] }[n];
+    const [fx, fy] = slots[p.i] || [.3, .5];
+    return { x: baseX + side * fx * FW, y: FY + fy * FH };
+  }
+  function kickoff(team) {
+    st.phase = 'kickoff'; st.phaseT = 1.1; st.kicker = team;
+    Object.assign(st.ball, { x: W / 2, y: H / 2, vx: 0, vy: 0, last: -1 });
+    for (const p of st.players) { const f = formation(p); p.x = Math.min(f.x, W / 2 - 30) * (p.team ? 0 : 1) + (p.team ? Math.max(f.x, W / 2 + 30) : 0); p.y = f.y; p.vx = p.vy = 0; p.face = p.team ? Math.PI : 0; p.charge = 0; }
+  }
+  function inputFor(p, inputs) {
+    if (p.ctrl === 'cpu') return cpu(p);
+    return inputs[p.ctrl] || { mx: 0, my: 0, kick: false, sprint: false };
+  }
+  function cpu(p) {
+    const b = st.ball, skill = cfg.skill, mates = st.players.filter(q => q.team === p.team);
+    const goalX = p.team ? FX : FX + FW, ownX = p.team ? FX + FW : FX;
+    const dist = q => Math.hypot(q.x - b.x, q.y - b.y);
+    const chaser = mates.filter(q => q.ctrl === 'cpu' || true).reduce((a, q) => (dist(q) < dist(a) ? q : a));
+    let tx, ty, kick = false, sprint = false;
+    const keeper = cfg.size >= 3 && p.i === 0;
+    if (keeper && Math.abs(b.x - ownX) > FW * .3) { tx = ownX + (p.team ? -40 : 40); ty = Math.max(H / 2 - GOAL / 2 + 10, Math.min(H / 2 + GOAL / 2 - 10, b.y)); }
+    else if (p === chaser || (keeper && Math.abs(b.x - ownX) <= FW * .3)) {
+      // get behind the ball relative to the target goal, then push through it
+      const aim = Math.atan2(H / 2 + (Math.sin(st.tick * .01 + p.i) * 50) - b.y, goalX - b.x);
+      const bx = b.x - Math.cos(aim) * (PR + BR + 6), by = b.y - Math.sin(aim) * (PR + BR + 6);
+      const behind = Math.hypot(p.x - bx, p.y - by) < 22;
+      if (behind || dist(p) < PR + BR + 8) { tx = b.x + Math.cos(aim) * 30; ty = b.y + Math.sin(aim) * 30; const facingGood = Math.cos(Math.atan2(b.y - p.y, b.x - p.x) - aim) > .7; kick = dist(p) < PR + BR + 6 && facingGood && Math.hypot(goalX - b.x, H / 2 - b.y) < [380, 520, 650][skill]; sprint = skill > 0; }
+      else { tx = bx; ty = by; sprint = dist(p) > 120 && skill > 0; }
+    } else { const f = formation(p); const push = (b.x - W / 2) * .45; tx = f.x + push; ty = f.y + (b.y - H / 2) * .3; }
+    const dx = tx - p.x, dy = ty - p.y, l = Math.hypot(dx, dy) || 1, slow = l < 12 ? l / 12 : 1;
+    const err = [0.35, 0.12, 0][skill];
+    return { mx: dx / l * slow + (Math.random() - .5) * err, my: dy / l * slow + (Math.random() - .5) * err, kick, sprint: sprint && p.stamina > .3, cpuKick: kick ? [.55, .8, 1][skill] : 0 };
+  }
+  function step(dt, inputs) {
+    st.tick++;
+    const A = ARENAS[st.arena], b = st.ball;
+    if (st.phase === 'kickoff' || st.phase === 'goal') { st.phaseT -= dt; if (st.phaseT <= 0) { if (st.phase === 'goal') { kickoff(st.kicker); return; } st.phase = 'play'; } if (st.phase !== 'play') return; }
+    if (st.phase === 'over') return;
+    st.time -= dt; if (st.time <= 0 && st.score[0] !== st.score[1]) { st.time = 0; st.phase = 'over'; events.push({ e: 'over' }); return; } if (st.time <= 0) st.time = 0; // golden goal when tied
+    for (const p of st.players) {
+      const inp = inputFor(p, inputs);
+      let mx = Math.max(-1, Math.min(1, inp.mx || 0)), my = Math.max(-1, Math.min(1, inp.my || 0)); const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
+      const sprint = inp.sprint && p.stamina > .05 && l > .1;
+      p.stamina = Math.max(0, Math.min(1, p.stamina + (sprint ? -.45 : .22) * dt));
+      const acc = sprint ? 2300 : 1650, max = sprint ? 330 : 250;
+      p.vx += mx * acc * dt; p.vy += my * acc * dt;
+      const sp = Math.hypot(p.vx, p.vy); if (sp > max) { p.vx *= max / sp; p.vy *= max / sp; }
+      p.vx *= Math.pow(.0009, dt); p.vy *= Math.pow(.0009, dt);
+      if (l > .2) p.face = Math.atan2(my, mx);
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.x = Math.max(FX - 40 + PR, Math.min(FX + FW + 40 - PR, p.x)); p.y = Math.max(FY + PR, Math.min(FY + FH - PR, p.y));
+      if (p.x < FX + PR || p.x > FX + FW - PR) { if (Math.abs(p.y - H / 2) > GOAL / 2 - PR) p.x = Math.max(FX + PR, Math.min(FX + FW - PR, p.x)); }
+      // kicking: hold to charge (humans); CPU kicks instantly
+      p.kickT = Math.max(0, p.kickT - dt);
+      if (p.ctrl === 'cpu') { if (inp.kick && p.kickT <= 0) doKick(p, inp.cpuKick); }
+      else { if (inp.kick) p.charge = Math.min(1, p.charge + dt * 1.6); else if (p.charge > 0) { doKick(p, .35 + p.charge * .65); p.charge = 0; } }
+    }
+    // player–player
+    for (let i = 0; i < st.players.length; i++) for (let j = i + 1; j < st.players.length; j++) {
+      const a = st.players[i], c = st.players[j], dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy);
+      if (d > 0 && d < PR * 2) { const o = (PR * 2 - d) / 2, nx = dx / d, ny = dy / d; a.x -= nx * o; a.y -= ny * o; c.x += nx * o; c.y += ny * o; const rv = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny; if (rv < 0) { a.vx += nx * rv * .5; a.vy += ny * rv * .5; c.vx -= nx * rv * .5; c.vy -= ny * rv * .5; } }
+    }
+    // ball
+    const sub = 3;
+    for (let k = 0; k < sub; k++) {
+      const h = dt / sub;
+      b.x += b.vx * h; b.y += b.vy * h;
+      for (const p of st.players) {
+        const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy);
+        if (d > 0 && d < PR + BR) { const nx = dx / d, ny = dy / d; b.x = p.x + nx * (PR + BR); b.y = p.y + ny * (PR + BR); const rv = (b.vx - p.vx) * nx + (b.vy - p.vy) * ny; if (rv < 0) { b.vx -= 1.5 * rv * nx; b.vy -= 1.5 * rv * ny; } b.last = st.players.indexOf(p); b.lastT = st.time; }
+      }
+      for (const [bx, by, br] of A.bumpers || []) { const dx = b.x - bx, dy = b.y - by, d = Math.hypot(dx, dy); if (d < br + BR) { const nx = dx / d, ny = dy / d; b.x = bx + nx * (br + BR); b.y = by + ny * (br + BR); const rv = b.vx * nx + b.vy * ny; b.vx -= 2 * rv * nx; b.vy -= 2 * rv * ny; b.vx *= 1.15; b.vy *= 1.15; events.push({ e: 'bump' }); } }
+      const inMouth = Math.abs(b.y - H / 2) < GOAL / 2 - BR;
+      if (b.y < FY + BR) { b.y = FY + BR; b.vy = Math.abs(b.vy) * A.wall; events.push({ e: 'wall' }); }
+      if (b.y > FY + FH - BR) { b.y = FY + FH - BR; b.vy = -Math.abs(b.vy) * A.wall; events.push({ e: 'wall' }); }
+      if (!inMouth) { if (b.x < FX + BR) { b.x = FX + BR; b.vx = Math.abs(b.vx) * A.wall; events.push({ e: 'wall' }); } if (b.x > FX + FW - BR) { b.x = FX + FW - BR; b.vx = -Math.abs(b.vx) * A.wall; events.push({ e: 'wall' }); } }
+      else if (b.x < FX - 6 || b.x > FX + FW + 6) {
+        const team = b.x < FX ? 1 : 0; st.score[team]++;
+        const sc = st.players[b.last], own = sc && sc.team !== team;
+        if (sc && !own) sc.goals++;
+        events.push({ e: 'goal', team, by: b.last, own, far: sc && (team === 0 ? sc.x < W / 2 : sc.x > W / 2) });
+        st.phase = st.time <= 0 ? 'over' : 'goal'; st.phaseT = 1.8; st.kicker = 1 - team;
+        if (st.phase === 'over') events.push({ e: 'over' });
+        b.vx = b.vy = 0; return;
+      }
+    }
+    const f = Math.pow(1 - (1 - A.fric) * 1.0, dt * 6); b.vx *= f; b.vy *= f;
+    const bs = Math.hypot(b.vx, b.vy); if (bs > 1100) { b.vx *= 1100 / bs; b.vy *= 1100 / bs; }
+  }
+  function doKick(p, power) {
+    const b = st.ball, dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy);
+    p.kickT = .25;
+    if (d > PR + BR + 12) return;
+    let ang = Math.atan2(dy, dx);
+    const fa = p.face, diff = Math.atan2(Math.sin(fa - ang), Math.cos(fa - ang)); ang += diff * .6;   // aim mostly where you face
+    const sp = 380 + 620 * power;
+    b.vx = Math.cos(ang) * sp + p.vx * .3; b.vy = Math.sin(ang) * sp + p.vy * .3; b.last = st.players.indexOf(p);
+    events.push({ e: 'kick', power });
+  }
+
+  /* ---------------- rendering ---------------- */
+  let events = [], parts = [], shake = 0, view = null;
+  function handleEvents(list) {
+    for (const ev of list) {
+      if (ev.e === 'kick') { sfx('shoot'); burst(view.ball.x, view.ball.y, '#e0f2fe', 8); }
+      if (ev.e === 'wall' && Math.random() < .5) sfx('click');
+      if (ev.e === 'bump') sfx('pop');
+      if (ev.e === 'goal') {
+        shake = .6; sfx('win'); burst(ev.team ? FX + FW + 10 : FX - 10, H / 2, ev.team ? '#fb7185' : '#38bdf8', 60);
+        const mine = role !== 'spectator' && view.players[myIdx] && view.players[myIdx].team === ev.team;
+        banner(ev.own ? 'OWN GOAL!' : 'GOAL!', ev.team ? '#fb7185' : '#38bdf8');
+        if (mine && ev.by === myIdx && !ev.own) { kit && kit.unlock('goal'); if (view.players[myIdx].goals + (role === 'client' ? 1 : 0) >= 3) kit && kit.unlock('hat'); if (ev.far) kit && kit.unlock('long'); }
+      }
+      if (ev.e === 'over') endMatch();
+    }
+  }
+  function burst(x, y, col, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 7, s = 60 + Math.random() * 380; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .4 + Math.random() * .5, col }); } }
+  let bannerT;
+  function banner(t, col) { const b = $('banner'); b.textContent = t; b.style.color = col; b.style.opacity = 1; clearTimeout(bannerT); bannerT = setTimeout(() => b.style.opacity = 0, 1400); }
+  function draw(dt) {
+    const v = view; if (!v) return;
+    const A = ARENAS[v.arena || 0];
+    g.save();
+    if (shake > 0) { g.translate((Math.random() - .5) * shake * 16, (Math.random() - .5) * shake * 16); shake = Math.max(0, shake - dt); }
+    g.fillStyle = '#05070f'; g.fillRect(-20, -20, W + 40, H + 40);
+    // pitch
+    const grd = g.createLinearGradient(0, FY, 0, FY + FH); grd.addColorStop(0, v.arena === 1 ? '#0c2733' : '#0a1a14'); grd.addColorStop(1, v.arena === 1 ? '#0a1d2a' : '#071410');
+    g.fillStyle = grd; g.fillRect(FX, FY, FW, FH);
+    for (let i = 0; i < 10; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,.015)' : 'rgba(0,0,0,0)'; g.fillRect(FX + i * FW / 10, FY, FW / 10, FH); }
+    g.shadowColor = A.col; g.shadowBlur = 14; g.strokeStyle = A.col; g.lineWidth = 3;
+    g.strokeRect(FX, FY, FW, FH); g.beginPath(); g.moveTo(W / 2, FY); g.lineTo(W / 2, FY + FH); g.stroke();
+    g.beginPath(); g.arc(W / 2, H / 2, 80, 0, 7); g.stroke();
+    g.strokeRect(FX, H / 2 - 130, 110, 260); g.strokeRect(FX + FW - 110, H / 2 - 130, 110, 260);
+    // goals
+    for (const [x, col] of [[FX, '#38bdf8'], [FX + FW, '#fb7185']]) { g.strokeStyle = col; g.shadowColor = col; g.lineWidth = 5; g.beginPath(); g.moveTo(x, H / 2 - GOAL / 2); g.lineTo(x + (x === FX ? -36 : 36), H / 2 - GOAL / 2); g.lineTo(x + (x === FX ? -36 : 36), H / 2 + GOAL / 2); g.lineTo(x, H / 2 + GOAL / 2); g.stroke(); }
+    g.shadowBlur = 0;
+    for (const [bx, by, br] of A.bumpers || []) { g.fillStyle = '#f0abfc'; g.shadowColor = '#f0abfc'; g.shadowBlur = 20; g.beginPath(); g.arc(bx, by, br, 0, 7); g.fill(); g.shadowBlur = 0; }
+    // players
+    v.players.forEach((p, i) => {
+      const col = p.team ? '#fb7185' : '#38bdf8';
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(p.x + 3, p.y + 5, PR, PR * .8, 0, 0, 7); g.fill();
+      g.shadowColor = col; g.shadowBlur = i === myIdx || i === myIdx2 ? 22 : 10; g.fillStyle = col; g.beginPath(); g.arc(p.x, p.y, PR, 0, 7); g.fill(); g.shadowBlur = 0;
+      const pim = playerImg(i); if (pim) drawPic(pim, p.x, p.y, PR - 3);
+      g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + Math.cos(p.face) * PR, p.y + Math.sin(p.face) * PR); g.stroke();
+      if (p.charge > 0) { g.strokeStyle = '#fde047'; g.lineWidth = 4; g.beginPath(); g.arc(p.x, p.y, PR + 6, -Math.PI / 2, -Math.PI / 2 + p.charge * Math.PI * 2); g.stroke(); }
+      if ((i === myIdx || i === myIdx2) && role !== 'spectator') { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(p.x, p.y - PR - 8); g.lineTo(p.x - 6, p.y - PR - 16); g.lineTo(p.x + 6, p.y - PR - 16); g.fill(); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(p.x - 16, p.y + PR + 6, 32, 4); g.fillStyle = '#fde047'; g.fillRect(p.x - 16, p.y + PR + 6, 32 * p.stamina, 4); }
+      if (p.name) { g.font = '600 11px system-ui'; g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.75)'; g.fillText(p.name, p.x, p.y - PR - (i === myIdx ? 20 : 6)); }
+    });
+    // ball
+    const b = v.ball;
+    g.fillStyle = 'rgba(0,0,0,.4)'; g.beginPath(); g.ellipse(b.x + 3, b.y + 4, BR, BR * .8, 0, 0, 7); g.fill();
+    g.shadowColor = '#fff'; g.shadowBlur = 16; g.fillStyle = '#f8fafc'; g.beginPath(); g.arc(b.x, b.y, BR, 0, 7); g.fill(); g.shadowBlur = 0;
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .94; p.vy *= .94; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } g.globalAlpha = Math.min(1, p.life * 2); g.fillStyle = p.col; g.fillRect(p.x - 2, p.y - 2, 4, 4); }
+    g.globalAlpha = 1;
+    if (v.phase === 'kickoff') { g.fillStyle = 'rgba(255,255,255,.8)'; g.font = '700 22px system-ui'; g.textAlign = 'center'; g.fillText('Kick-off', W / 2, FY + 40); }
+    g.restore();
+    $('sb').textContent = v.score[0]; $('sr').textContent = v.score[1];
+    const t = Math.ceil(v.time); $('tm').textContent = t > 0 ? `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` : 'Golden goal';
+  }
+
+  /* ---------------- input ---------------- */
+  const P1 = { up: ['w', 'ArrowUp'], down: ['s', 'ArrowDown'], left: ['a', 'ArrowLeft'], right: ['d', 'ArrowRight'], kick: [' ', 'k', 'z'], sprint: ['Shift', 'l', 'x'] };
+  const SPLIT1 = { up: ['w'], down: ['s'], left: ['a'], right: ['d'], kick: [' '], sprint: ['ShiftLeft'] }, SPLIT2 = { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], kick: ['Enter'], sprint: ['ShiftRight'] };
+  const any = list => list.some(k => keys[k]);
+  let touch = { mx: 0, my: 0, kick: false, sprint: false, on: false };
+  function readInput(map) {
+    if (touch.on && map === P1) return { mx: touch.mx, my: touch.my, kick: touch.kick, sprint: touch.sprint };
+    return { mx: (any(map.right) ? 1 : 0) - (any(map.left) ? 1 : 0), my: (any(map.down) ? 1 : 0) - (any(map.up) ? 1 : 0), kick: any(map.kick), sprint: any(map.sprint) };
+  }
+  addEventListener('keydown', e => { keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true; keys[e.code] = true; if (/^Arrow| $/.test(e.key) && running) e.preventDefault(); if (e.key === 'Escape' || e.key === 'p') togglePause(); });
+  addEventListener('keyup', e => { keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false; keys[e.code] = false; });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+  // touch stick
+  const stick = $('stick'), knob = $('knob');
+  if (matchMedia('(pointer:coarse)').matches) $('touch').classList.add('on');
+  let stickId = null;
+  stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(e.pointerId); touch.on = true; moveStick(e); });
+  stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) moveStick(e); });
+  const endStick = () => { stickId = null; touch.mx = touch.my = 0; knob.style.transform = ''; };
+  stick.addEventListener('pointerup', endStick); stick.addEventListener('pointercancel', endStick);
+  function moveStick(e) { const r = stick.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2), l = Math.hypot(dx, dy), m = Math.min(l, 45); touch.mx = l ? dx / l * m / 45 : 0; touch.my = l ? dy / l * m / 45 : 0; knob.style.transform = `translate(${touch.mx * 40}px,${touch.my * 40}px)`; }
+  for (const [id, k] of [['kickB', 'kick'], ['sprintB', 'sprint']]) { const b = $(id); b.addEventListener('pointerdown', e => { e.preventDefault(); touch.on = true; touch[k] = true; }); b.addEventListener('pointerup', () => touch[k] = false); b.addEventListener('pointerleave', () => touch[k] = false); }
+  cv.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') { $('touch').classList.add('on'); } });
+
+  /* ---------------- online: host runs the sim; clients send input, predict themselves, smooth the rest ---------------- */
+  let snaps = [], pred = null, inputSeq = 0, sendT = 0, snapT = 0, remoteInputs = {};
+  const SNAP_HZ = 20, INTERP = 110;
+  function packState() { return { t: performance.now(), p: st.players.map(p => [Math.round(p.x), Math.round(p.y), Math.round(p.vx), Math.round(p.vy), +p.face.toFixed(2), +p.charge.toFixed(2), +p.stamina.toFixed(2)]), b: [Math.round(st.ball.x), Math.round(st.ball.y), Math.round(st.ball.vx), Math.round(st.ball.vy)], s: st.score, tm: +st.time.toFixed(1), ph: st.phase, ar: st.arena, n: st.players.map(p => p.name), tm2: st.players.map(p => p.team), g: st.players.map(p => p.goals) }; }
+  function unpack(d) { return { arena: d.ar, players: d.p.map((a, i) => ({ x: a[0], y: a[1], vx: a[2], vy: a[3], face: a[4], charge: a[5], stamina: a[6], name: d.n[i], team: d.tm2[i], goals: d.g[i] })), ball: { x: d.b[0], y: d.b[1], vx: d.b[2], vy: d.b[3] }, score: d.s, time: d.tm, phase: d.ph }; }
+  function interpView(now) {
+    if (!snaps.length) return null;
+    const tgt = now - INTERP;
+    let a = snaps[0], b = snaps[snaps.length - 1];
+    for (let i = 0; i < snaps.length - 1; i++) if (snaps[i].rt <= tgt && snaps[i + 1].rt >= tgt) { a = snaps[i]; b = snaps[i + 1]; break; }
+    const k = b.rt === a.rt ? 1 : Math.max(0, Math.min(1, (tgt - a.rt) / (b.rt - a.rt)));
+    const L = (x, y) => x + (y - x) * k, A = unpack(a.d), B = unpack(b.d);
+    const v = { ...B, players: B.players.map((p, i) => ({ ...p, x: L(A.players[i].x, p.x), y: L(A.players[i].y, p.y), face: p.face })), ball: { x: L(A.ball.x, B.ball.x), y: L(A.ball.y, B.ball.y) } };
+    // own player: predicted locally, gently pulled toward the host's latest position
+    if (pred && myIdx >= 0 && v.players[myIdx]) { const latest = unpack(snaps[snaps.length - 1].d).players[myIdx]; pred.x += (latest.x - pred.x) * .12; pred.y += (latest.y - pred.y) * .12; v.players[myIdx] = { ...v.players[myIdx], x: pred.x, y: pred.y, face: pred.face }; }
+    return v;
+  }
+  function predictSelf(inp, dt) {
+    if (!pred) return;
+    let mx = inp.mx, my = inp.my; const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
+    const acc = inp.sprint ? 2300 : 1650, max = inp.sprint ? 330 : 250;
+    pred.vx += mx * acc * dt; pred.vy += my * acc * dt; const sp = Math.hypot(pred.vx, pred.vy); if (sp > max) { pred.vx *= max / sp; pred.vy *= max / sp; }
+    pred.vx *= Math.pow(.0009, dt); pred.vy *= Math.pow(.0009, dt); if (l > .2) pred.face = Math.atan2(my, mx);
+    pred.x = Math.max(FX - 40 + PR, Math.min(FX + FW + 40 - PR, pred.x + pred.vx * dt)); pred.y = Math.max(FY + PR, Math.min(FY + FH - PR, pred.y + pred.vy * dt));
+  }
+
+  async function goOnline() {
+    try { net = await SJNet.lobby({ game: 'soccer', gameName: 'Neon Soccer', max: 8, min: 2, teams: ['Blue', 'Red'], maps: ['Neon Bowl', 'Ice Rink', 'Pinball'], modes: ['3:00', '1:30', '5:00'] }); }
+    catch { $('mode').value = 'cpu'; return; }
+    net.on('start', () => startOnline());
+    net.on('m', (d, from) => {
+      if (d.slots) { lastSlots = d.slots; if (!net.isHost) { myIdx = d.slots.indexOf(net.me.id); pred = null; role = myIdx < 0 ? 'spectator' : 'client'; } }
+      if (d.in && net.isHost) remoteInputs['u' + from] = d.in;
+      if (okPic(d.pimg)) { const uid = net.isHost ? from : d.uid; if (uid != null && uid !== net.me.id) { setPeerPic(uid, d.pimg); if (net.isHost) net.send({ pimg: d.pimg, uid }); } }
+      if (d.s && !net.isHost) { snaps.push({ rt: performance.now(), d: d.s }); if (snaps.length > 30) snaps.shift(); if (d.ev) handleEvents(d.ev); if (d.s.ph === 'kickoff' && pred) { const me = unpack(d.s).players[myIdx]; if (me) { pred.x = me.x; pred.y = me.y; pred.vx = pred.vy = 0; } } }
+    });
+    net.on('host', () => { if (net.isHost) { $('net').textContent = 'You are now hosting'; adoptAsHost(); } });
+    for (const ev of ['peer-joined', 'peer-back']) net.on(ev, d => { const u = d && (d.user ? d.user.id : d.uid || d.id); if (net.isHost && u) for (const k in peerData) net.send({ pimg: peerData[k], uid: +k }, u); });
+    net.on('peer-left', d => { if (st && net.isHost) for (const p of st.players) if (p.uid === d.uid) { p.ctrl = 'cpu'; p.name += ' (CPU)'; } });
+    startOnline();
+  }
+  function startOnline() {
+    const r = net.room, players = net.players();
+    const size = Math.max(1, Math.min(4, Math.ceil(Math.max(players.filter(m => m.team === 0).length, players.filter(m => m.team === 1).length, Math.ceil(players.length / 2)))));
+    const sz = Math.max(size, +$('size').value || 1);
+    cfg = { size: Math.min(4, sz), skill: +$('skill').value, len: +(({ '3:00': 180, '1:30': 90, '5:00': 300 })[r.mode] || 180), arena: Math.max(0, ['Neon Bowl', 'Ice Rink', 'Pinball'].indexOf(r.map)) };
+    role = net.spectating() ? 'spectator' : net.isHost ? 'host' : 'client';
+    snaps = []; running = true; paused = false; $('menu').hidden = true;
+    if (net.isHost) {
+      newMatch(cfg);
+      const slots = [0, 1].map(t => st.players.filter(p => p.team === t));
+      for (const m of players) { const free = slots[m.team].find(p => p.ctrl === 'cpu') || slots[1 - m.team].find(p => p.ctrl === 'cpu'); if (free) { free.ctrl = m.id === net.me.id ? 'local' : 'u' + m.id; free.uid = m.id; free.name = m.display; } }
+      for (const p of st.players) if (p.ctrl === 'cpu') p.name = 'CPU';
+      myIdx = st.players.findIndex(p => p.uid === net.me.id);
+    }
+    // clients learn their slot from the first snapshot's names; the host tells them explicitly too
+    if (net.isHost) { lastSlots = st.players.map(p => p.uid); net.send({ slots: lastSlots }); }
+    shareMine(); setTimeout(shareMine, 2000);
+    $('net').textContent = role === 'host' ? 'Hosting · room ' + r.code : role === 'spectator' ? 'Watching · room ' + r.code : 'Online · room ' + r.code;
+  }
+  function adoptAsHost() {
+    // host migration: rebuild the sim from the latest snapshot and carry on
+    if (!snaps.length) return;
+    const v = unpack(snaps[snaps.length - 1].d);
+    newMatch(cfg);
+    v.players.forEach((p, i) => { if (st.players[i]) Object.assign(st.players[i], { x: p.x, y: p.y, vx: p.vx, vy: p.vy, name: p.name, goals: p.goals }); });
+    Object.assign(st.ball, v.ball); st.score = v.score; st.time = v.time; st.phase = v.phase === 'over' ? 'over' : 'play';
+    const slotUids = lastSlots || [];
+    st.players.forEach((p, i) => { const uid = slotUids[i]; p.uid = uid || null; p.ctrl = uid === net.me.id ? 'local' : uid ? 'u' + uid : 'cpu'; });
+    role = 'host'; pred = null; myIdx = st.players.findIndex(p => p.uid === net.me.id);
+    net.send({ slots: st.players.map(p => p.uid) });
+  }
+  let lastSlots = null;
+
+  /* ---------------- match flow ---------------- */
+  function start() {
+    const mode = $('mode').value;
+    if (mode === 'online') { goOnline(); return; }
+    if (net) { try { net.leave(); } catch {} net = null; }
+    role = 'solo'; snaps = []; pred = null;
+    newMatch({ size: +$('size').value, skill: +$('skill').value, len: +$('len').value, arena: +$('arena').value });
+    st.players[0].ctrl = 'local'; st.players[0].name = 'You';
+    myIdx = 0; myIdx2 = -1;
+    if (mode === 'local') { const p2 = st.players.find(p => p.team === 1); p2.ctrl = 'local2'; p2.name = 'P2'; st.players[0].name = 'P1'; myIdx2 = st.players.indexOf(p2); }
+    running = true; paused = false; $('menu').hidden = true; $('resume').hidden = false; $('net').textContent = '';
+    sfx('power');
+  }
+  function endMatch() {
+    const v = view, myTeam = v.players[myIdx] ? v.players[myIdx].team : -1, won = myTeam >= 0 && v.score[myTeam] > v.score[1 - myTeam];
+    running = false;
+    if (role !== 'spectator' && $('mode').value !== 'local') {
+      if (won) { if (role === 'solo') { kit && kit.unlock('win'); if (cfg.skill === 2) kit && kit.unlock('legend'); } else kit && kit.unlock('online'); if (v.score[1 - myTeam] === 0) kit && kit.unlock('clean'); kit && kit.stat('wins'); kit && kit.score(kit.getStat('wins'), 'wins'); }
+    }
+    sfx(won ? 'win' : 'lose');
+    $('mtext').innerHTML = `<b style="font-size:20px">${v.score[0]} – ${v.score[1]}</b><br>${myTeam < 0 || $('mode').value === 'local' ? (v.score[0] > v.score[1] ? 'Blue wins!' : 'Red wins!') : won ? '🏆 You win!' : 'You lost — rematch?'}`;
+    $('go').textContent = net ? (net.isHost ? 'Rematch' : 'Waiting for host…') : 'Play again';
+    $('go').disabled = !!net && !net.isHost;
+    $('resume').hidden = true;
+    setTimeout(() => { $('menu').hidden = false; }, 1200);
+  }
+  function togglePause() { if (!running) return; if (net) { $('menu').hidden = !$('menu').hidden; return; } paused = !paused; $('menu').hidden = !paused; }
+  $('pause').onclick = togglePause;
+  $('resume').onclick = () => { paused = false; $('menu').hidden = true; };
+  $('go').onclick = () => { if (net && net.room) { if (net.isHost) net.rematch(); return; } start(); };
+  $('mode').onchange = () => { $('go').textContent = $('mode').value === 'online' ? 'Find a match' : 'Kick off'; };
+
+  /* ---------------- main loop (fixed 120 Hz sim, render every frame) ---------------- */
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    const dt = Math.min(.1, (now - last) / 1000); last = now;
+    const inputs = { local: readInput($('mode').value === 'local' ? SPLIT1 : P1), local2: readInput(SPLIT2), ...remoteInputs };
+    if (running && !paused && (role === 'solo' || role === 'host')) {
+      acc += dt; const h = 1 / 120;
+      while (acc >= h) { step(h, inputs); acc -= h; }
+      view = { ...st, players: st.players };
+      const evs = events; events = [];
+      handleEvents(evs);
+      if (role === 'host') { snapT += dt; if (snapT >= 1 / SNAP_HZ) { snapT = 0; net.send({ s: packState(), ev: evs.length ? evs : undefined }); } else if (evs.length) net.send({ s: packState(), ev: evs }); }
+    } else if (role === 'client' || role === 'spectator') {
+      if (role === 'client' && myIdx >= 0) {
+        const inp = inputs.local; sendT += dt;
+        if (!pred && snaps.length) { const me = unpack(snaps[snaps.length - 1].d).players[myIdx]; if (me) pred = { x: me.x, y: me.y, vx: 0, vy: 0, face: me.face }; }
+        predictSelf(inp, dt);
+        if (sendT >= 1 / 30) { sendT = 0; net.send({ in: { mx: +inp.mx.toFixed(2), my: +inp.my.toFixed(2), kick: !!inp.kick, sprint: !!inp.sprint, n: ++inputSeq } }); }
+      }
+      const v = interpView(now); if (v) view = v;
+      if (net) $('net').textContent = `${role === 'spectator' ? 'Watching' : 'Online'} · ${net.ping} ms`;
+    }
+    if (view) draw(dt);
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------------- ball design (default / profile picture / custom image) ---------------- */
+  // ballImg = YOUR picture. Online, each player sends theirs (a small JPEG) to the host, who relays it to everyone.
+  let ballImg = null;
+  const peerImgs = {}, peerData = {};
+  const BALL_KEY = 'sj-soccer.ball', BALL_IMG_KEY = 'sj-soccer.ballImg';
+  const okPic = v => typeof v === 'string' && v.length < 30000 && (v === 'default' || v.startsWith('data:image/'));
+  function myPayload() {
+    if (!ballImg) return 'default';
+    try { const S = 72, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), iw = ballImg.naturalWidth || ballImg.width, ih = ballImg.naturalHeight || ballImg.height, k = S / Math.min(iw, ih);
+      x.fillStyle = '#f8fafc'; x.fillRect(0, 0, S, S); x.drawImage(ballImg, (S - iw * k) / 2, (S - ih * k) / 2, iw * k, ih * k); return c.toDataURL('image/jpeg', .8); } catch { return 'default'; }
+  }
+  function setPeerPic(uid, src) { peerData[uid] = src; if (src === 'default') { delete peerImgs[uid]; return; } const im = new Image(); im.onload = () => { if (peerData[uid] === src) peerImgs[uid] = im; }; im.src = src; }
+  function shareMine() { if (!net || !net.me) return; const d = myPayload(); peerData[net.me.id] = d; net.send(net.isHost ? { pimg: d, uid: net.me.id } : { pimg: d }); }
+  function playerImg(i) {
+    if (!net || role === 'solo') return i === myIdx ? ballImg : null;
+    const uid = role === 'host' && st.players[i] ? st.players[i].uid : (lastSlots || [])[i];
+    if (uid == null) return null;
+    return uid === net.me.id ? ballImg : peerImgs[uid] || null;
+  }
+  function drawPic(im, x, y, r) {
+    g.save(); g.beginPath(); g.arc(x, y, r, 0, 7); g.clip();
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, sc = (2 * r) / Math.min(iw, ih);
+    g.drawImage(im, x - iw * sc / 2, y - ih * sc / 2, iw * sc, ih * sc); g.restore();
+  }
+  function loadBallImg(src, msg) {
+    if (!src) { ballImg = null; $('ballmsg').textContent = msg || ''; shareMine(); return; }
+    const im = new Image(); im.onload = () => { ballImg = im; $('ballmsg').textContent = msg || ''; shareMine(); };
+    im.onerror = () => { ballImg = null; $('ballmsg').textContent = 'Couldn’t load that image — using the default ball.'; }; im.src = src;
+  }
+  async function applyBall() {
+    const mode = $('balls').value; localStorage.setItem(BALL_KEY, mode);
+    if (mode === 'default') return loadBallImg(null);
+    if (mode === 'custom') { const d = localStorage.getItem(BALL_IMG_KEY); if (d) loadBallImg(d, 'Tap here to change image'); else { loadBallImg(null, 'Pick an image…'); $('ballfile').click(); } return; }
+    let u = null; try { const r = await fetch('/social/api/me', { credentials: 'same-origin' }); if (r.ok) u = (await r.json()).me; } catch {}
+    if (u && u.avatar) loadBallImg(u.avatar);
+    else loadBallImg(null, 'No profile picture found (sign in to Social and set one) — using the default ball.');
+  }
+  function shrink(file) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onerror = rej; fr.onload = () => { const im = new Image(); im.onerror = rej; im.onload = () => { const S = 160, c = document.createElement('canvas'); c.width = c.height = S; const k = S / Math.min(im.width, im.height); c.getContext('2d').drawImage(im, (S - im.width * k) / 2, (S - im.height * k) / 2, im.width * k, im.height * k); res(c.toDataURL('image/png')); }; im.src = fr.result; }; fr.readAsDataURL(file); }); }
+  $('balls').onchange = applyBall;
+  $('ballmsg').onclick = () => { if ($('balls').value === 'custom') $('ballfile').click(); };
+  $('ballfile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) { if (!localStorage.getItem(BALL_IMG_KEY)) { $('balls').value = 'default'; applyBall(); } return; }
+    try { const d = await shrink(f); localStorage.setItem(BALL_IMG_KEY, d); loadBallImg(d, 'Tap here to change image'); } catch { loadBallImg(null, 'Couldn’t read that image.'); } };
+  $('balls').value = ['default', 'pfp', 'custom'].includes(localStorage.getItem(BALL_KEY)) ? localStorage.getItem(BALL_KEY) : 'default';
+  applyBall();
+  // preview pitch behind the menu
+  newMatch({ size: 3, skill: 1, len: 180, arena: 0 }); view = st; st.phase = 'kickoff';
+  window.__soccer = () => ({ pos: i => view && view.players[i] && { x: view.players[i].x, y: view.players[i].y }, role, running, score: view && view.score, time: view && view.time, phase: view && view.phase, myIdx, players: view && view.players.length, ball: view && view.ball, start, step: n => { for (let i = 0; i < n; i++) step(1 / 120, {}); } });
+  const join = new URLSearchParams(location.search).get('join') || new URLSearchParams(location.search).get('online'); if (join) { $('mode').value = 'online'; goOnline(); }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

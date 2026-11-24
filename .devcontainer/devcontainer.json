@@ -1,0 +1,18 @@
+{
+  // GitHub Codespaces: runs SanjivramOS from this repository on port 8080 and opens it in a new tab.
+  "name": "SanjivramOS",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
+  // Once, when the Codespace is created: the server's two npm packages.
+  "postCreateCommand": "cd server && npm ci --omit=dev --no-audit --no-fund",
+  // Every time the Codespace starts or resumes.
+  "postStartCommand": "bash start.sh",
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "SanjivramOS", "onAutoForward": "openBrowser" }
+  },
+  // Optional Codespaces secret: SITE_PASSWORD (turns on the Terminal app — see README).
+  "secrets": {
+    "SITE_PASSWORD": { "description": "Optional. Password for SanjivramOS (any user name). Setting it also turns on the Terminal app." }
+  },
+  "hostRequirements": { "cpus": 2 }
+}

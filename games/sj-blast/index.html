@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blast Arena</title>
+<style>
+html,body{margin:0;height:100%;background:#0f0a1e;color:#ede9fe;font:14px system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#wrap{position:absolute;inset:0;display:flex;flex-direction:column}
+#bar{display:flex;gap:10px;align-items:center;padding:6px 10px;background:#1a1233;border-bottom:1px solid #2e2252;flex-wrap:wrap}
+#bar .sp{flex:1}
+.pl{display:flex;align-items:center;gap:5px;font-weight:600}.pl i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.pl.dead{opacity:.35;text-decoration:line-through}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+canvas{display:block;max-width:100%;max-height:100%;touch-action:none;image-rendering:auto}
+button{border:none;background:#3b2a6b;color:#fff;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:hover{background:#4c3889}button.pri{background:#db2777}button.pri:hover{background:#ec4899}
+button.on{background:#db2777}
+.ov{position:absolute;inset:0;background:rgba(10,6,22,.85);display:flex;align-items:center;justify-content:center;overflow:auto}
+.ov[hidden]{display:none}
+.card{background:#1a1233;border:1px solid #3b2a6b;border-radius:14px;padding:16px 20px;max-width:520px;width:calc(100% - 32px);box-sizing:border-box}
+.card h1{margin:0 0 4px}.card p{opacity:.75;margin:0 0 10px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.row label{min-width:84px;opacity:.75}
+.hint{font-size:12px;opacity:.6;margin-top:8px}
+#msg{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font:800 38px system-ui;color:#fde68a;text-shadow:0 3px 0 #000;pointer-events:none;text-align:center}
+#pad{position:absolute;left:12px;bottom:12px;display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:4px}
+#pad[hidden],#bombBtn[hidden]{display:none}
+#pad button,#bombBtn{background:rgba(255,255,255,.13);border:2px solid rgba(255,255,255,.25);font-size:22px;padding:0;touch-action:none}
+#bombBtn{position:absolute;right:16px;bottom:24px;width:90px;height:90px;border-radius:50%;font-size:34px}
+</style></head><body>
+<div id="wrap">
+  <div id="bar"><b>💣 Blast Arena</b><span id="pls"></span><span class="sp"></span><span id="net"></span><button id="mute">🔊</button><button id="menuBtn">Menu</button></div>
+  <div id="stage"><canvas id="c"></canvas><div id="msg"></div>
+    <div id="pad" hidden><span></span><button data-d="up">▲</button><span></span><button data-d="left">◀</button><span></span><button data-d="right">▶</button><span></span><button data-d="down">▼</button><span></span></div>
+    <button id="bombBtn" hidden>💣</button>
+    <div class="ov" id="menu"><div class="card">
+      <h1>💣 Blast Arena</h1><p>Drop bombs, blast crates, grab power-ups and be the last one standing. First to <b id="toWinL">3</b> round wins takes the match.</p>
+      <div class="row"><label>Mode</label><button class="m on" data-m="cpu">vs CPU</button><button class="m" data-m="local">2 players</button><button class="m" data-m="online">🌐 Online</button></div>
+      <div class="row" id="botRow"><label>CPU rivals</label><button class="b" data-b="1">1</button><button class="b" data-b="2">2</button><button class="b on" data-b="3">3</button></div>
+      <div class="row" id="lvlRow"><label>CPU skill</label><button class="s" data-s="0">Easy</button><button class="s on" data-s="1">Normal</button><button class="s" data-s="2">Hard</button></div>
+      <div class="row"><label>Arena</label><button class="a on" data-a="0">Garden</button><button class="a" data-a="1">Factory</button><button class="a" data-a="2">Ice</button></div>
+      <div class="row"><label>Wins</label><button class="w" data-w="1">1</button><button class="w on" data-w="3">3</button><button class="w" data-w="5">5</button></div>
+      <div class="row"><button class="pri" id="go">Play ▶</button></div>
+      <div class="hint">P1: WASD / arrows + Space to bomb. 2-player: P2 uses arrows + Enter (P1 then WASD + Space). Online: 2–4 friends, empty seats filled by CPU. Touch: d-pad + 💣.</div>
+    </div></div>
+  </div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('blast', { vs: false, title: 'Blast Arena', trophies: [
+  { id: 'win', name: 'Last One Standing', desc: 'Win a round', icon: '💣' },
+  { id: 'match', name: 'Champion', desc: 'Win a match vs 3 CPUs', icon: '🏆' },
+  { id: 'hard', name: 'Bot Breaker', desc: 'Win a match against Hard CPUs', icon: '🤖' },
+  { id: 'double', name: 'Double Trouble', desc: 'Knock out 2 rivals with one bomb', icon: '✌️' },
+  { id: 'maxed', name: 'Fully Loaded', desc: 'Reach 6 bombs or range 6', icon: '🔥' },
+  { id: 'online', name: 'Net Bomber', desc: 'Win an online round', icon: '🌐' },
+] }) : null;
+const sfx = n => kit && kit.sfx(n);
+const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
+const GW = 15, GH = 13, T = 48;
+cv.width = GW * T; cv.height = GH * T;
+const COLS = ['#f472b6', '#38bdf8', '#a3e635', '#fbbf24'], NAMES = ['Pink', 'Blue', 'Lime', 'Gold'];
+const ARENAS = [
+  { floor: ['#4d7c0f', '#538a10'], wall: '#365314', wallTop: '#4d7c0f', crate: '#a16207', crateLine: '#713f12' },
+  { floor: ['#3f3f46', '#45454e'], wall: '#18181b', wallTop: '#52525b', crate: '#b45309', crateLine: '#78350f' },
+  { floor: ['#bae6fd', '#c7ecfd'], wall: '#0369a1', wallTop: '#38bdf8', crate: '#e0f2fe', crateLine: '#7dd3fc', ice: true },
+];
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+let opts = { m: 'cpu', b: 3, s: 1, a: 0, w: 3 };
+try { Object.assign(opts, JSON.parse(localStorage.getItem('blast.opts')) || {}); } catch {}
+
+/* ---------------- simulation (host / offline) ---------------- */
+let S = null; // { grid, players, bombs, flames, items, t, round, wins, phase, phaseT, arena, toWin }
+let rnd = Math.random;
+function newMatch(nPlayers, humans, arena, toWin) {
+  S = { arena, toWin, wins: Array(nPlayers).fill(0), round: 0, humans, n: nPlayers, names: humans.map((h, i) => h ? h.name : 'CPU ' + NAMES[i]) };
+  newRound();
+}
+function newRound() {
+  const grid = [];
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    let c = 0;
+    if (x === 0 || y === 0 || x === GW - 1 || y === GH - 1 || (x % 2 === 0 && y % 2 === 0)) c = 1;
+    else if (rnd() < .72) c = 2;
+    grid.push(c);
+  }
+  const starts = [[1, 1], [GW - 2, GH - 2], [GW - 2, 1], [1, GH - 2]];
+  for (const [sx, sy] of starts) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) {
+    const x = sx + dx, y = sy + dy; if (x > 0 && y > 0 && x < GW - 1 && y < GH - 1 && grid[y * GW + x] === 2) grid[y * GW + x] = 0;
+  }
+  // hidden items under crates
+  const items = {};
+  grid.forEach((c, i) => { if (c === 2 && rnd() < .3) items[i] = ['b', 'r', 's', 'b', 'r', 'k'][Math.floor(rnd() * 6)]; });
+  S.grid = grid; S.hidden = items; S.items = {};
+  S.players = Array.from({ length: S.n }, (_, i) => ({ id: i, x: starts[i][0], y: starts[i][1], tx: starts[i][0], ty: starts[i][1], p: 1, alive: true, bombs: 1, range: 2, speed: 4, kick: false, dir: 'down', want: null, bomb: false, out: 0 }));
+  S.bombs = []; S.flames = []; S.t = 0; S.round++; S.phase = 'ready'; S.phaseT = 2; S.sudden = 0; S.kills = [];
+  S.timeLeft = 120;
+}
+const at = (x, y) => S.grid[y * GW + x];
+const bombAt = (x, y) => S.bombs.find(b => b.x === x && b.y === y);
+function walkable(x, y, pl) {
+  if (x < 0 || y < 0 || x >= GW || y >= GH) return false;
+  if (at(x, y) !== 0) return false;
+  const b = bombAt(x, y); if (b && !(pl && b.x === pl.x && b.y === pl.y)) return false;
+  return true;
+}
+function stepSim(dt, inputs) {
+  if (S.phase === 'ready') { S.phaseT -= dt; if (S.phaseT <= 0) S.phase = 'play'; return; }
+  if (S.phase === 'over') { S.phaseT -= dt; if (S.phaseT <= 0) { if (S.wins.some(w => w >= S.toWin)) S.phase = 'done'; else newRound(); } return; }
+  if (S.phase !== 'play') return;
+  S.t += dt; S.timeLeft = Math.max(0, S.timeLeft - dt);
+  if (S.timeLeft <= 0) suddenDeath(dt);
+  for (const pl of S.players) {
+    if (!pl.alive) continue;
+    const inp = inputs[pl.id] || {};
+    if (inp.bomb) placeBomb(pl);
+    // movement: tile to tile
+    if (pl.p >= 1) {
+      pl.x = pl.tx; pl.y = pl.ty;
+      const d = inp.dir;
+      if (d) {
+        pl.dir = d; const [dx, dy] = DIRS[d], nx = pl.x + dx, ny = pl.y + dy;
+        if (walkable(nx, ny)) { pl.tx = nx; pl.ty = ny; pl.p = 0; pl.fx = pl.x; pl.fy = pl.y; }
+        else { const b = bombAt(nx, ny); if (b && pl.kick && !b.slide) { b.slide = d; } }
+      }
+      // items
+      const k = pl.y * GW + pl.x, it = S.items[k];
+      if (it) {
+        delete S.items[k]; S.ev = (S.ev || []).concat({ t: 'item', p: pl.id });
+        if (it === 'b') pl.bombs = Math.min(8, pl.bombs + 1);
+        if (it === 'r') pl.range = Math.min(8, pl.range + 1);
+        if (it === 's') pl.speed = Math.min(8, pl.speed + .8);
+        if (it === 'k') pl.kick = true;
+      }
+    }
+    if (pl.p < 1) {
+      pl.p = Math.min(1, pl.p + pl.speed * dt);
+      if (pl.p >= 1) { pl.x = pl.tx; pl.y = pl.ty; }
+    }
+  }
+  // bombs
+  for (const b of S.bombs) {
+    b.t -= dt;
+    if (b.slide) {
+      b.sp = (b.sp || 0) + dt * 8;
+      while (b.sp >= 1) {
+        b.sp -= 1; const [dx, dy] = DIRS[b.slide], nx = b.x + dx, ny = b.y + dy;
+        if (at(nx, ny) === 0 && !bombAt(nx, ny) && !S.players.some(p => p.alive && ((p.x === nx && p.y === ny) || (p.tx === nx && p.ty === ny)))) { b.x = nx; b.y = ny; }
+        else { b.slide = null; break; }
+      }
+    }
+  }
+  let guard = 0;
+  while (S.bombs.some(b => b.t <= 0) && guard++ < 50) explode(S.bombs.find(b => b.t <= 0));
+  for (const f of S.flames) f.t -= dt;
+  S.flames = S.flames.filter(f => f.t > 0);
+  // deaths
+  for (const pl of S.players) {
+    if (!pl.alive) continue;
+    const cx = pl.p > .5 ? pl.tx : pl.x, cy = pl.p > .5 ? pl.ty : pl.y;
+    const f = S.flames.find(f => f.x === cx && f.y === cy);
+    if (f || at(cx, cy) === 1) { pl.alive = false; pl.out = S.t; S.ev = (S.ev || []).concat({ t: 'die', p: pl.id, by: f ? f.o : -1 }); if (f) S.kills.push({ by: f.o, b: f.b, v: pl.id }); }
+  }
+  const alive = S.players.filter(p => p.alive);
+  if (alive.length <= 1) {
+    S.phase = 'over'; S.phaseT = 3; S.winner = alive.length ? alive[0].id : -1;
+    if (alive.length) S.wins[alive[0].id]++;
+    S.ev = (S.ev || []).concat({ t: 'round', w: S.winner });
+  }
+}
+function placeBomb(pl) {
+  const x = pl.p > .5 ? pl.tx : pl.x, y = pl.p > .5 ? pl.ty : pl.y;
+  if (bombAt(x, y) || S.bombs.filter(b => b.o === pl.id).length >= pl.bombs || at(x, y) !== 0) return;
+  S.bombs.push({ x, y, t: 2.4, o: pl.id, r: pl.range, id: Math.random() });
+  S.ev = (S.ev || []).concat({ t: 'place' });
+}
+function blastCells(x, y, r) {
+  const cells = [[x, y]];
+  for (const [dx, dy] of Object.values(DIRS)) for (let i = 1; i <= r; i++) {
+    const cx = x + dx * i, cy = y + dy * i, c = at(cx, cy);
+    if (c === 1) break;
+    cells.push([cx, cy]);
+    if (c === 2) break;
+  }
+  return cells;
+}
+function explode(b) {
+  S.bombs = S.bombs.filter(o => o !== b);
+  for (const [cx, cy] of blastCells(b.x, b.y, b.r)) {
+    const k = cy * GW + cx;
+    if (S.grid[k] === 2) { S.grid[k] = 0; if (S.hidden[k]) { S.items[k] = S.hidden[k]; delete S.hidden[k]; } }
+    else if (S.items[k]) delete S.items[k];
+    S.flames.push({ x: cx, y: cy, t: .55, o: b.o, b: b.id });
+    const other = bombAt(cx, cy); if (other) other.t = Math.min(other.t, .05);
+  }
+  S.ev = (S.ev || []).concat({ t: 'boom' });
+}
+function suddenDeath(dt) {
+  S.sudden += dt;
+  if (S.sudden < .35) return; S.sudden = 0;
+  // spiral of falling walls
+  const ring = S.ring || (S.ring = spiral());
+  const c = ring.shift(); if (!c) return;
+  S.grid[c[1] * GW + c[0]] = 1; delete S.items[c[1] * GW + c[0]];
+  S.bombs = S.bombs.filter(b => !(b.x === c[0] && b.y === c[1]));
+}
+function spiral() {
+  const out = []; let x0 = 1, y0 = 1, x1 = GW - 2, y1 = GH - 2;
+  while (x0 <= x1 && y0 <= y1) {
+    for (let x = x0; x <= x1; x++) out.push([x, y0]); y0++;
+    for (let y = y0; y <= y1; y++) out.push([x1, y]); x1--;
+    for (let x = x1; x >= x0; x--) out.push([x, y1]); y1--;
+    for (let y = y1; y >= y0; y--) out.push([x0, y]); x0++;
+  }
+  return out.filter(([x, y]) => !(x % 2 === 0 && y % 2 === 0));
+}
+
+/* ---------------- CPU ---------------- */
+function dangerMap(extra) {
+  const d = new Float32Array(GW * GH).fill(99);
+  const bombs = (extra ? S.bombs.concat(extra) : S.bombs).map(b => ({ x: b.x, y: b.y, r: b.r, t: b.t }));
+  for (let pass = 0; pass < 4; pass++) for (const b of bombs) for (const [x, y] of blastCells(b.x, b.y, b.r)) { const o = bombs.find(q => q !== b && q.x === x && q.y === y); if (o && o.t > b.t) o.t = b.t; }
+  for (const b of bombs) for (const [x, y] of blastCells(b.x, b.y, b.r)) d[y * GW + x] = Math.min(d[y * GW + x], b.t);
+  for (const f of S.flames) d[f.y * GW + f.x] = 0;
+  return d;
+}
+function bfs(pl, goal, danger, maxD = 30, strict = false) {
+  const sx = pl.p >= 1 ? pl.x : pl.tx, sy = pl.p >= 1 ? pl.y : pl.ty;
+  const prev = new Map(), q = [[sx, sy, 0]]; prev.set(sy * GW + sx, null);
+  while (q.length) {
+    const [x, y, dist] = q.shift();
+    if (goal(x, y, dist)) { // walk back for first step
+      let k = y * GW + x, first = null;
+      while (prev.get(k) != null) { first = k; k = prev.get(k); }
+      if (first == null) return { dir: null, dist };
+      const fx = first % GW, fy = Math.floor(first / GW);
+      return { dir: Object.keys(DIRS).find(d => DIRS[d][0] === fx - sx && DIRS[d][1] === fy - sy), dist, x, y };
+    }
+    if (dist >= maxD) continue;
+    for (const [dx, dy] of Object.values(DIRS)) {
+      const nx = x + dx, ny = y + dy, k = ny * GW + nx;
+      if (prev.has(k) || !walkable(nx, ny, pl)) continue;
+      const arrive = (dist + 1) / pl.speed;
+      if (danger && danger[k] < 99 && danger[k] - arrive < .5 && danger[k] - arrive > -0.7) continue;
+      if (danger && danger[k] === 0) continue;
+      if (strict && danger[k] < 99) continue;
+      prev.set(k, y * GW + x); q.push([nx, ny, dist + 1]);
+    }
+  }
+  return null;
+}
+function cpuInput(pl) {
+  const skill = S.skill ?? 1, inp = { dir: null, bomb: false };
+  if (!pl.alive || pl.p < 1) return { dir: pl.lastIn ? pl.lastIn.dir : null, bomb: false };
+  const dm = dangerMap(), here = pl.y * GW + pl.x;
+  if (dm[here] < 99) {
+    const r = bfs(pl, (x, y) => dm[y * GW + x] >= 99, dm);
+    inp.dir = r ? r.dir : null; pl.lastIn = inp; return inp;
+  }
+  if (Math.random() < [0.35, .12, 0][skill]) { pl.lastIn = inp; return inp; }
+  // bomb if useful and escapable
+  const near = (x, y) => Object.values(DIRS).some(([dx, dy]) => at(x + dx, y + dy) === 2);
+  const enemyInBlast = blastCells(pl.x, pl.y, pl.range).some(([x, y]) => S.players.some(o => o !== pl && o.alive && o.x === x && o.y === y));
+  const mine = S.bombs.filter(b => b.o === pl.id).length;
+  if ((near(pl.x, pl.y) || enemyInBlast) && mine < pl.bombs) {
+    const fake = { x: pl.x, y: pl.y, t: 2.4, r: pl.range };
+    const dm2 = dangerMap([fake]);
+    const esc = bfs(pl, (x, y) => dm2[y * GW + x] >= 99, dm2, 8);
+    if (esc && esc.dist <= 5) { inp.bomb = true; inp.dir = esc.dir; pl.lastIn = inp; return inp; }
+  }
+  // go for items, then enemies (hard), then crates
+  let r = bfs(pl, (x, y) => !!S.items[y * GW + x], dm, 10, true);
+  if (!r && skill >= 1) { const foe = S.players.find(o => o !== pl && o.alive); if (foe && skill === 2) r = bfs(pl, (x, y) => blastCells(x, y, pl.range).some(([a, b]) => a === foe.x && b === foe.y), dm, 20, true); }
+  if (!r) r = bfs(pl, (x, y, d) => d > 0 && near(x, y), dm, 30, true);
+  if (!r) { const foe = S.players.find(o => o !== pl && o.alive); if (foe) r = bfs(pl, (x, y) => Math.abs(x - foe.x) + Math.abs(y - foe.y) <= 2, dm, 40, true); }
+  if (r && r.dir) { const [dx, dy] = DIRS[r.dir], k = (pl.y + dy) * GW + pl.x + dx; if (dm[k] < 99) r = null; }
+  inp.dir = r ? r.dir : null;
+  pl.lastIn = inp;
+  return inp;
+}
+
+/* ---------------- input ---------------- */
+const keys = {}, touch = { dir: null, bomb: false };
+let bombPress = [false, false];
+addEventListener('keydown', e => {
+  if (e.repeat) { if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); return; }
+  keys[e.code] = performance.now();
+  if (e.code === 'Space') bombPress[0] = true;
+  if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'ShiftRight') bombPress[mode === 'local' ? 1 : 0] = true;
+  if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup', e => { delete keys[e.code]; });
+addEventListener('blur', () => { for (const k in keys) delete keys[k]; });
+function dirFrom(codes) {
+  let best = null, bt = -1;
+  for (const [d, c] of codes) if (keys[c] && keys[c] > bt) { bt = keys[c]; best = d; }
+  return best;
+}
+const P1KEYS = [['up', 'KeyW'], ['down', 'KeyS'], ['left', 'KeyA'], ['right', 'KeyD'], ['up', 'ArrowUp'], ['down', 'ArrowDown'], ['left', 'ArrowLeft'], ['right', 'ArrowRight']];
+const P1ONLY = P1KEYS.slice(0, 4), P2KEYS = P1KEYS.slice(4);
+function localInput(slot) {
+  const codes = mode === 'local' ? (slot === 0 ? P1ONLY : P2KEYS) : P1KEYS;
+  const inp = { dir: dirFrom(codes) || (slot === 0 ? touch.dir : null), bomb: bombPress[slot] || (slot === 0 && touch.bomb) };
+  bombPress[slot] = false; if (slot === 0) touch.bomb = false;
+  return inp;
+}
+document.querySelectorAll('#pad [data-d]').forEach(b => {
+  b.addEventListener('pointerdown', e => { e.preventDefault(); touch.dir = b.dataset.d; });
+  const off = e => { e.preventDefault(); if (touch.dir === b.dataset.d) touch.dir = null; };
+  b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+});
+$('bombBtn').addEventListener('pointerdown', e => { e.preventDefault(); touch.bomb = true; });
+if (matchMedia('(pointer:coarse)').matches) { $('pad').hidden = false; $('bombBtn').hidden = false; }
+
+/* ---------------- online ---------------- */
+let net = null, mode = 'cpu', mySlot = 0, netInputs = {}, snapT = 0, lastSent = '', slotOf = {};
+async function goOnline() {
+  if (!window.SJNet) { $('msg').textContent = 'Online needs SanjivramOS'; return; }
+  try { net = await SJNet.lobby({ game: 'blast', gameName: 'Blast Arena', max: 4, min: 2, maps: ['Garden', 'Factory', 'Ice'], modes: ['First to 3', 'First to 1', 'First to 5'] }); }
+  catch { setMode('cpu'); return; }
+  mode = 'online';
+  const players = net.players();
+  players.forEach((m, i) => { slotOf[m.id] = i; });
+  mySlot = slotOf[net.me.id] ?? 0;
+  const arena = Math.max(0, ['Garden', 'Factory', 'Ice'].indexOf(net.room.map));
+  const toWin = +((net.room.mode || '').match(/\d/) || [3])[0];
+  rnd = Math.random;
+  if (net.isHost) {
+    const n = Math.max(2, Math.min(4, players.length + (players.length < 2 ? 1 : 0)));
+    const humans = Array.from({ length: Math.max(n, 2) }, (_, i) => players[i] ? { name: players[i].display, uid: players[i].id } : null);
+    S = null; newMatch(humans.length, humans, arena, toWin); S.skill = 1;
+  }
+  net.on('m', (d, from) => {
+    if (net.isHost && d.in) { const s = slotOf[from]; if (s != null) { const prev = netInputs[s] || {}; netInputs[s] = { dir: d.in.dir, bomb: prev.bomb || d.in.bomb }; } }
+    if (!net.isHost && d.s) { S = d.s; for (const e of d.s.ev || []) evFx(e); }
+    if (net.isHost && d.hi) sendSnap();
+  });
+  net.on('host', () => { if (net.isHost && S) { $('net').textContent = 'You are now the host'; } });
+  net.on('peer-left', d => { if (net.isHost && S) { const s = slotOf[d && d.id]; if (s != null && S.humans[s]) { S.humans[s] = null; S.names[s] += ' (left)'; } } });
+  hideMenu();
+  if (!net.isHost) net.send({ hi: 1 });
+}
+function sendSnap() {
+  if (!net || !net.isHost || !S) return;
+  const snap = { ...S, hidden: undefined, ring: undefined, ev: S.ev };
+  net.send({ s: snap });
+  S.ev = [];
+}
+
+/* ---------------- loop ---------------- */
+let last = performance.now(), msgT = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (S && !menuOpen) {
+    if (mode !== 'online' || net.isHost) {
+      const inputs = {};
+      for (const pl of S.players) {
+        if (mode === 'online') inputs[pl.id] = pl.id === mySlot ? localInput(0) : S.humans[pl.id] ? { ...(netInputs[pl.id] || {}) } : cpuInput(pl);
+        else if (mode === 'local') inputs[pl.id] = pl.id < 2 ? localInput(pl.id) : cpuInput(pl);
+        else inputs[pl.id] = pl.id === 0 && !S.allCpu ? localInput(0) : cpuInput(pl);
+      }
+      for (const k in netInputs) if (netInputs[k]) netInputs[k].bomb = false;
+      const evBefore = (S.ev || []).length;
+      stepSim(dt, inputs);
+      for (const e of (S.ev || []).slice(evBefore)) evFx(e);
+      if (mode === 'online') { snapT -= dt; if (snapT <= 0) { snapT = 1 / 15; sendSnap(); } }
+      else S.ev = [];
+      if (S.phase === 'done' && !S.doneShown) { S.doneShown = true; matchOver(); }
+    } else {
+      const inp = localInput(0), key = JSON.stringify(inp);
+      if (key !== lastSent || inp.bomb || (now - (frame.ka || 0)) > 500) { net.send({ in: inp }); lastSent = key; frame.ka = now; }
+      if (S.phase === 'done' && !S.doneShown) { S.doneShown = true; matchOver(); }
+    }
+    draw();
+  }
+  requestAnimationFrame(frame);
+}
+function evFx(e) {
+  if (e.t === 'boom') sfx('boom');
+  else if (e.t === 'place') sfx('pop');
+  else if (e.t === 'item') sfx('coin');
+  else if (e.t === 'die') sfx('hurt');
+  else if (e.t === 'round') {
+    const me = mode === 'online' ? mySlot : 0;
+    if (e.w === me) { sfx('win'); kit && kit.unlock('win'); if (mode === 'online') kit && kit.unlock('online'); } else sfx('lose');
+    if (S.kills) { const byBomb = {}; for (const k of S.kills) if (k.by === me && k.v !== me) byBomb[k.b] = (byBomb[k.b] || 0) + 1; if (Object.values(byBomb).some(n => n >= 2)) kit && kit.unlock('double'); }
+  }
+}
+function matchOver() {
+  const best = Math.max(...S.wins), w = S.wins.indexOf(best), me = mode === 'online' ? mySlot : 0;
+  if (w === me && mode === 'cpu') { if (S.n >= 4) kit && kit.unlock('match'); if (S.skill === 2) kit && kit.unlock('hard'); kit && kit.score(S.wins[me] * 100 + S.n * 10, 'match'); }
+  if (mode === 'online') { // rematch automatically with the same seats
+    setTimeout(() => { if (net && net.isHost && S && S.phase === 'done') { const o = S; newMatch(o.n, o.humans, o.arena, o.toWin); S.skill = 1; S.names = o.names; } }, 6000);
+    return;
+  }
+  setTimeout(showMenu, 3500);
+}
+
+/* ---------------- draw ---------------- */
+const ITEM_ICON = { b: '💣', r: '🔥', s: '👟', k: '🦶' };
+function draw() {
+  const A = ARENAS[S.arena] || ARENAS[0];
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = S.grid[y * GW + x], px = x * T, py = y * T;
+    g.fillStyle = A.floor[(x + y) % 2]; g.fillRect(px, py, T, T);
+    if (c === 1) { g.fillStyle = A.wall; g.fillRect(px, py, T, T); g.fillStyle = A.wallTop; g.fillRect(px + 3, py + 3, T - 6, T - 12); }
+    else if (c === 2) { g.fillStyle = A.crate; g.fillRect(px + 3, py + 3, T - 6, T - 6); g.strokeStyle = A.crateLine; g.lineWidth = 3; g.strokeRect(px + 6, py + 6, T - 12, T - 12); g.beginPath(); g.moveTo(px + 6, py + 6); g.lineTo(px + T - 6, py + T - 6); g.stroke(); }
+  }
+  for (const k in S.items) { const x = k % GW, y = Math.floor(k / GW); g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.arc(x * T + T / 2, y * T + T / 2, T * .38, 0, 7); g.fill(); g.font = `${T * .5}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ITEM_ICON[S.items[k]], x * T + T / 2, y * T + T / 2 + 2); }
+  const now = performance.now() / 1000;
+  for (const b of S.bombs) {
+    const pulse = 1 + Math.sin(now * (b.t < .8 ? 22 : 9)) * .07, cx = b.x * T + T / 2, cy = b.y * T + T / 2 + 2;
+    g.fillStyle = '#111827'; g.beginPath(); g.arc(cx, cy, T * .36 * pulse, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(cx - 6, cy - 6, 5, 0, 7); g.fill();
+    g.strokeStyle = '#a16207'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx + 8, cy - 12); g.quadraticCurveTo(cx + 14, cy - 22, cx + 6, cy - 24); g.stroke();
+    g.fillStyle = Math.floor(now * 12) % 2 ? '#fde047' : '#f97316'; g.beginPath(); g.arc(cx + 6, cy - 24, 4, 0, 7); g.fill();
+  }
+  for (const f of S.flames) {
+    const a = Math.min(1, f.t / .3);
+    g.fillStyle = `rgba(249,115,22,${a})`; g.fillRect(f.x * T + 2, f.y * T + 2, T - 4, T - 4);
+    g.fillStyle = `rgba(254,240,138,${a})`; g.fillRect(f.x * T + 12, f.y * T + 12, T - 24, T - 24);
+  }
+  for (const pl of S.players) {
+    if (!pl.alive) continue;
+    const p = Math.min(1, pl.p), fx = pl.p < 1 ? pl.fx ?? pl.x : pl.x, fy = pl.p < 1 ? pl.fy ?? pl.y : pl.y;
+    const x = (fx + (pl.tx - fx) * p) * T + T / 2, y = (fy + (pl.ty - fy) * p) * T + T / 2, bob = pl.p < 1 ? Math.sin(p * Math.PI) * 4 : 0;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y + T * .34, T * .3, T * .1, 0, 0, 7); g.fill();
+    g.fillStyle = COLS[pl.id]; g.beginPath(); g.arc(x, y - bob, T * .34, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 2; g.stroke();
+    const [dx, dy] = DIRS[pl.dir] || [0, 1];
+    g.fillStyle = '#fff'; for (const s of [-1, 1]) { g.beginPath(); g.arc(x + dx * 6 + s * (dy ? 6 : 3), y - bob - 4 + dy * 3 + (dx ? s * 4 : 0), 5, 0, 7); g.fill(); }
+    g.fillStyle = '#111'; for (const s of [-1, 1]) { g.beginPath(); g.arc(x + dx * 8 + s * (dy ? 6 : 3), y - bob - 4 + dy * 4 + (dx ? s * 4 : 0), 2.4, 0, 7); g.fill(); }
+    if (mode === 'online' && pl.id === mySlot || mode !== 'online' && pl.id === 0) { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x, y - T * .55 - bob); g.lineTo(x - 6, y - T * .7 - bob); g.lineTo(x + 6, y - T * .7 - bob); g.fill(); }
+  }
+  // HUD
+  $('pls').innerHTML = S.players.map(pl => `<span class="pl${pl.alive ? '' : ' dead'}"><i style="background:${COLS[pl.id]}"></i>${esc(S.names[pl.id])} ${'★'.repeat(S.wins[pl.id])}</span>`).join(' ');
+  const tl = Math.ceil(S.timeLeft);
+  let m = '';
+  if (S.phase === 'ready') m = `Round ${S.round}<br><small style="font-size:20px">Get ready…</small>`;
+  else if (S.phase === 'over') m = S.winner >= 0 ? `${esc(S.names[S.winner])} wins the round!` : 'Draw!';
+  else if (S.phase === 'done') { const w = S.wins.indexOf(Math.max(...S.wins)); m = `🏆 ${esc(S.names[w])} wins the match!` + (mode === 'online' ? '<br><small style="font-size:18px">Rematch starting soon…</small>' : ''); }
+  else if (tl <= 0) m = '<small style="font-size:22px;color:#f87171">SUDDEN DEATH</small>';
+  $('msg').innerHTML = m;
+  $('net').textContent = mode === 'online' ? `Room ${net.room ? net.room.code : ''} · ${net.ping || '–'} ms${net.isHost ? ' · host' : ''}` : (S.phase === 'play' ? `⏱ ${Math.floor(tl / 60)}:${String(tl % 60).padStart(2, '0')}` : '');
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------------- menu ---------------- */
+let menuOpen = true;
+function hideMenu() { menuOpen = false; $('menu').hidden = true; }
+function showMenu() { menuOpen = true; $('menu').hidden = false; renderOpts(); }
+function renderOpts() {
+  for (const [cls, key] of [['m', 'm'], ['b', 'b'], ['s', 's'], ['a', 'a'], ['w', 'w']]) document.querySelectorAll('.' + cls).forEach(b => b.classList.toggle('on', String(opts[key]) === b.dataset[key]));
+  $('botRow').style.display = opts.m === 'online' ? 'none' : '';
+  $('lvlRow').style.display = opts.m === 'online' ? 'none' : '';
+}
+$('menu').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const k of ['m', 'b', 's', 'a', 'w']) if (b.dataset[k] != null) opts[k] = isNaN(+b.dataset[k]) ? b.dataset[k] : +b.dataset[k];
+  try { localStorage.setItem('blast.opts', JSON.stringify(opts)); } catch {}
+  if (b.id === 'go') setMode(opts.m); else { renderOpts(); sfx('click'); }
+});
+function setMode(m) {
+  if (net && m !== 'online') { try { net.leave(); } catch {} net = null; }
+  mode = m;
+  if (m === 'online') { goOnline(); return; }
+  rnd = Math.random;
+  const n = m === 'local' ? Math.max(2, 1 + opts.b) : 1 + opts.b;
+  const humans = Array.from({ length: n }, (_, i) => (i === 0 || (m === 'local' && i === 1)) ? { name: m === 'local' ? 'P' + (i + 1) : 'You' } : null);
+  newMatch(n, humans, opts.a, opts.w); S.skill = opts.s;
+  hideMenu();
+}
+$('menuBtn').onclick = () => { if (net) { try { net.leave(); } catch {} net = null; mode = 'cpu'; } showMenu(); };
+$('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+if (kit && kit.muted) $('mute').textContent = '🔇';
+setInterval(() => { if (S && S.players) { const me = S.players[mode === 'online' ? mySlot : 0]; if (me && (me.bombs >= 6 || me.range >= 6)) kit && kit.unlock('maxed'); } }, 1000);
+renderOpts();
+const q = new URLSearchParams(location.search);
+if (q.get('join') || q.get('online')) { opts.m = 'online'; setMode('online'); }
+window.__blast = () => ({ S, mode, setMode, cpuInput, stepSim, newMatch, keys, touch, opts, get net() { return net; } });
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

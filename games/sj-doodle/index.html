@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Doodle Guess</title>
+<style>
+html,body{margin:0;height:100%;background:#fef3c7;color:#1c1917;font:15px system-ui,sans-serif;overflow:hidden}
+#app{position:absolute;inset:0;display:flex;flex-direction:column}
+#bar{display:flex;gap:10px;align-items:center;padding:6px 10px;background:#fde68a;border-bottom:2px solid #f59e0b;flex-wrap:wrap}
+#bar .sp{flex:1}#word{font:700 20px ui-monospace,monospace;letter-spacing:4px}
+#main{flex:1;min-height:0;display:flex;gap:8px;padding:8px}
+#left{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+#cwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+canvas{background:#fff;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.15);max-width:100%;max-height:100%;aspect-ratio:4/3;touch-action:none;cursor:crosshair}
+#tools{display:flex;gap:5px;flex-wrap:wrap;align-items:center;justify-content:center}
+#tools button.c{width:28px;height:28px;border-radius:50%;padding:0;border:3px solid #fff;box-shadow:0 0 0 1px #0003}
+#tools button.c.on{box-shadow:0 0 0 3px #1c1917}
+#side{width:270px;flex:none;display:flex;flex-direction:column;gap:6px}
+#players{background:#fff;border-radius:12px;padding:6px 8px;font-size:14px}
+#players div{display:flex;justify-content:space-between;padding:2px 0}#players .dr{font-weight:700}#players .ok{color:#16a34a}
+#chat{flex:1;min-height:0;overflow:auto;background:#fff;border-radius:12px;padding:6px 8px;font-size:14px;display:flex;flex-direction:column;gap:2px}
+#chat .good{color:#16a34a;font-weight:700}#chat .sys{color:#78716c;font-style:italic}#chat .close{color:#d97706}
+#guess{display:flex;gap:4px}#guess input{flex:1}
+button{border:none;background:#f59e0b;color:#1c1917;border-radius:8px;padding:7px 11px;font:inherit;font-weight:600;cursor:pointer}
+button:hover{background:#fbbf24}button.sec{background:#fff}button:disabled{opacity:.4}
+input{font:inherit;border:2px solid #f59e0b;border-radius:8px;padding:7px 9px;min-width:0}
+.ov{position:absolute;inset:0;background:rgba(120,53,15,.55);display:flex;align-items:center;justify-content:center}
+.ov[hidden]{display:none}
+.card{background:#fffbeb;border-radius:16px;padding:18px 22px;max-width:460px;width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.3);text-align:center}
+.card h1,.card h2{margin:0 0 6px}.card p{margin:0 0 12px;color:#57534e}
+.picks{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.picks button{font-size:18px;padding:10px 16px}
+@media (max-width:720px){#main{flex-direction:column}#side{width:auto;height:38%}#chat{min-height:60px}}
+</style></head><body>
+<div id="app">
+  <div id="bar"><b>✏️ Doodle Guess</b><span id="round"></span><span class="sp"></span><span id="word"></span><span class="sp"></span><span id="timer"></span><span id="net"></span><button class="sec" id="menuBtn">Menu</button></div>
+  <div id="main">
+    <div id="left"><div id="cwrap"><canvas id="c" width="800" height="600"></canvas></div>
+      <div id="tools"></div></div>
+    <div id="side"><div id="players"></div><div id="chat"></div><form id="guess"><input id="gIn" placeholder="Type your guess…" maxlength="40" autocomplete="off"><button>Send</button></form></div>
+  </div>
+  <div class="ov" id="menu"><div class="card">
+    <h1>✏️ Doodle Guess</h1><p>One player draws a secret word, everyone else races to guess it. Faster guesses score more!</p>
+    <div class="picks"><button id="online">🌐 Play online (2–8)</button><button class="sec" id="local">📱 Pass &amp; play on this device</button></div>
+    <p style="margin-top:12px;font-size:13px">Pass &amp; play: the drawer sees the word, everyone else guesses out loud, tap “Someone got it!” to score.</p>
+  </div></div>
+  <div class="ov" id="pick" hidden><div class="card"><h2>Pick a word to draw</h2><div class="picks" id="picks"></div><p id="pickT" style="margin-top:10px"></p></div></div>
+  <div class="ov" id="between" hidden><div class="card"><h2 id="bT"></h2><p id="bI"></p><div id="bBtns" class="picks"></div></div></div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('doodle', { vs: false, title: 'Doodle Guess', trophies: [
+  { id: 'guess', name: 'Mind Reader', desc: 'Guess a word online', icon: '💡' },
+  { id: 'first', name: 'Quick Draw', desc: 'Be the first to guess a word', icon: '⚡' },
+  { id: 'artist', name: 'Artist', desc: 'Everyone guessed your drawing', icon: '🎨' },
+  { id: 'champ', name: 'Doodle Champ', desc: 'Win an online game', icon: '🏆' },
+] }) : null;
+const sfx = n => kit && kit.sfx(n);
+const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
+const WORDS = ('apple banana cat dog house tree car boat rocket moon sun star cloud rain umbrella fish bird snake turtle frog ' +
+  'pizza cake cookie ice cream sandwich egg cheese carrot bread pumpkin hat shoe sock glasses crown ring key lock door window ' +
+  'chair table bed lamp clock phone computer guitar drum piano bicycle train plane bus robot ghost dragon unicorn castle bridge ' +
+  'mountain volcano island beach wave tent campfire snowman flower cactus mushroom leaf spider butterfly bee ladybug octopus whale ' +
+  'shark penguin owl elephant giraffe lion monkey rabbit mouse horse cow pig duck chicken bone heart rainbow lightning tornado ' +
+  'balloon kite gift candle book pencil scissors hammer ladder bucket anchor sword shield bow arrow treasure map compass ' +
+  'skateboard football basketball trophy medal camera television headphones toothbrush soap bathtub ladder fence windmill ' +
+  'lighthouse pyramid igloo rocketship astronaut alien planet comet dinosaur egg nest snail worm crab starfish jellyfish ' +
+  'cupcake donut popcorn hotdog burger taco watermelon cherry grapes lemon pineapple strawberry corn peas tomato potato').split(' ').map(w => w.replace(/_/g, ' ')).filter((w, i, a) => w && a.indexOf(w) === i);
+// fix the two-word items that got split
+const MULTI = ['ice cream']; const WL = WORDS.filter(w => !['ice', 'cream'].includes(w)).concat(MULTI);
+const COLORS = ['#1c1917', '#ef4444', '#f97316', '#facc15', '#22c55e', '#0ea5e9', '#6366f1', '#a855f7', '#ec4899', '#92400e', '#9ca3af', '#ffffff'];
+const SIZES = [4, 10, 22];
+let color = COLORS[0], size = SIZES[0], strokes = [], cur = null, mode = null, net = null;
+// game state (host-owned online): { order:[ids], drawer, word, mask, phase:'pick'|'draw'|'between'|'over', t, round, rounds, scores:{id:n}, guessed:[ids] }
+let G = null, myId = null, myWord = null;
+
+/* ---------------- drawing ---------------- */
+function tools() {
+  $('tools').innerHTML = COLORS.map(c => `<button class="c${c === color ? ' on' : ''}" data-c="${c}" style="background:${c}" aria-label="colour ${c}"></button>`).join('') +
+    SIZES.map(s => `<button class="sec${s === size ? '' : ''}" data-s="${s}" style="${s === size ? 'outline:2px solid #1c1917' : ''}">${s === 4 ? '•' : s === 10 ? '●' : '⬤'}</button>`).join('') +
+    `<button class="sec" id="undoS">↶ Undo</button><button class="sec" id="clearS">🗑 Clear</button>`;
+}
+$('tools').onclick = e => {
+  const c = e.target.closest('[data-c]'), s = e.target.closest('[data-s]');
+  if (c) color = c.dataset.c; if (s) size = +s.dataset.s;
+  if (e.target.id === 'undoS' && canDraw()) { strokes.pop(); share({ undo: 1 }); redraw(); }
+  if (e.target.id === 'clearS' && canDraw()) { strokes = []; share({ clear: 1 }); redraw(); }
+  tools();
+};
+const canDraw = () => mode === 'local' ? G && G.phase === 'draw' : G && G.phase === 'draw' && G.drawer === myId;
+function pt(e) { const r = cv.getBoundingClientRect(); return [Math.round((e.clientX - r.left) / r.width * 800), Math.round((e.clientY - r.top) / r.height * 600)]; }
+cv.addEventListener('pointerdown', e => { if (!canDraw()) return; try { cv.setPointerCapture(e.pointerId); } catch {} cur = { c: color, s: size, p: [pt(e)] }; strokes.push(cur); redraw(); sentUpTo = 0; });
+cv.addEventListener('pointermove', e => { if (!cur) return; cur.p.push(pt(e)); drawStroke(cur, cur.p.length - 2); flushStroke(false); });
+addEventListener('pointerup', () => { if (cur) { flushStroke(true); cur = null; } });
+let sentUpTo = 0, lastFlush = 0;
+function flushStroke(end) {
+  if (mode !== 'online' || !cur) return;
+  const now = performance.now(); if (!end && now - lastFlush < 50) return; lastFlush = now;
+  const pts = cur.p.slice(sentUpTo); if (!pts.length) return;
+  share({ st: { c: cur.c, s: cur.s, p: pts, n: sentUpTo === 0 } }); sentUpTo = cur.p.length - 1; if (sentUpTo < 0) sentUpTo = 0;
+}
+function drawStroke(st, from = 0) {
+  g.strokeStyle = st.c; g.lineWidth = st.s; g.lineCap = g.lineJoin = 'round';
+  g.beginPath(); const p = st.p;
+  if (p.length === 1) { g.fillStyle = st.c; g.beginPath(); g.arc(p[0][0], p[0][1], st.s / 2, 0, 7); g.fill(); return; }
+  g.moveTo(p[Math.max(0, from)][0], p[Math.max(0, from)][1]); for (let i = Math.max(1, from + 1); i < p.length; i++) g.lineTo(p[i][0], p[i][1]); g.stroke();
+}
+function redraw() { g.fillStyle = '#fff'; g.fillRect(0, 0, 800, 600); for (const s of strokes) drawStroke(s); }
+// drawer → host → everyone (the host relays drawing to all guests)
+function share(d) { if (mode !== 'online') return; if (net.isHost) net.send({ dr: d, by: myId }); else net.send({ dr: d }); }
+function applyDraw(d) {
+  if (d.clear) strokes = [];
+  else if (d.undo) strokes.pop();
+  else if (d.st) { if (d.st.n || !strokes.length) strokes.push({ c: d.st.c, s: d.st.s, p: d.st.p }); else { const s = strokes[strokes.length - 1]; s.p.push(...d.st.p); } }
+  redraw();
+}
+
+/* ---------------- chat & guesses ---------------- */
+function chat(html, cls = '') { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; $('chat').appendChild(d); $('chat').scrollTop = 1e9; while ($('chat').children.length > 200) $('chat').firstChild.remove(); }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+$('guess').onsubmit = e => {
+  e.preventDefault(); const t = $('gIn').value.trim(); if (!t) return; $('gIn').value = '';
+  if (mode === 'online') { if (net.isHost) hostGuess(myId, t); else net.send({ gs: t }); }
+  else chat(esc(t));
+};
+const nameOf = id => { if (mode !== 'online') return id; const m = net.room && net.room.members.find(x => x.id === id); return m ? m.display : 'Someone'; };
+
+/* ---------------- online host logic ---------------- */
+const ROUND_T = 80, PICK_T = 12;
+function hostNewGame() {
+  const ids = net.players().map(m => m.id);
+  G = { order: ids, di: -1, drawer: null, word: null, mask: '', phase: 'between', t: 2, round: 1, rounds: Math.max(2, Math.min(3, Math.ceil(6 / ids.length) + 1)), scores: Object.fromEntries(ids.map(i => [i, 0])), guessed: [], choices: null };
+  pushState();
+}
+function hostNextTurn() {
+  G.di++;
+  if (G.di >= G.order.length) { G.di = 0; G.round++; }
+  if (G.round > G.rounds) { G.phase = 'over'; G.t = 0; pushState(); return; }
+  const present = new Set(net.players().map(m => m.id));
+  G.order = G.order.filter(id => present.has(id)); for (const id of present) if (!G.order.includes(id)) { G.order.push(id); G.scores[id] = G.scores[id] || 0; }
+  if (G.order.length < 2) { G.phase = 'over'; pushState(); return; }
+  if (G.di >= G.order.length) G.di = 0;
+  G.drawer = G.order[G.di]; G.word = null; G.guessed = []; G.phase = 'pick'; G.t = PICK_T;
+  G.choices = []; while (G.choices.length < 3) { const w = WL[Math.floor(Math.random() * WL.length)]; if (!G.choices.includes(w)) G.choices.push(w); }
+  strokes = []; redraw(); net.send({ dr: { clear: 1 } });
+  pushState();
+  sendPrivate(G.drawer, { choices: G.choices });
+}
+function sendPrivate(id, d) { if (id === myId) onPrivate(d); else net.send({ pv: d }, id); }
+function hostPick(id, w) {
+  if (G.phase !== 'pick' || id !== G.drawer || !G.choices.includes(w)) return;
+  G.word = w; G.mask = w.replace(/[a-z]/g, '_'); G.phase = 'draw'; G.t = ROUND_T; G.revealed = 0;
+  sendPrivate(G.drawer, { word: w });
+  pushState();
+}
+function hostGuess(id, text) {
+  if (G && G.phase === 'draw' && id !== G.drawer && !G.guessed.includes(id)) {
+    const a = norm(text), w = norm(G.word);
+    if (a === w) {
+      const pts = Math.max(20, Math.round(G.t / ROUND_T * 100)) + (G.guessed.length ? 0 : 20);
+      G.scores[id] += pts; G.scores[G.drawer] += 25; G.guessed.push(id);
+      broadcastChat({ good: `${nameOf(id)} guessed the word! +${pts}`, who: id, first: G.guessed.length === 1 });
+      if (G.guessed.length >= G.order.length - 1) endTurn(true);
+      else { G.t = Math.min(G.t, 25); pushState(); }
+      return;
+    }
+    if (w.length > 3 && lev(a, w) === 1) { sendPrivate(id, { close: text }); }
+  }
+  if (G && G.phase === 'draw' && (id === G.drawer || G.guessed.includes(id)) && norm(text).includes(norm(G.word))) return; // never leak the word
+  broadcastChat({ name: nameOf(id), text: text.slice(0, 80) });
+}
+function endTurn(all) {
+  G.phase = 'between'; G.t = 4; G.last = { word: G.word, drawer: G.drawer, all }; G.word = null;
+  pushState();
+}
+function broadcastChat(c) { net.send({ ch: c }); onChat(c); }
+function pushState() { const pub = { ...G, word: undefined, choices: undefined }; net.send({ g: pub }); onState(pub); }
+function hostTick(dt) {
+  if (!G) return;
+  G.t -= dt;
+  if (G.phase === 'draw') {
+    // reveal letters as time runs down
+    const want = G.t < ROUND_T * .5 ? (G.t < ROUND_T * .25 ? 2 : 1) : 0;
+    if (want > (G.revealed || 0) && G.word.replace(/ /g, '').length > 3) {
+      G.revealed = want; const idx = [...G.word].map((c, i) => c !== ' ' && G.mask[i] === '_' ? i : -1).filter(i => i >= 0); const i = idx[Math.floor(Math.random() * idx.length)];
+      if (i != null) { G.mask = G.mask.slice(0, i) + G.word[i] + G.mask.slice(i + 1); pushState(); }
+    }
+    if (G.t <= 0) endTurn(false);
+  } else if (G.phase === 'pick' && G.t <= 0) hostPick(G.drawer, G.choices[0]);
+  else if (G.phase === 'between' && G.t <= 0) hostNextTurn();
+}
+
+/* ---------------- client side (everyone, including host) ---------------- */
+let lastPhase = null;
+function onState(s) {
+  const was = lastPhase; lastPhase = s.phase;
+  if (!(net && net.isHost)) G = s; // the host keeps its own full state (with the secret word)
+  if (s.phase !== 'draw' && s.phase !== 'pick') myWord = null;
+  if (s.phase === 'pick' && s.drawer !== myId) { $('pick').hidden = true; }
+  if (s.phase !== 'pick') $('pick').hidden = true;
+  $('between').hidden = !(s.phase === 'between' && s.last) && s.phase !== 'over';
+  if (s.phase === 'between' && s.last) { $('bT').textContent = `The word was “${s.last.word}”`; $('bI').textContent = s.last.all ? 'Everyone got it!' : `${nameOf(s.last.drawer)} was drawing.`; $('bBtns').innerHTML = ''; if (was === 'draw') { sfx('coin'); if (s.last.all && s.last.drawer === myId) kit && kit.unlock('artist'); } }
+  if (s.phase === 'over') {
+    const rows = Object.entries(s.scores).sort((a, b) => b[1] - a[1]);
+    $('bT').textContent = `🏆 ${nameOf(rows[0][0])} wins!`; $('bI').innerHTML = rows.map(([id, v], i) => `${i + 1}. ${esc(nameOf(id))} — ${v}`).join('<br>');
+    $('bBtns').innerHTML = net && net.isHost ? '<button id="again">Play again</button>' : '<span>Waiting for the host…</span>';
+    if ($('again')) $('again').onclick = () => hostNewGame();
+    if (was !== 'over') { sfx(rows[0][0] === myId ? 'win' : 'lose'); if (rows[0][0] === myId) kit && kit.unlock('champ'); }
+  }
+  if (s.phase === 'draw' && was !== 'draw') { sfx('power'); chat(`${esc(nameOf(s.drawer))} is drawing now`, 'sys'); }
+  render();
+}
+function onPrivate(d) {
+  if (d.choices) { $('picks').innerHTML = d.choices.map(w => `<button data-w="${esc(w)}">${esc(w)}</button>`).join(''); $('pick').hidden = false; }
+  if (d.word) { myWord = d.word; $('pick').hidden = true; render(); }
+  if (d.close) chat(`“${esc(d.close)}” is very close!`, 'close');
+}
+$('picks').onclick = e => { const b = e.target.closest('[data-w]'); if (!b) return; if (net.isHost) hostPick(myId, b.dataset.w); else net.send({ pk: b.dataset.w }); $('pick').hidden = true; };
+function onChat(c) {
+  if (c.good) { chat(esc(c.good), 'good'); if (c.who === myId) { sfx('win'); kit && kit.unlock('guess'); if (c.first) kit && kit.unlock('first'); } else sfx('pop'); }
+  else chat(`<b>${esc(c.name)}:</b> ${esc(c.text)}`);
+}
+function render() {
+  if (!G) return;
+  const drawing = G.phase === 'draw' && G.drawer === myId;
+  $('word').textContent = mode === 'local' ? (G.word ? G.word.toUpperCase() : '') : G.phase === 'draw' ? (drawing ? (myWord || '').toUpperCase() : (G.mask || '').toUpperCase().split('').join(' ')) : '';
+  $('round').textContent = mode === 'online' ? `Round ${Math.min(G.round, G.rounds)}/${G.rounds}` : `Turn ${G.turn || 1}`;
+  $('timer').textContent = G.phase === 'draw' || G.phase === 'pick' ? `⏱ ${Math.max(0, Math.ceil(G.t))}` : '';
+  if (mode === 'online') {
+    const rows = Object.entries(G.scores).sort((a, b) => b[1] - a[1]);
+    $('players').innerHTML = rows.map(([id, v]) => `<div class="${+id === G.drawer || id === G.drawer ? 'dr' : ''} ${G.guessed && G.guessed.includes(+id) ? 'ok' : ''}"><span>${+id === G.drawer ? '✏️ ' : G.guessed && G.guessed.includes(+id) ? '✅ ' : ''}${esc(nameOf(+id))}${+id === myId ? ' (you)' : ''}</span><b>${v}</b></div>`).join('');
+    $('net').textContent = net.room ? `Room ${net.room.code}` : '';
+  }
+  $('gIn').disabled = mode === 'online' && (drawing || (G.guessed && G.guessed.includes(myId)));
+  $('gIn').placeholder = drawing ? 'You are drawing!' : G.guessed && G.guessed.includes(myId) ? 'You got it! Chat with others…' : 'Type your guess…';
+  cv.style.cursor = canDraw() ? 'crosshair' : 'default';
+}
+
+/* ---------------- online setup ---------------- */
+async function goOnline() {
+  if (!window.SJNet) { chat('Online needs SanjivramOS', 'sys'); return; }
+  try { net = await SJNet.lobby({ game: 'doodle', gameName: 'Doodle Guess', max: 8, min: 2 }); } catch { $('menu').hidden = false; return; }
+  mode = 'online'; myId = net.me.id; $('menu').hidden = true; $('guess').style.display = '';
+  net.on('m', (d, from) => {
+    if (net.isHost) {
+      if (d.gs) hostGuess(from, String(d.gs));
+      if (d.pk) hostPick(from, String(d.pk));
+      if (d.dr && G && G.phase === 'draw' && from === G.drawer) { applyDraw(d.dr); net.send({ dr: d.dr, by: from }); }
+      if (d.hi) { pushState(); net.send({ full: strokes }, from); }
+    } else {
+      if (d.g) onState(d.g);
+      if (d.ch) onChat(d.ch);
+      if (d.pv) onPrivate(d.pv);
+      if (d.dr && d.by !== myId) applyDraw(d.dr);
+      if (d.full) { strokes = d.full; redraw(); }
+    }
+  });
+  net.on('peer-left', () => { if (net.isHost && G && G.phase !== 'over' && !net.players().some(m => m.id === G.drawer)) endTurn(false); });
+  if (net.isHost) hostNewGame(); else net.send({ hi: 1 });
+  chat(`Joined room ${net.room.code}. ${net.isHost ? 'You are the host.' : ''}`, 'sys');
+}
+$('online').onclick = goOnline;
+
+/* ---------------- pass & play (offline) ---------------- */
+$('local').onclick = () => { mode = 'local'; G = { phase: 'between', turn: 0, score: 0 }; $('menu').hidden = true; $('guess').style.display = 'none'; localTurn(); };
+function localTurn() {
+  G.turn++; G.phase = 'reveal'; G.word = WL[Math.floor(Math.random() * WL.length)]; strokes = []; redraw();
+  $('players').innerHTML = `<div><span>Words guessed</span><b>${G.score}</b></div>`;
+  $('bT').textContent = `Turn ${G.turn}: drawer only!`; $('bI').textContent = 'Hand the device to the next drawer. Everyone else: no peeking!';
+  $('bBtns').innerHTML = '<button id="showW">Show me the word</button>'; $('between').hidden = false;
+  $('showW').onclick = () => {
+    $('bT').textContent = G.word.toUpperCase(); $('bI').textContent = 'Remember it, then start drawing. You have 80 seconds.';
+    $('bBtns').innerHTML = '<button id="startD">Start drawing</button><button class="sec" id="skipW">Different word</button>';
+    $('skipW').onclick = () => { G.word = WL[Math.floor(Math.random() * WL.length)]; $('bT').textContent = G.word.toUpperCase(); };
+    $('startD').onclick = () => { $('between').hidden = true; G.phase = 'draw'; G.t = 80; G.shownWord = G.word; render(); $('word').textContent = ''; chat('Drawing! Guess out loud.', 'sys'); localButtons(); };
+  };
+  render(); $('word').textContent = '';
+}
+function localButtons() { $('chat').innerHTML = ''; const b = document.createElement('div'); b.innerHTML = '<button id="gotIt">🎉 Someone got it!</button> <button class="sec" id="giveUp">Give up</button>'; $('chat').appendChild(b); $('gotIt').onclick = () => localEnd(true); $('giveUp').onclick = () => localEnd(false); }
+function localEnd(got) { if (G.phase !== 'draw') return; G.phase = 'between'; if (got) { G.score++; sfx('win'); } else sfx('lose'); $('bT').textContent = `It was “${G.word}”`; $('bI').textContent = got ? 'Nice!' : 'Better luck next time.'; $('bBtns').innerHTML = '<button id="nextT">Next turn</button>'; $('between').hidden = false; $('nextT').onclick = localTurn; }
+
+/* ---------------- loop ---------------- */
+let last = performance.now(), rt = 0;
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (mode === 'online' && net && net.isHost) hostTick(dt);
+  else if (G && (G.phase === 'draw' || G.phase === 'pick')) G.t -= dt;
+  if (mode === 'local' && G && G.phase === 'draw' && G.t <= 0) localEnd(false);
+  rt -= dt; if (rt <= 0) { rt = .25; render(); }
+  requestAnimationFrame(frame);
+}
+$('menuBtn').onclick = () => { if (net) { try { net.leave(); } catch {} net = null; } mode = null; G = null; $('menu').hidden = false; $('between').hidden = true; $('pick').hidden = true; };
+tools(); redraw();
+const q = new URLSearchParams(location.search); if (q.get('join') || q.get('online')) goOnline();
+window.__doodle = () => ({ get G() { return G; }, get net() { return net; }, get myWord() { return myWord; }, strokes: () => strokes, WL });
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

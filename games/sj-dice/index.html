@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dice Roller</title>
+<style>
+html,body{margin:0;min-height:100%;background:#2e1065;color:#f5f3ff;font:14px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px;box-sizing:border-box}
+#sides{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.side{background:#4c1d95;color:#ddd6fe;border:none;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+.side.on{background:#a78bfa;color:#2e1065;font-weight:700}
+#count{display:flex;align-items:center;gap:8px}
+#count button{width:36px;height:36px;border-radius:50%;border:none;background:#6d28d9;color:#fff;font-size:18px;cursor:pointer}
+#table{min-height:150px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;width:min(92vw,520px)}
+.die{width:86px;height:86px;border-radius:18px;background:#fff;color:#2e1065;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;box-shadow:0 8px 0 #7c3aed,0 12px 20px #0006;animation:roll .5s ease-out}
+.die.max{background:#fde68a}.die.min{background:#fca5a5}
+@keyframes roll{0%{transform:rotate(-360deg) scale(.4)}100%{transform:none}}
+#sum{font-size:28px;font-weight:700;min-height:36px}
+#big{padding:16px 36px;font-size:20px;font-weight:800;border:none;border-radius:14px;background:#facc15;color:#2e1065;cursor:pointer;box-shadow:0 6px 0 #ca8a04}
+#big:active{transform:translateY(3px);box-shadow:0 3px 0 #ca8a04}
+#hist{opacity:.8;font-size:13px;max-width:520px;text-align:center}
+</style></head><body>
+<div id="sides"></div>
+<div id="count"><button id="minus" aria-label="Fewer dice">−</button><span>Dice: <b id="n">2</b></span><button id="plus" aria-label="More dice">+</button></div>
+<div id="table"></div>
+<div id="sum"></div>
+<button id="big">Roll</button>
+<div id="hist"></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const SIDES = [4, 6, 8, 10, 12, 20, 100];
+  let side = 6, n = 2, hist = [];
+  try { const s = JSON.parse(localStorage.getItem('sj-dice') || 'null'); if (s) { side = s.side || 6; n = s.n || 2; hist = s.hist || []; } } catch {}
+  const save = () => { try { localStorage.setItem('sj-dice', JSON.stringify({ side, n, hist: hist.slice(0, 20) })); } catch {} };
+  SIDES.forEach(s => {
+    const b = document.createElement('button'); b.className = 'side'; b.textContent = 'd' + s; b.dataset.s = s;
+    $('sides').appendChild(b);
+  });
+  function paintSides() { [...$('sides').children].forEach(b => b.classList.toggle('on', +b.dataset.s === side)); $('n').textContent = n; }
+  function roll() {
+    const vals = Array.from({ length: n }, () => 1 + Math.random() * side | 0);
+    const sum = vals.reduce((a, b) => a + b, 0);
+    $('table').innerHTML = vals.map(v => `<div class="die${v === side && side > 1 ? ' max' : v === 1 ? ' min' : ''}">${v}</div>`).join('');
+    $('sum').textContent = n > 1 ? `Total ${sum}` : '';
+    hist.unshift(`${n}d${side}: ${vals.join(', ')}${n > 1 ? ' = ' + sum : ''}`);
+    $('hist').innerHTML = hist.slice(0, 8).map(h => `<div>${h}</div>`).join('');
+    save();
+  }
+  $('sides').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; side = +b.dataset.s; paintSides(); save(); });
+  $('minus').addEventListener('click', () => { n = Math.max(1, n - 1); paintSides(); save(); });
+  $('plus').addEventListener('click', () => { n = Math.min(12, n + 1); paintSides(); save(); });
+  $('big').addEventListener('click', roll);
+  addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); roll(); } });
+  paintSides();
+  $('hist').innerHTML = hist.slice(0, 8).map(h => `<div>${h}</div>`).join('');
+})();
+</script>
+</body></html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tower Stack</title>
+<style>
+html,body{margin:0;height:100%;background:#0f172a;color:#fff;font:14px system-ui,sans-serif;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+canvas{display:block;touch-action:manipulation;cursor:pointer}
+</style></head><body>
+<canvas id="cv" width="400" height="640" aria-label="Tower Stack"></canvas>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("stack", { vs: {}, title: "Tower Stack", lower: false, trophies: [{"id": "h25", "name": "Skyscraper", "desc": "Stack 25 blocks", "icon": "🏢"}, {"id": "h50", "name": "Cloud Scraper", "desc": "Stack 50 blocks", "icon": "☁️"}] });</script>
+<script>
+(() => {
+  const VW = 400, VH = 640, BH = 26, BASE_W = 220;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  let stack, mover, falling, camY, state = 'title', perfect, best = 0, flash = 0, popups = [];
+  try { best = +localStorage.getItem('sj-stack-best') || 0; } catch {}
+  const hue = i => (200 + i * 9) % 360;
+  function reset() {
+    stack = [{ x: (VW - BASE_W) / 2, w: BASE_W }]; falling = []; camY = 0; perfect = 0; popups = [];
+    spawn();
+  }
+  function spawn() {
+    const top = stack[stack.length - 1], lvl = stack.length;
+    const fromLeft = lvl % 2 === 0;
+    mover = { x: fromLeft ? -top.w : VW, w: top.w, dir: fromLeft ? 1 : -1, speed: Math.min(420, 150 + lvl * 7) };
+  }
+  function drop() {
+    if (state !== 'play') { if (state === 'title' || state === 'over') { reset(); state = 'play'; } return; }
+    const top = stack[stack.length - 1];
+    const l = Math.max(mover.x, top.x), r = Math.min(mover.x + mover.w, top.x + top.w);
+    if (r - l <= 0) { // missed completely
+      falling.push({ x: mover.x, y: stack.length, w: mover.w, vy: 0, rot: 0, i: stack.length });
+      state = 'over';
+      const h = stack.length - 1; window.SJG && (SJG.score(h), h >= 25 && SJG.unlock('h25'), h >= 50 && SJG.unlock('h50')); if (h > best) { best = h; try { localStorage.setItem('sj-stack-best', String(best)); } catch {} }
+      return;
+    }
+    if (Math.abs(mover.x - top.x) < 5) { // perfect: snap and reward
+      perfect++; flash = 1;
+      let w = top.w; if (perfect >= 3) w = Math.min(BASE_W, w + 10);
+      stack.push({ x: top.x - (w - top.w) / 2, w });
+      popups.push({ text: perfect >= 3 ? 'PERFECT +' : 'PERFECT', y: stack.length, t: 1 });
+    } else {
+      perfect = 0;
+      stack.push({ x: l, w: r - l });
+      // The overhang falls off.
+      if (mover.x < l) falling.push({ x: mover.x, y: stack.length - 1, w: l - mover.x, vy: 0, rot: 0, i: stack.length - 1, side: -1 });
+      if (mover.x + mover.w > r) falling.push({ x: r, y: stack.length - 1, w: mover.x + mover.w - r, vy: 0, rot: 0, i: stack.length - 1, side: 1 });
+    }
+    spawn();
+  }
+  function update(dt) {
+    flash = Math.max(0, flash - dt * 3);
+    popups.forEach(p => p.t -= dt); popups = popups.filter(p => p.t > 0);
+    falling.forEach(f => { f.vy += 30 * dt; f.y -= f.vy * dt; f.rot += (f.side || 1) * dt * 1.5; });
+    falling = falling.filter(f => (f.y - camY) * BH > -VH);
+    if (state !== 'play' && state !== 'over') return;
+    const targetCam = Math.max(0, stack.length - 14);
+    camY += (targetCam - camY) * Math.min(1, dt * 4);
+    if (state === 'play') {
+      mover.x += mover.dir * mover.speed * dt;
+      const top = stack[stack.length - 1];
+      if (mover.x > VW - 10 && mover.dir > 0 && mover.x > top.x + top.w + 20) mover.dir = -1;
+      if (mover.x + mover.w < 10 && mover.dir < 0 && mover.x + mover.w < top.x - 20) mover.dir = 1;
+    }
+  }
+  const yOf = i => VH - 80 - (i - camY) * BH;
+  function block(x, i, w, h = BH) {
+    const y = yOf(i);
+    ctx.fillStyle = `hsl(${hue(i)} 70% 55%)`; ctx.fillRect(x, y - h, w, h);
+    ctx.fillStyle = `hsl(${hue(i)} 70% 68%)`; ctx.fillRect(x, y - h, w, 5);
+    ctx.fillStyle = `hsl(${hue(i)} 70% 42%)`; ctx.fillRect(x, y - 4, w, 4);
+  }
+  function draw() {
+    const top = stack ? stack.length : 0;
+    const g = ctx.createLinearGradient(0, 0, 0, VH);
+    g.addColorStop(0, `hsl(${hue(top) + 40} 50% ${Math.max(8, 30 - top * 0.3)}%)`); g.addColorStop(1, `hsl(${hue(top)} 45% 14%)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+    if (stack) {
+      stack.forEach((b, i) => { if (yOf(i) < VH + BH) block(b.x, i, b.w); });
+      if (state === 'play') block(mover.x, stack.length, mover.w);
+      falling.forEach(f => { ctx.save(); const y = yOf(f.y) - BH / 2; ctx.translate(f.x + f.w / 2, y); ctx.rotate(f.rot); ctx.fillStyle = `hsl(${hue(f.i)} 70% 55%)`; ctx.fillRect(-f.w / 2, -BH / 2, f.w, BH); ctx.restore(); });
+      if (flash) { const t = stack[stack.length - 1]; ctx.strokeStyle = `rgba(255,255,255,${flash})`; ctx.lineWidth = 3; ctx.strokeRect(t.x - 4, yOf(stack.length - 1) - BH - 4, t.w + 8, BH + 8); }
+      popups.forEach(p => { ctx.globalAlpha = p.t; ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText(p.text, VW / 2, yOf(p.y) - BH - 14 - (1 - p.t) * 20); ctx.globalAlpha = 1; });
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = 'bold 48px system-ui'; ctx.fillText(stack.length - 1, VW / 2, 80);
+      ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText(`Best ${best}`, VW / 2, 104);
+    }
+    if (state === 'title' || state === 'over') {
+      ctx.fillStyle = 'rgba(15,23,42,.55)'; ctx.fillRect(0, 0, VW, VH);
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = 'bold 38px system-ui';
+      ctx.fillText(state === 'title' ? 'TOWER STACK' : 'Tower fell!', VW / 2, VH / 2 - 20);
+      ctx.font = '15px system-ui';
+      ctx.fillText(state === 'title' ? 'Tap or press Space to drop each block' : `Height ${stack.length - 1} · best ${best}`, VW / 2, VH / 2 + 14);
+      ctx.fillText(state === 'title' ? 'Line them up exactly to grow the tower back' : 'Tap to build again', VW / 2, VH / 2 + 38);
+    }
+  }
+  addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') && !e.repeat) { e.preventDefault(); drop(); } });
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); drop(); });
+  function fit() { const s = Math.min(innerWidth / VW, innerHeight / VH); cv.style.width = Math.floor(VW * s) + 'px'; cv.style.height = Math.floor(VH * s) + 'px'; }
+  addEventListener('resize', fit); fit();
+  let last = performance.now();
+  function frame(t) { update(Math.min(0.05, (t - last) / 1000)); last = t; draw(); requestAnimationFrame(frame); }
+  reset(); requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

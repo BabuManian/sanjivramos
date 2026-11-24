@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Memory Match</title>
+<style>
+html,body{margin:0;min-height:100%;background:#1e1b4b;color:#eef2ff;font:14px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px;box-sizing:border-box}
+header{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center}
+button{background:#6366f1;color:#fff;border:none;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+#board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:min(92vw,420px)}
+.card{aspect-ratio:1;perspective:600px;cursor:pointer;border:none;padding:0;background:none}
+.in{position:relative;width:100%;height:100%;transition:transform .35s;transform-style:preserve-3d}
+.card.up .in,.card.done .in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;border-radius:10px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;font-size:clamp(20px,6vw,34px)}
+.back{background:linear-gradient(135deg,#4f46e5,#7c3aed);box-shadow:inset 0 0 0 3px rgba(255,255,255,.15)}
+.front{background:#fff;transform:rotateY(180deg)}
+.card.done .front{background:#bbf7d0}
+.card.bad .front{background:#fecaca}
+.card.up .front{background:#fff}
+p{margin:0;opacity:.8}
+#win{font-size:18px;min-height:24px}
+</style></head><body>
+<header>
+  <span>Moves <b id="mv">0</b></span><span>Time <b id="tm">0</b>s</span><span>Best <b id="bs">–</b></span>
+  <button id="new">New game</button>
+</header>
+<div id="board"></div>
+<p id="win">Find all the matching pairs.</p>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("memory", { vs: { mode: 'time' }, title: "Memory Match", lower: true, trophies: [{"id": "done", "name": "Good Memory", "desc": "Finish a game", "icon": "🧠"}] });</script>
+<script>
+(() => {
+  const SYMBOLS = ['🍎', '🍌', '🍇', '🍓', '🍒', '🥝', '🍍', '🥥'];
+  const board = document.getElementById('board');
+  let deck, first, lock, moves, matched, timer, t0, running;
+  const $ = id => document.getElementById(id);
+  const bestKey = 'sj-memory-best';
+  const readBest = () => { try { return +localStorage.getItem(bestKey) || 0; } catch { return 0; } };
+  const saveBest = v => { try { localStorage.setItem(bestKey, String(v)); } catch {} };
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  function newGame() {
+    clearInterval(timer); running = false;
+    deck = shuffle([...SYMBOLS, ...SYMBOLS].map((s, i) => ({ s, id: i })));
+    first = null; lock = false; moves = 0; matched = 0;
+    board.innerHTML = '';
+    deck.forEach((card, i) => {
+      const b = document.createElement('button');
+      b.className = 'card'; b.dataset.i = i; b.setAttribute('aria-label', 'Card ' + (i + 1));
+      b.innerHTML = '<div class="in"><div class="face back"></div><div class="face front">' + card.s + '</div></div>';
+      board.appendChild(b);
+    });
+    $('mv').textContent = 0; $('tm').textContent = 0;
+    const best = readBest();
+    $('bs').textContent = best ? best + ' moves' : '–';
+    $('win').textContent = 'Find all the matching pairs.';
+  }
+
+  board.addEventListener('click', e => {
+    const card = e.target.closest('.card');
+    if (!card || lock || card.classList.contains('up') || card.classList.contains('done')) return;
+    if (!running) { running = true; t0 = Date.now(); timer = setInterval(() => { $('tm').textContent = Math.floor((Date.now() - t0) / 1000); }, 500); }
+    card.classList.add('up');
+    if (first === null) { first = card; return; }
+    moves++; $('mv').textContent = moves;
+    const a = deck[first.dataset.i], b = deck[card.dataset.i];
+    const second = card;
+    if (a.s === b.s) {
+      first.classList.add('done'); second.classList.add('done');
+      first = null; matched++;
+      if (matched === SYMBOLS.length) finish();
+    } else {
+      lock = true;
+      first.classList.add('bad'); second.classList.add('bad');
+      const f = first; first = null;
+      setTimeout(() => {
+        f.classList.remove('up', 'bad'); second.classList.remove('up', 'bad'); lock = false;
+      }, 800);
+    }
+  });
+
+  function finish() {
+    clearInterval(timer); running = false;
+    const secs = Math.floor((Date.now() - t0) / 1000);
+    window.SJG && (SJG.score(moves, 'moves'), SJG.unlock('done'));
+    const best = readBest();
+    if (!best || moves < best) saveBest(moves);
+    $('win').textContent = `Done in ${moves} moves and ${secs}s! ${!best || moves < best ? 'New best!' : ''}`;
+    $('bs').textContent = Math.min(best || Infinity, moves) + ' moves';
+  }
+
+  $('new').addEventListener('click', newGame);
+  newGame();
+})();
+</script>
+</body></html>

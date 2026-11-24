@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Lava Rise</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#1c0a05;color:#fff7ed;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+#tags{position:fixed;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;z-index:3;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+#top{left:50%;top:10px;transform:translateX(-50%);text-align:center}
+#top b{display:block;font:900 28px system-ui}#top small{opacity:.9;font-weight:700}
+#stats{left:12px;top:12px;display:flex;flex-direction:column;gap:4px;font-weight:800;background:rgba(0,0,0,.35);padding:8px 12px;border-radius:12px}
+#room{right:12px;top:12px;background:rgba(0,0,0,.4);padding:8px 12px;border-radius:12px;font-size:13px;min-width:140px}
+#room:empty{display:none}
+#warn{left:0;right:0;bottom:0;height:22vh;background:linear-gradient(transparent,rgba(249,115,22,.55));opacity:0;transition:opacity .3s}
+#pw{left:50%;bottom:20px;transform:translateX(-50%);display:flex;gap:8px}
+#pw span{background:rgba(0,0,0,.45);padding:5px 10px;border-radius:999px;font-weight:800}
+.panel{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(20,5,0,.55);backdrop-filter:blur(8px)}
+.panel[hidden]{display:none}
+.card{width:min(700px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:linear-gradient(180deg,rgba(69,26,3,.95),rgba(28,10,5,.95));border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+h1{margin:0;font:900 50px/1 system-ui;background:linear-gradient(180deg,#fde047,#f97316,#dc2626);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:0 0 8px;font:900 26px system-ui}
+.sub{opacity:.85;margin:8px 0 14px;line-height:1.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{padding:11px 18px;border-radius:14px;background:rgba(255,255,255,.1);font-weight:800}
+.btn.pri{background:linear-gradient(135deg,#f97316,#dc2626);color:#fff;box-shadow:0 8px 24px rgba(249,115,22,.4)}
+.modes{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.modes button{padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.08);font-weight:700}.modes button.on{background:#ea580c}
+#touch{position:fixed;right:14px;bottom:18px;z-index:4;display:none;gap:10px;align-items:flex-end}
+#touch.on{display:flex}
+#touch button{width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.2);font-weight:900;font-size:13px;touch-action:none}
+#touch button.on{background:rgba(249,115,22,.65)}#touch .sm{width:54px;height:54px}
+</style></head>
+<body>
+<canvas id="gl"></canvas><div id="tags"></div>
+<div class="hud" id="warn"></div>
+<div class="hud" id="top"></div><div class="hud" id="stats"></div><div class="hud" id="room"></div><div class="hud" id="pw"></div>
+<div id="touch"><button class="sm" data-btn="menu">☰</button><button class="sm" data-btn="run">🏃</button><button data-btn="jump">JUMP</button></div>
+<div class="panel" id="menu"><div class="card">
+  <h1>LAVA RISE</h1>
+  <p class="sub">The volcano is waking up. Climb the spiral tower before the lava catches you — it rises faster and faster. Grab gems, double-jump boots, lava freezes and shields on the way up.</p>
+  <div class="modes" id="modes"><button data-m="normal" class="on">🔥 Normal</button><button data-m="chill">🧊 Chill (slow lava)</button><button data-m="inferno">☄️ Inferno</button></div>
+  <div class="btns"><button class="btn pri" id="bPlay">▶ Climb!</button><button class="btn" id="bOnline">🌐 Race friends</button><button class="btn" id="bLook">🧍 My character</button></div>
+  <p class="sub" id="best" style="margin-bottom:0"></p>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px;opacity:.85"><input type="checkbox" id="lowq"> Faster graphics (for older phones)</label>
+  <p style="opacity:.65;font-size:13px">WASD move · Space jump · Shift run · mouse turns the camera · phone: left = walk, right = look.</p>
+</div></div>
+<div class="panel" id="over" hidden><div class="card" style="text-align:center"><div id="overText"></div><div class="btns" style="justify-content:center" id="overBtns"></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script src="../sj-gamekit/obby3d.js"></script>
+<script src="../sj-gamekit/friends3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('lava', { title: 'Lava Rise', vs: false, unit: 'm', trophies: [
+  { id: 'h50', name: 'Warm Feet', desc: 'Climb 50 m', icon: '🦶' },
+  { id: 'h150', name: 'Heat Wave', desc: 'Climb 150 m', icon: '🌡️' },
+  { id: 'h300', name: 'Sky High', desc: 'Climb 300 m', icon: '🚀' },
+  { id: 'gems50', name: 'Gem Hoarder', desc: 'Collect 50 gems in one climb', icon: '💎' },
+  { id: 'inferno', name: 'Inferno', desc: 'Climb 100 m on Inferno', icon: '☄️' },
+  { id: 'saved', name: 'Close Call', desc: 'Get saved by a shield', icon: '🛡️' },
+  { id: 'race', name: 'King of the Hill', desc: 'Win an online race', icon: '👑' },
+] }) : null;
+const $ = id => document.getElementById(id), G3 = GL3D, { M } = G3;
+const TEST = /[?&]nogl\b/.test(location.search);
+let R = null; if (!TEST) { try { R = G3.create($('gl'), { maxDpr: 1.5 }); } catch (e) { console.warn(e); } }
+if (!R && !TEST) $('menu').querySelector('.sub').textContent = 'This browser can’t run WebGL, so Lava Rise can’t be drawn here.';
+const IN = G3.Input($('gl')); IN.bindButtons($('touch'));
+const store = { get() { try { return Object.assign({ best: {}, gems: 0, low: false, mode: 'normal' }, JSON.parse(localStorage.getItem('sj-lava')) || {}); } catch { return { best: {}, gems: 0, mode: 'normal' }; } }, set(v) { try { localStorage.setItem('sj-lava', JSON.stringify(v)); } catch {} } };
+let SV = store.get();
+const MODES = { chill: { start: 0.22, grow: 0.006, cap: 0.9 }, normal: { start: 0.35, grow: 0.011, cap: 1.35 }, inferno: { start: 0.6, grow: 0.02, cap: 2.1 } };
+const POWERS = { boots: ['#a855f7', '👢 Double jump', 12], freeze: ['#38bdf8', '🧊 Lava frozen', 7], wings: ['#facc15', '🪽 Super jump', 12], shield: ['#22c55e', '🛡 Shield', 0] };
+
+/* =================== TOWER =================== */
+let W = null, rng = null, floors = 0, built = -1, lava = -6, best = 0, gems = 0, t = 0, mode = SV.mode, P = null, power = {}, shield = false, over = false, F = null, seed = 1, lastFloor = 0;
+const FLOOR_H = 1.2, PER = 20;
+const floorPos = i => { const a = i * 0.56 + Math.sin(i * 0.37) * 0.12, r = 6.8 + Math.sin(i * 0.23) * 1.3; return [Math.cos(a) * r, i * FLOOR_H, Math.sin(a) * r, a]; };
+function genChunk(c) {
+  const R2 = G3.rng(seed * 1000 + c * 7919);
+  for (let i = c * PER; i < (c + 1) * PER; i++) {
+    const [x, y, z, a] = floorPos(i), lvl = Math.min(1, i / 260);
+    const roll = R2();
+    if (i % 30 === 15) W.add({ k: 'tramp', b: [x - 1.2, y - 0.5, z - 1.2, x + 1.2, y, z + 1.2], chunk: c, power: 15 });
+    else if (i > 25 && roll < 0.12 + lvl * 0.15) W.add({ k: 'move', b: [x - 1.2, y - 0.5, z - 1.2, x + 1.2, y, z + 1.2], chunk: c, axis: Math.abs(Math.cos(a)) > 0.7 ? 'z' : 'x', amp: 1 + lvl, speed: 0.9 + lvl * 0.8, phase: R2() * 6, col: '#fb923c' });
+    else if (i > 15 && roll < 0.3 + lvl * 0.2) W.add({ k: 'vanish', b: [x - 1.2, y - 0.5, z - 1.2, x + 1.2, y, z + 1.2], chunk: c, col: '#fcd34d' });
+    else { const sz = 2.6 - lvl * 0.6; W.add({ k: 'solid', b: [x - sz / 2, y - 0.6, z - sz / 2, x + sz / 2, y, z + sz / 2], chunk: c, col: ['#78716c', '#57534e', '#a8a29e', '#92400e'][i % 4] }); }
+    if (R2() < 0.35) W.add({ k: 'coin', b: [x - 0.3, y + 0.9, z - 0.3, x + 0.3, y + 1.5, z + 0.3], chunk: c, gem: true });
+    if (i > 10 && R2() < 0.045) { const keys = Object.keys(POWERS), ty = keys[(R2() * keys.length) | 0]; W.add({ k: 'power', b: [x - 0.3, y + 0.8, z - 0.3, x + 0.3, y + 1.6, z + 0.3], chunk: c, type: ty, col: POWERS[ty][0] }); }
+  }
+  // the central pillar of this chunk (decoration + a wall to bump into)
+  const y0 = c * PER * FLOOR_H - 1, y1 = (c + 1) * PER * FLOOR_H - 1;
+  W.add({ k: 'solid', b: [-3, y0, -3, 3, y1, 3], chunk: c, col: c % 2 ? '#44403c' : '#3f3a36', trim: false });
+  for (let k = 0; k < 4; k++) { const yy = y0 + k * PER * FLOOR_H / 4; W.add({ k: 'kill', b: [-3.15, yy + 1, -0.2, -3.0, yy + 1.4, 0.2], chunk: c, col: '#f97316', glow: false }); }
+}
+function ensureChunks() {
+  const need = Math.floor((Math.max(P.y, 0) / FLOOR_H + 60) / PER);
+  while (built < need) { built++; genChunk(built); }
+  for (const id of [...W.chunks.keys()]) if ((id + 1) * PER * FLOOR_H < lava - 20) W.dropChunk(id);
+}
+
+/* =================== GAME =================== */
+function newGame(s) {
+  if (!R && !TEST) return;
+  seed = s || (Math.random() * 1e9 | 0); over = false; t = 0; lava = -6; best = 0; gems = 0; power = {}; shield = false; built = -1; lastFloor = 0;
+  if (W) W.clear();
+  W = Obby3D.create({ R, input: IN, look: () => window.SJLook ? SJLook.cached : null, onDie, onCoin: () => { gems++; SV.gems++; }, onPower });
+  P = W.P;
+  const [x, y, z] = floorPos(0); W.place(x, y + 0.1, z);
+  W.cam.yaw = Math.atan2(x, z) + Math.PI; W.cam.pitch = -0.35; W.cam.dist = 8;
+  ensureChunks(); W.build();
+  W.trail = null;
+  $('menu').hidden = true; $('over').hidden = true; running = true; $('touch').classList.toggle('on', IN.touch);
+}
+function onPower(ob) {
+  const ty = ob.type;
+  if (ty === 'shield') { shield = true; } else power[ty] = POWERS[ty][2];
+  G3.tone(600, 0.3, 'square', 0.05, 1400);
+}
+function onDie() {
+  if (over) return;
+  if (shield) { // saved: back onto the highest floor you reached, lava drops a bit
+    shield = false; kit && kit.unlock('saved');
+    const f = Math.max(0, lastFloor), [x, y, z] = floorPos(f); setTimeout(() => { W.place(x, y + 0.1, z); P.dead = 0; }, 50); lava -= 6; return;
+  }
+  over = true; W.frozen = true;
+  const h = Math.round(best);
+  SV.best[mode] = Math.max(SV.best[mode] || 0, h); store.set(SV);
+  kit && kit.score(h, mode);
+  if (F) F.send(Object.assign(myState(), { dead: 1, h }), true);
+  setTimeout(showOver, 900);
+}
+function showOver() {
+  const h = Math.round(best);
+  let rank = '';
+  if (F) { const all = [{ name: 'You', h, dead: 1 }].concat(F.list().map(o => ({ name: o.name, h: o.t.h || 0, dead: o.t.dead }))).sort((a, b) => b.h - a.h); rank = `<div style="text-align:left;margin:10px auto;max-width:300px">${all.map((p, i) => `<div>${['🥇', '🥈', '🥉'][i] || i + 1}. ${SJFriends.esc(p.name)} — ${p.h} m${p.dead ? '' : ' (still climbing)'}</div>`).join('')}</div>`; }
+  $('overText').innerHTML = `<h2>🔥 The lava got you!</h2><p class="sub">You climbed <b>${h} m</b> and grabbed <b>${gems}</b> gem${gems === 1 ? '' : 's'}. Best on ${mode}: <b>${SV.best[mode] || 0} m</b>.</p>${rank}`;
+  $('overBtns').innerHTML = '';
+  const b = (txt, fn, pri) => { const e = document.createElement('button'); e.className = 'btn' + (pri ? ' pri' : ''); e.textContent = txt; e.onclick = fn; $('overBtns').appendChild(e); };
+  if (F) { if (F.isHost) b('New race (everyone)', () => F.rematch(), true); else b('Waiting for the host…', () => {}); b('Watch', () => { $('over').hidden = true; }); b('Leave', () => { F.leave(); F = null; toMenu(); }); }
+  else { b('Climb again', () => newGame(), true); b('Menu', toMenu); }
+  $('over').hidden = false; if (document.pointerLockElement) document.exitPointerLock();
+}
+const myState = () => ({ x: P.x, y: P.y, z: P.z, yaw: P.yaw, spd: Math.min(1, Math.hypot(P.vx, P.vz) / 5), h: Math.round(best), label: Math.round(best) + ' m', dead: over ? 1 : 0 });
+
+/* =================== LOOP =================== */
+let running = false, last = performance.now(), camC = null;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) return;
+  const raw = IN.frame();
+  if (IN.hit('Escape') || IN.hit('Btnmenu')) { if (F) { F.leave(); F = null; } toMenu(); IN.endFrame(); return; }
+  step(dt, { mx: raw.mx, mz: raw.mz, run: raw.run || IN.down('run'), jump: IN.hit('Space') || IN.hit('Btnjump') || IN.hit('Tap'), jumpHeld: IN.down('Space') || IN.down('jump'), lookX: raw.lookX, lookY: raw.lookY, wheel: raw.wheel });
+  render(now);
+  IN.endFrame();
+}
+function step(dt, inp) {
+  if (!over) {
+    t += dt;
+    const md = MODES[mode], speed = Math.min(md.cap, md.start + md.grow * t);
+    if (power.freeze > 0) power.freeze -= dt; else lava += speed * dt;
+    // the lava never lags too far behind (no camping at the bottom)
+    lava = Math.max(lava, best - 34);
+    for (const k of ['boots', 'wings']) if (power[k] > 0) power[k] -= dt;
+    W.doubleJump = power.boots > 0; W.jumpMul = power.wings > 0 ? 1.3 : 1;
+    W.killY = lava + 0.3;
+    best = Math.max(best, P.y);
+    if (P.ground && P.on == null && P.y > 0) lastFloor = Math.max(lastFloor, Math.round(P.y / FLOOR_H) - 1);
+    else if (P.ground && P.on) lastFloor = Math.max(lastFloor, Math.round(P.y / FLOOR_H) - 1);
+    if (best >= 50) kit && kit.unlock('h50'); if (best >= 150) kit && kit.unlock('h150'); if (best >= 300) kit && kit.unlock('h300');
+    if (gems >= 50) kit && kit.unlock('gems50'); if (mode === 'inferno' && best >= 100) kit && kit.unlock('inferno');
+    ensureChunks();
+  }
+  W.update(dt, over ? { mx: 0, mz: 0, jump: false, lookX: 0, lookY: 0 } : inp);
+  camC = W.camera(inp, dt);
+  if (over && F) { const top = F.list().filter(o => !o.t.dead).sort((a, b) => b.y - a.y)[0]; if (top) { const f = G3.dirOf(W.cam.yaw, W.cam.pitch); camC.eye = [top.x - f[0] * 9, top.y + 2 - f[1] * 9, top.z - f[2] * 9]; } }
+  if (F) { F.send(myState()); F.update(dt); if (over && !$('over').hidden === false && F.list().every(o => o.t.dead)) {} }
+  hud();
+}
+function render(now) {
+  if (!R || !camC) return;
+  const glowK = 0.75 + Math.sin(now * 0.003) * 0.1;
+  W.render(camC, { skyTop: '#140402', skyHorizon: '#9a3412', skyGround: '#ea580c', clouds: 0.45, cloudCol: [0.2, 0.08, 0.05], sun: [0.3, 0.4, -0.7], sunCol: [0.55, 0.35, 0.25], amb: [0.45, 0.32, 0.28], sunGlow: [1, 0.45, 0.15], hemi: [[1, 0.9, 0.85], [1.6, 0.7, 0.35]], fog: [40, 150], view: SV.low ? 60 : 110,
+    lights: [{ p: [P.x, lava + 1.5, P.z], c: [1.6, 0.55, 0.15], r: 14 }] }, r => {
+    r.box(-150, lava - 30, -150, 150, lava, 150, [1, 0.38 * glowK + 0.1, 0.05], 1, 1);
+    for (let i = 0; i < 14; i++) { const a = i * 2.4 + now * 0.0002 * (i % 3 + 1), d = 4 + (i * 7) % 26; r.glow([Math.cos(a) * d + P.x * 0.3, lava + 0.4, Math.sin(a) * d + P.z * 0.3], 3 + (i % 4), [1, 0.4, 0.08], 0.35); }
+    for (let i = 0; i < 10; i++) { const k = (now * 0.0004 + i * 0.1) % 1, a = i * 2.1; r.glow([Math.cos(a) * (5 + i), lava + k * 9, Math.sin(a) * (5 + i)], 0.25, [1, 0.6, 0.2], 1 - k); }
+    if (F) F.draw(r);
+    if (shield && !over) r.glow([P.x, P.y + 1, P.z], 1.8, [0.3, 1, 0.5], 0.3);
+  });
+  if (F) F.tags(R, $('tags'));
+}
+let hudT = 0;
+function hud() {
+  if ((hudT -= 1) > 0) return; hudT = 5;
+  $('top').innerHTML = `<b>${Math.round(best)} m</b><small>Lava ${Math.max(0, Math.round(P.y - lava))} m below you</small>`;
+  $('stats').innerHTML = `<span>💎 ${gems}</span><span>🏆 ${SV.best[mode] || 0} m</span><span style="opacity:.8">${mode}</span>`;
+  $('warn').style.opacity = over ? 0 : Math.max(0, Math.min(1, (6 - (P.y - lava)) / 5));
+  $('pw').innerHTML = Object.entries(power).filter(([, v]) => v > 0).map(([k, v]) => `<span style="color:${POWERS[k][0]}">${POWERS[k][1]} ${Math.ceil(v)}</span>`).join('') + (shield ? '<span style="color:#22c55e">🛡 Shield</span>' : '');
+  if (F) { const list = [{ name: 'You', h: Math.round(best), dead: over }].concat(F.list().map(o => ({ name: o.name, h: o.t.h || 0, dead: o.t.dead }))).sort((a, b) => b.h - a.h); $('room').innerHTML = `<b>🌐 Race ${F.net.room ? F.net.room.code : ''}</b>` + list.map((p, i) => `<div style="${p.dead ? 'opacity:.5' : ''}">${i + 1}. ${SJFriends.esc(p.name)} — ${p.h} m${p.dead ? ' 🔥' : ''}</div>`).join(''); }
+}
+
+/* =================== MENU =================== */
+function toMenu() { running = false; $('menu').hidden = false; $('over').hidden = true; $('touch').classList.remove('on'); $('tags').innerHTML = ''; renderBest(); if (document.pointerLockElement) document.exitPointerLock(); }
+function renderBest() { $('best').innerHTML = `Best: 🧊 ${SV.best.chill || 0} m · 🔥 ${SV.best.normal || 0} m · ☄️ ${SV.best.inferno || 0} m · 💎 ${SV.gems} gems collected`; document.querySelectorAll('#modes [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode)); }
+$('modes').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mode = SV.mode = b.dataset.m; store.set(SV); renderBest(); };
+$('bPlay').onclick = () => newGame();
+$('bLook').onclick = () => { location.href = '../sj-avatar/'; };
+$('lowq').checked = !!SV.low; if (R) { R.quality = SV.low ? 'low' : 'high'; R.scale = SV.low ? 0.65 : 1; }
+$('lowq').onchange = () => { SV.low = $('lowq').checked; store.set(SV); if (R) { R.quality = SV.low ? 'low' : 'high'; R.scale = SV.low ? 0.65 : 1; } };
+$('bOnline').onclick = async () => {
+  if (!(await SJFriends.available())) { alert('Online races need SanjivramOS (open this game from the SanjivramOS desktop).'); return; }
+  try { F = await SJFriends.join({ game: 'lava', gameName: 'Lava Rise', modes: ['Normal', 'Chill', 'Inferno'] }); } catch { return; }
+  const m = (F.net.room && F.net.room.mode || 'Normal').toLowerCase(); mode = MODES[m] ? m : 'normal';
+  F.on('start', s => newGame(s));
+  F.on('room', () => { if (over && F && F.list().length && F.list().every(o => o.t.dead) && !F._won) { F._won = true; const mine = Math.round(best); if (F.list().every(o => (o.t.h || 0) < mine)) kit && kit.unlock('race'); } });
+  newGame(F.seed);
+};
+if (new URLSearchParams(location.search).get('join') || new URLSearchParams(location.search).get('online')) setTimeout(() => $('bOnline').click(), 600);
+if (window.SJLook) SJLook.get();
+renderBest(); requestAnimationFrame(frame);
+window.__lava = { newGame, step: (n, dt = 1 / 60, inp = {}) => { for (let i = 0; i < n; i++) step(dt, Object.assign({ mx: 0, mz: 0, jump: false, jumpHeld: false, lookX: 0, lookY: 0 }, typeof inp === 'function' ? inp(i) : inp)); return { y: P.y, lava, best, over, gems, chunks: W.chunks.size }; }, get W() { return W; }, floorPos, get state() { return { lava, best, over, shield, power, mode }; }, set mode(m) { mode = m; } };
+})();
+</script>
+</body></html>

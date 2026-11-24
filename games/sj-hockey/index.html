@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Puck Rush</title>
+<style>
+html,body{margin:0;height:100%;background:#07111f;color:#e0f2fe;font:14px system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center}
+#bar{display:flex;gap:10px;align-items:center;padding:6px 10px;width:100%;box-sizing:border-box;background:#0c1a2e}
+#bar .sp{flex:1}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%;position:relative}
+canvas{max-width:100%;max-height:100%;aspect-ratio:6/9;touch-action:none;display:block;cursor:none}
+button{border:none;background:#1e3a5f;color:#fff;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:hover{background:#285080}button.on,button.pri{background:#06b6d4;color:#04202a;font-weight:700}
+.ov{position:absolute;inset:0;background:rgba(4,10,20,.86);display:flex;align-items:center;justify-content:center}
+.ov[hidden]{display:none}
+.card{background:#0c1a2e;border:1px solid #1e3a5f;border-radius:14px;padding:16px 20px;max-width:420px;width:calc(100% - 32px)}
+.card h1{margin:0 0 4px}.card p{opacity:.75;margin:0 0 10px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}.row label{min-width:70px;opacity:.75}
+.hint{font-size:12px;opacity:.6}
+</style></head><body>
+<div id="wrap">
+  <div id="bar"><b>🏒 Puck Rush</b><span id="sc"></span><span class="sp"></span><span id="net"></span><button id="mute">🔊</button><button id="menuBtn">Menu</button></div>
+  <div id="stage"><canvas id="c" width="600" height="900"></canvas>
+    <div class="ov" id="menu"><div class="card">
+      <h1>🏒 Puck Rush</h1><p>Fast air hockey. Move your mallet with the mouse or your finger and smash the puck into the far goal. First to <b id="toL">7</b>.</p>
+      <div class="row"><label>Mode</label><button class="m on" data-m="cpu">vs CPU</button><button class="m" data-m="local">2 players</button><button class="m" data-m="online">🌐 Online</button></div>
+      <div class="row" id="lvRow"><label>CPU</label><button class="l" data-l="0">Easy</button><button class="l on" data-l="1">Normal</button><button class="l" data-l="2">Pro</button></div>
+      <div class="row"><label>Goals</label><button class="g" data-g="5">5</button><button class="g on" data-g="7">7</button><button class="g" data-g="11">11</button></div>
+      <div class="row"><button class="pri" id="go">Play ▶</button></div>
+      <div class="hint">2 players: share one touch screen (each player touches their half), or P1 uses the mouse and P2 uses W A S D.</div>
+    </div></div>
+  </div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('hockey', { vs: false, title: 'Puck Rush', trophies: [
+  { id: 'win', name: 'On the Board', desc: 'Win a match vs the CPU', icon: '🏒' },
+  { id: 'pro', name: 'Pro Player', desc: 'Beat the Pro CPU', icon: '🏆' },
+  { id: 'shutout', name: 'Shutout', desc: 'Win without conceding', icon: '🧤' },
+  { id: 'rocket', name: 'Rocket Shot', desc: 'Hit the puck at top speed', icon: '🚀' },
+  { id: 'online', name: 'Rink Rival', desc: 'Win an online match', icon: '🌐' },
+] }) : null;
+const sfx = n => kit && kit.sfx(n);
+const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
+const W = 600, H = 900, PR = 22, MR = 38, GOAL = 180, MAXV = 1500;
+let opts = { m: 'cpu', l: 1, g: 7 };
+try { Object.assign(opts, JSON.parse(localStorage.getItem('hockey.opts')) || {}); } catch {}
+let S = null, mode = 'cpu', net = null, menuOpen = true, mySide = 0; // side 0 = bottom, 1 = top
+function newMatch(toWin) { S = { puck: { x: W / 2, y: H / 2, vx: 0, vy: 0 }, m: [{ x: W / 2, y: H - 120, vx: 0, vy: 0 }, { x: W / 2, y: 120, vx: 0, vy: 0 }], score: [0, 0], toWin, phase: 'ready', t: 1.2, serve: 0, ev: [], conceded: [0, 0] }; resetPuck(0); }
+function resetPuck(toward) { S.puck = { x: W / 2, y: toward === 0 ? H / 2 + 80 : H / 2 - 80, vx: 0, vy: 0 }; }
+const targets = [{ x: W / 2, y: H - 120 }, { x: W / 2, y: 120 }];
+function moveMallet(i, dt) {
+  const m = S.m[i], t = targets[i];
+  const minY = i === 0 ? H / 2 + MR : MR, maxY = i === 0 ? H - MR : H / 2 - MR;
+  const tx = Math.max(MR, Math.min(W - MR, t.x)), ty = Math.max(minY, Math.min(maxY, t.y));
+  const nx = m.x + (tx - m.x) * Math.min(1, dt * 30), ny = m.y + (ty - m.y) * Math.min(1, dt * 30);
+  m.vx = (nx - m.x) / dt; m.vy = (ny - m.y) / dt; m.x = nx; m.y = ny;
+}
+function cpu(dt) {
+  const p = S.puck, lv = opts.l, m = S.m[1], spd = [.45, .7, .95][lv];
+  let tx, ty;
+  if (p.y < H / 2 && p.vy < 200) { tx = p.x + (p.x - W / 2) * .1; ty = p.y - 30; } // attack from behind
+  else { tx = W / 2 + (p.x - W / 2) * .6; ty = 90; }
+  if (p.y < m.y) { tx = p.x + (p.x > W / 2 ? -60 : 60); ty = 60; } // get back behind the puck
+  const t = targets[1]; t.x += (tx - t.x) * Math.min(1, dt * 8 * spd); t.y += (ty - t.y) * Math.min(1, dt * 8 * spd);
+}
+function step(dt) {
+  if (S.phase === 'ready') { S.t -= dt; if (S.t <= 0) S.phase = 'play'; }
+  if (S.phase === 'goal') { S.t -= dt; if (S.t <= 0) { if (S.score.some(v => v >= S.toWin)) { S.phase = 'done'; S.ev.push({ t: 'done', w: S.score[0] > S.score[1] ? 0 : 1 }); } else { resetPuck(S.serve); S.phase = 'play'; } } }
+  for (let i = 0; i < 2; i++) moveMallet(i, dt);
+  if (S.phase !== 'play') return;
+  const p = S.puck, n = 4;
+  for (let k = 0; k < n; k++) {
+    const h = dt / n;
+    p.x += p.vx * h; p.y += p.vy * h;
+    p.vx *= Math.pow(.995, h * 60); p.vy *= Math.pow(.995, h * 60);
+    if (p.x < PR) { p.x = PR; p.vx = Math.abs(p.vx) * .9; S.ev.push({ t: 'wall' }); }
+    if (p.x > W - PR) { p.x = W - PR; p.vx = -Math.abs(p.vx) * .9; S.ev.push({ t: 'wall' }); }
+    const inGoal = Math.abs(p.x - W / 2) < GOAL / 2 - PR / 2;
+    if (p.y < PR && !inGoal) { p.y = PR; p.vy = Math.abs(p.vy) * .9; S.ev.push({ t: 'wall' }); }
+    if (p.y > H - PR && !inGoal) { p.y = H - PR; p.vy = -Math.abs(p.vy) * .9; S.ev.push({ t: 'wall' }); }
+    if (p.y < -PR) return goal(0);
+    if (p.y > H + PR) return goal(1);
+    for (let i = 0; i < 2; i++) {
+      const m = S.m[i], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy);
+      if (d < PR + MR && d > 0) {
+        const nx = dx / d, ny = dy / d; p.x = m.x + nx * (PR + MR); p.y = m.y + ny * (PR + MR);
+        const rvx = p.vx - m.vx, rvy = p.vy - m.vy, vn = rvx * nx + rvy * ny;
+        if (vn < 0) { p.vx -= 1.9 * vn * nx; p.vy -= 1.9 * vn * ny; S.ev.push({ t: 'hit', p: i, v: Math.hypot(p.vx, p.vy) }); }
+        const sp = Math.hypot(p.vx, p.vy); if (sp > MAXV) { p.vx *= MAXV / sp; p.vy *= MAXV / sp; }
+      }
+    }
+  }
+}
+function goal(scorer) { S.score[scorer]++; S.conceded[1 - scorer]++; S.phase = 'goal'; S.t = 1.4; S.serve = 1 - scorer; S.ev.push({ t: 'goal', s: scorer }); }
+
+/* ---------------- input ---------------- */
+const keys = {};
+function toCanvas(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+const flipIf = p => mode === 'online' && mySide === 1 ? { x: W - p.x, y: H - p.y } : p;
+cv.addEventListener('pointermove', e => handlePtr(e));
+cv.addEventListener('pointerdown', e => { try { cv.setPointerCapture(e.pointerId); } catch {} handlePtr(e); });
+function handlePtr(e) {
+  if (!S) return;
+  const p = flipIf(toCanvas(e));
+  if (mode === 'local') { const side = (e.pointerType === 'mouse') ? 0 : (p.y > H / 2 ? 0 : 1); targets[side].x = p.x; targets[side].y = p.y; }
+  else { const s = mode === 'online' ? mySide : 0; targets[s].x = p.x; targets[s].y = p.y; }
+}
+addEventListener('keydown', e => { keys[e.code] = true; }); addEventListener('keyup', e => { keys[e.code] = false; });
+function keyMove(dt) { if (mode !== 'local') return; const v = 600 * dt, t = targets[1]; if (keys.KeyA) t.x -= v; if (keys.KeyD) t.x += v; if (keys.KeyW) t.y -= v; if (keys.KeyS) t.y += v; t.x = Math.max(MR, Math.min(W - MR, t.x)); t.y = Math.max(MR, Math.min(H / 2 - MR, t.y)); }
+
+/* ---------------- online: host simulates, guest (top) sends its mallet target ---------------- */
+async function goOnline() {
+  if (!window.SJNet) return;
+  try { net = await SJNet.lobby({ game: 'hockey', gameName: 'Puck Rush', max: 2, min: 2, modes: ['First to 7', 'First to 5', 'First to 11'] }); } catch { setMode('cpu'); return; }
+  mode = 'online'; mySide = net.isHost ? 0 : 1;
+  newMatch(+((net.room.mode || '').match(/\d+/) || [7])[0]);
+  net.on('m', d => {
+    if (net.isHost && d.t) { targets[1].x = d.t[0]; targets[1].y = d.t[1]; }
+    if (net.isHost && d.again && S.phase === 'done') { newMatch(S.toWin); }
+    if (!net.isHost && d.s) { const ev = d.s.ev; S = d.s; for (const e of ev) fx(e); }
+  });
+  net.on('peer-left', () => { $('net').textContent = 'Opponent left'; });
+  menuOpen = false; $('menu').hidden = true;
+}
+let sendT = 0;
+
+/* ---------------- loop ---------------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(1 / 30, (now - last) / 1000); last = now;
+  if (S && !menuOpen) {
+    if (mode !== 'online' || net.isHost) {
+      if (mode === 'cpu') cpu(dt);
+      keyMove(dt);
+      step(dt);
+      if (mode === 'online') { sendT -= dt; if (sendT <= 0) { sendT = 1 / 30; net.send({ s: S }); for (const e of S.ev) fx(e); S.ev = []; } }
+      else { for (const e of S.ev) fx(e); S.ev = []; }
+    } else {
+      sendT -= dt; if (sendT <= 0) { sendT = 1 / 30; net.send({ t: [Math.round(targets[1].x), Math.round(targets[1].y)] }); }
+      // predict own mallet locally for responsiveness
+      moveMallet(1, dt);
+    }
+    draw();
+  }
+  requestAnimationFrame(frame);
+}
+function fx(e) {
+  if (e.t === 'wall') sfx('click');
+  if (e.t === 'hit') { sfx('hit'); if (e.v > 1400 && e.p === (mode === 'online' ? mySide : 0)) kit && kit.unlock('rocket'); }
+  if (e.t === 'goal') sfx(e.s === (mode === 'online' ? mySide : 0) ? 'coin' : 'hurt');
+  if (e.t === 'done') {
+    const me = mode === 'online' ? mySide : 0, won = e.w === me;
+    sfx(won ? 'win' : 'lose');
+    if (won && mode === 'cpu') { kit && kit.unlock('win'); if (opts.l === 2) kit && kit.unlock('pro'); if (!S.conceded[0]) kit && kit.unlock('shutout'); kit && kit.score(S.score[0] - S.score[1], 'margin'); }
+    if (won && mode === 'online') kit && kit.unlock('online');
+    if (mode !== 'online') setTimeout(() => { menuOpen = true; $('menu').hidden = false; }, 2500);
+  }
+}
+function draw() {
+  const flip = mode === 'online' && mySide === 1;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (flip) g.setTransform(-1, 0, 0, -1, W, H);
+  g.fillStyle = '#e0f2fe'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#38bdf8'; g.lineWidth = 6; g.strokeRect(3, 3, W - 6, H - 6);
+  g.strokeStyle = '#f87171'; g.lineWidth = 4; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+  g.beginPath(); g.arc(W / 2, H / 2, 80, 0, 7); g.stroke();
+  g.strokeStyle = '#38bdf8'; for (const y of [0, H]) { g.beginPath(); g.arc(W / 2, y, 120, 0, 7); g.stroke(); }
+  g.fillStyle = '#0f172a'; g.fillRect(W / 2 - GOAL / 2, 0, GOAL, 8); g.fillRect(W / 2 - GOAL / 2, H - 8, GOAL, 8);
+  const cols = ['#ef4444', '#2563eb'];
+  for (let i = 0; i < 2; i++) { const m = S.m[i]; g.fillStyle = cols[i]; g.beginPath(); g.arc(m.x, m.y, MR, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(m.x, m.y, MR * .55, 0, 7); g.fill(); g.fillStyle = cols[i]; g.beginPath(); g.arc(m.x, m.y, MR * .35, 0, 7); g.fill(); }
+  const p = S.puck; g.fillStyle = '#111827'; g.beginPath(); g.arc(p.x, p.y, PR, 0, 7); g.fill(); g.strokeStyle = '#facc15'; g.lineWidth = 3; g.beginPath(); g.arc(p.x, p.y, PR * .6, 0, 7); g.stroke();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const me = mode === 'online' ? mySide : 0;
+  g.fillStyle = 'rgba(15,23,42,.18)'; g.font = 'bold 120px system-ui'; g.textAlign = 'center';
+  g.fillText(S.score[1 - me], W / 2, H / 2 - 120); g.fillText(S.score[me], W / 2, H / 2 + 200);
+  let m = '';
+  if (S.phase === 'ready') m = 'Ready…'; else if (S.phase === 'goal') m = 'GOAL!'; else if (S.phase === 'done') m = S.score[me] > S.score[1 - me] ? 'You win! 🏆' : mode === 'local' ? (S.score[0] > S.score[1] ? 'Red wins!' : 'Blue wins!') : 'You lose';
+  if (m) { g.fillStyle = '#0f172a'; g.font = 'bold 56px system-ui'; g.fillText(m, W / 2, H / 2 + 20); }
+  if (S.phase === 'done' && mode === 'online') { g.font = '22px system-ui'; g.fillText(net.isHost ? 'Tap to play again' : 'Waiting for host…', W / 2, H / 2 + 60); }
+  $('sc').textContent = `${S.score[me]} : ${S.score[1 - me]}  (first to ${S.toWin})`;
+  $('net').textContent = mode === 'online' && net ? `Room ${net.room ? net.room.code : ''} · ${net.ping || '–'} ms` : '';
+}
+cv.addEventListener('click', () => { if (mode === 'online' && net && net.isHost && S && S.phase === 'done') newMatch(S.toWin); });
+
+/* ---------------- menu ---------------- */
+function renderOpts() { for (const k of ['m', 'l', 'g']) document.querySelectorAll('.' + k).forEach(b => b.classList.toggle('on', String(opts[k]) === b.dataset[k])); $('lvRow').style.display = opts.m === 'cpu' ? '' : 'none'; $('toL').textContent = opts.g; }
+$('menu').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const k of ['m', 'l', 'g']) if (b.dataset[k] != null) opts[k] = isNaN(+b.dataset[k]) ? b.dataset[k] : +b.dataset[k];
+  try { localStorage.setItem('hockey.opts', JSON.stringify(opts)); } catch {}
+  if (b.id === 'go') setMode(opts.m); else { renderOpts(); sfx('click'); }
+});
+function setMode(m) {
+  if (net && m !== 'online') { try { net.leave(); } catch {} net = null; }
+  mode = m; if (m === 'online') { goOnline(); return; }
+  newMatch(opts.g); menuOpen = false; $('menu').hidden = true;
+}
+$('menuBtn').onclick = () => { if (net) { try { net.leave(); } catch {} net = null; mode = 'cpu'; } menuOpen = true; $('menu').hidden = false; renderOpts(); };
+$('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+if (kit && kit.muted) $('mute').textContent = '🔇';
+renderOpts();
+const q = new URLSearchParams(location.search); if (q.get('join') || q.get('online')) setMode('online');
+window.__hockey = () => ({ S, mode, targets, setMode, get net() { return net; } });
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

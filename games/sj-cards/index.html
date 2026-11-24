@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spellbound</title>
+<style>
+:root{--bg:#1a1325;--panel:#261b36;--ink:#efe7ff;--mute:#a89cc0;--acc:#c084fc;--atk:#f87171;--def:#60a5fa;--skl:#4ade80;--pow:#fbbf24}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif;overflow:hidden;user-select:none}
+#app{height:100%;display:flex;flex-direction:column}
+#top{display:flex;gap:12px;align-items:center;padding:6px 12px;background:var(--panel);flex-wrap:wrap}
+#top .sp{flex:1}
+#relics{display:flex;gap:4px;font-size:18px}
+#relics span{cursor:help}
+button{border:none;border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer;background:#7c3aed;color:#fff}
+button.alt{background:#3b2d52;color:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+#view{flex:1;min-height:0;position:relative;overflow:auto}
+.center{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;box-sizing:border-box;text-align:center}
+h1{margin:0;font-size:34px;color:var(--acc)}h2{margin:0}
+.muted{color:var(--mute)}
+/* battle */
+#battle{height:100%;display:flex;flex-direction:column}
+#field{flex:1;min-height:0;display:flex;align-items:center;justify-content:space-around;gap:8px;padding:8px;flex-wrap:wrap}
+.unit{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:110px;padding:6px;border-radius:12px;position:relative;transition:transform .15s}
+.unit.target{cursor:crosshair;background:rgba(248,113,113,.15);outline:2px dashed var(--atk)}
+.unit.hit{animation:hit .25s}
+@keyframes hit{30%{transform:translateX(-8px)}60%{transform:translateX(8px)}}
+.face{font-size:56px;line-height:1}
+.bar{width:110px;height:10px;background:#000;border-radius:6px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;background:var(--atk)}
+.hp{font-size:12px}
+.blk{color:var(--def);font-weight:700}
+.st{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;font-size:12px}
+.st span{background:#0006;border-radius:6px;padding:1px 5px}
+.intent{font-size:13px;background:#0008;border-radius:8px;padding:2px 8px}
+.float{position:absolute;top:0;font-weight:800;font-size:20px;animation:fl 0.9s forwards;pointer-events:none}
+@keyframes fl{to{transform:translateY(-40px);opacity:0}}
+#hud{display:flex;align-items:center;gap:10px;padding:6px 12px;background:#0004}
+.energy{width:44px;height:44px;border-radius:50%;background:radial-gradient(#fde68a,#d97706);color:#1c1917;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+#hand{display:flex;justify-content:center;gap:6px;padding:8px 8px 12px;min-height:150px;flex-wrap:nowrap;overflow-x:auto}
+.card{flex:0 0 auto;width:108px;height:146px;border-radius:12px;background:#2f2342;border:2px solid #4c3b66;padding:6px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative;transition:transform .12s,box-shadow .12s;text-align:left}
+.card:hover{transform:translateY(-8px);box-shadow:0 8px 18px #0008}
+.card.sel{transform:translateY(-16px);border-color:var(--acc)}
+.card.no{opacity:.5}
+.card .cost{position:absolute;top:-8px;left:-8px;width:26px;height:26px;border-radius:50%;background:#fbbf24;color:#1c1917;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #1a1325}
+.card .nm{font-weight:700;font-size:13px;padding-left:18px}
+.card .art{font-size:30px;text-align:center}
+.card .tx{font-size:11px;line-height:1.3;color:#ddd}
+.card.atk{border-color:#7f1d1d}.card.skl{border-color:#14532d}.card.pow{border-color:#78350f}
+.card.up .nm{color:#86efac}
+.card .ty{position:absolute;bottom:4px;right:8px;font-size:9px;opacity:.5;text-transform:uppercase}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+/* map */
+.map{display:flex;flex-direction:column-reverse;gap:10px;align-items:center;padding:16px}
+.floor{display:flex;gap:16px;align-items:center}
+.floor .n{width:30px;opacity:.5;font-size:12px}
+.node{width:52px;height:52px;border-radius:50%;background:#2f2342;font-size:24px;display:flex;align-items:center;justify-content:center;border:2px solid #4c3b66;padding:0}
+.node.avail{border-color:var(--acc);box-shadow:0 0 12px var(--acc);animation:pulse 1.2s infinite}
+.node.done{opacity:.35}.node.taken{border-color:#86efac;opacity:.8}
+@keyframes pulse{50%{box-shadow:0 0 2px var(--acc)}}
+#tip{position:fixed;z-index:20;background:#000d;color:#fff;padding:6px 9px;border-radius:8px;font-size:12px;max-width:220px;pointer-events:none;display:none}
+#mute{padding:4px 8px}
+</style></head><body>
+<div id="app">
+  <div id="top"><b>🃏 Spellbound</b><span>❤️ <b id="php">0</b></span><span>🪙 <b id="gold">0</b></span><span>Floor <b id="flr">0</b>/15</span><span id="relics"></span><span class="sp"></span><button class="alt" id="deckBtn">Deck (<span id="dn">0</span>)</button><button class="alt" id="mute">🔊</button></div>
+  <div id="view"></div>
+</div>
+<div id="tip"></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id), view = $('view');
+  const kit = window.SJG ? SJG.init('cards', { vs: { live: () => window.__cards && __cards().run && __cards().run.floor }, title: 'Spellbound', trophies: [
+    { id: 'win', name: 'Spellbound', desc: 'Defeat the Lich King', icon: '👑' },
+    { id: 'elite', name: 'Elite Slayer', desc: 'Defeat an elite', icon: '⚔️' },
+    { id: 'big', name: 'Overkill', desc: 'Deal 40+ damage with one card', icon: '💥' },
+    { id: 'wall', name: 'Iron Wall', desc: 'Have 40+ block at once', icon: '🧱' },
+    { id: 'thin', name: 'Minimalist', desc: 'Win a run with 12 cards or fewer', icon: '✂️' },
+    { id: 'relics5', name: 'Hoarder', desc: 'Hold 5 relics', icon: '🏺' },
+    { id: 'poison', name: 'Toxic', desc: 'Stack 20 poison on one enemy', icon: '🧪' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  const R = (a, b) => a + Math.floor(Math.random() * (b - a + 1)), pick = a => a[Math.random() * a.length | 0], shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  /* ---------- cards: [id, name, art, type, cost, rarity, text(up), effect(up)] ---------- */
+  const CARDS = {};
+  const def = (id, name, art, type, cost, rar, text, fx, up = {}) => { CARDS[id] = { id, name, art, type, cost, rar, text, fx, up }; };
+  // up: { cost, n:{...} } numbers referenced as v.a, v.b
+  def('strike', 'Strike', '🗡️', 'atk', 1, 0, v => `Deal ${v.a} damage.`, (v, c) => c.hit(v.a), { a: [6, 9] });
+  def('guard', 'Guard', '🛡️', 'skl', 1, 0, v => `Gain ${v.a} block.`, (v, c) => c.block(v.a), { a: [5, 8] });
+  def('spark', 'Spark', '⚡', 'atk', 0, 0, v => `Deal ${v.a} damage.`, (v, c) => c.hit(v.a), { a: [3, 5] });
+  def('cleave', 'Cleave', '🪓', 'atk', 1, 1, v => `Deal ${v.a} damage to ALL enemies.`, (v, c) => c.hitAll(v.a), { a: [7, 10] });
+  def('twin', 'Twin Fang', '🐍', 'atk', 1, 1, v => `Deal ${v.a} damage twice.`, (v, c) => { c.hit(v.a); c.hit(v.a); }, { a: [4, 6] });
+  def('bash', 'Shield Bash', '🔰', 'atk', 1, 1, () => `Deal damage equal to your block.`, (v, c) => c.hit(c.me.block), {}, { cost: [1, 0] });
+  def('fireball', 'Fireball', '🔥', 'atk', 2, 1, v => `Deal ${v.a} damage. Apply ${v.b} burn.`, (v, c) => { c.hit(v.a); c.apply('burn', v.b); }, { a: [12, 16], b: [3, 5] });
+  def('venom', 'Venom Dart', '🧪', 'atk', 1, 1, v => `Deal ${v.a} damage. Apply ${v.b} poison.`, (v, c) => { c.hit(v.a); c.apply('poison', v.b); }, { a: [3, 4], b: [4, 6] });
+  def('expose', 'Expose', '🎯', 'skl', 1, 1, v => `Apply ${v.a} vulnerable (takes 50% more).`, (v, c) => c.apply('vuln', v.a), { a: [2, 3] }, { cost: [1, 0] });
+  def('hex', 'Hex', '🌀', 'skl', 1, 1, v => `Apply ${v.a} weak to ALL enemies (deal 25% less).`, (v, c) => c.applyAll('weak', v.a), { a: [2, 3] });
+  def('barrier', 'Barrier', '🧱', 'skl', 2, 1, v => `Gain ${v.a} block.`, (v, c) => c.block(v.a), { a: [12, 16] });
+  def('focus', 'Focus', '🧘', 'skl', 1, 1, v => `Draw ${v.a} cards.`, (v, c) => c.draw(v.a), { a: [2, 3] });
+  def('surge', 'Mana Surge', '💠', 'skl', 0, 1, v => `Gain ${v.a} energy. Exhaust.`, (v, c) => { c.energy(v.a); c.exhaust(); }, { a: [1, 2] });
+  def('parry', 'Parry', '🤺', 'skl', 1, 1, v => `Gain ${v.a} block. Draw 1.`, (v, c) => { c.block(v.a); c.draw(1); }, { a: [6, 9] });
+  def('drain', 'Life Drain', '🩸', 'atk', 2, 2, v => `Deal ${v.a} damage. Heal what you deal.`, (v, c) => { const d = c.hit(v.a); c.heal(d); }, { a: [8, 12] });
+  def('meteor', 'Meteor', '☄️', 'atk', 3, 2, v => `Deal ${v.a} damage to ALL enemies.`, (v, c) => c.hitAll(v.a), { a: [18, 26] });
+  def('rage', 'Battle Rage', '😤', 'pow', 1, 2, v => `Gain ${v.a} strength (attacks deal more).`, (v, c) => c.self('str', v.a), { a: [2, 3] });
+  def('thorns', 'Thorn Armor', '🌵', 'pow', 1, 2, v => `Gain ${v.a} thorns (attackers take damage).`, (v, c) => c.self('thorns', v.a), { a: [3, 5] });
+  def('regen', 'Regrowth', '🌿', 'pow', 2, 2, v => `Gain ${v.a} regen (heal at end of turn).`, (v, c) => c.self('regen', v.a), { a: [3, 5] });
+  def('plague', 'Plague', '☠️', 'skl', 2, 2, v => `Apply ${v.a} poison to ALL enemies.`, (v, c) => c.applyAll('poison', v.a), { a: [6, 9] });
+  def('catalyst', 'Catalyst', '⚗️', 'skl', 1, 2, () => `Double the target's poison.`, (v, c) => c.apply('poison', c.tgt ? c.tgt.st.poison || 0 : 0), {}, { cost: [1, 0] });
+  def('fortress', 'Fortress', '🏰', 'pow', 2, 2, () => `Block no longer vanishes at the start of your turn.`, (v, c) => c.self('keepblock', 1), {}, { cost: [2, 1] });
+  def('whirl', 'Whirlwind', '🌪️', 'atk', 2, 2, v => `Deal ${v.a} damage to ALL enemies 3 times.`, (v, c) => { for (let i = 0; i < 3; i++) c.hitAll(v.a); }, { a: [4, 6] });
+  def('execute', 'Execute', '⚰️', 'atk', 2, 2, v => `Deal ${v.a} damage. Triple if the target is below half health.`, (v, c) => c.hit(c.tgt && c.tgt.hp < c.tgt.max / 2 ? v.a * 3 : v.a), { a: [9, 12] });
+  def('mirror', 'Mirror Ward', '🪞', 'skl', 1, 1, v => `Gain ${v.a} block and 2 thorns this turn.`, (v, c) => { c.block(v.a); c.self('tthorns', 2); }, { a: [6, 9] });
+  def('wish', 'Wish', '🌠', 'skl', 1, 2, v => `Draw ${v.a} cards. Gain 1 energy. Exhaust.`, (v, c) => { c.draw(v.a); c.energy(1); c.exhaust(); }, { a: [3, 4] });
+  def('flurry', 'Flurry', '🥢', 'atk', 1, 1, v => `Deal 2 damage ${v.a} times.`, (v, c) => { for (let i = 0; i < v.a; i++) c.hit(2); }, { a: [4, 5] });
+  def('ember', 'Ember', '🕯️', 'skl', 0, 1, v => `Apply ${v.a} burn.`, (v, c) => c.apply('burn', v.a), { a: [3, 5] });
+  // curse
+  def('wound', 'Wound', '🩹', 'cur', 99, 9, () => `Unplayable. Clutters your hand.`, () => {}, {});
+
+  const STATUS = { str: ['💪', 'Strength: attacks deal more'], weak: ['🥀', 'Weak: deals 25% less'], vuln: ['🎯', 'Vulnerable: takes 50% more'], poison: ['🧪', 'Poison: loses that much HP each turn, then 1 less'], burn: ['🔥', 'Burn: takes that much damage each turn, then fades by half'], thorns: ['🌵', 'Thorns: attackers take this damage'], tthorns: ['🌵', 'Thorns this turn'], regen: ['🌿', 'Regen: heals each turn'], keepblock: ['🏰', 'Fortress: block stays'], ritual: ['🕯️', 'Ritual: gains strength each turn'] };
+
+  /* ---------- relics ---------- */
+  const RELICS = {
+    amulet: ['📿', 'Amulet', 'Start each fight with 6 block.'], ring: ['💍', 'Ruby Ring', 'Heal 6 after each fight.'], boots: ['👢', 'Swift Boots', 'Draw 1 extra card on turn 1.'],
+    crown: ['👑', 'Crown', '+1 energy every turn.'], skull: ['💀', 'Skull Cup', 'Enemies start with 1 vulnerable.'], vial: ['🧴', 'Toxic Vial', 'Poison you apply is +2.'],
+    lantern: ['🏮', 'Lantern', 'Gain 1 energy on turn 1.'], feather: ['🪶', 'Feather', 'Every 3rd card played draws a card.'], horn: ['📯', 'War Horn', 'Start each fight with 1 strength.'], purse: ['👛', 'Purse', '+50% gold from fights.'],
+    heart: ['🫀', 'Giant Heart', '+12 max HP.'], prism: ['🔷', 'Prism', 'Attacks that hit all enemies deal +2.'],
+  };
+
+  /* ---------- enemies ---------- */
+  const EN = {
+    slime: { name: 'Slime', face: '🟢', hp: [14, 18], moves: [['atk', 6], ['atk', 4, 'weak', 1], ['def', 6]] },
+    rat: { name: 'Giant Rat', face: '🐀', hp: [10, 13], moves: [['atk', 5], ['atk', 3, 'x2']] },
+    bandit: { name: 'Bandit', face: '🥷', hp: [20, 24], moves: [['atk', 8], ['def', 8], ['atk', 5, 'vuln', 1]] },
+    spider: { name: 'Spider', face: '🕷️', hp: [16, 20], moves: [['atk', 4, 'poison', 3], ['atk', 7]] },
+    imp: { name: 'Imp', face: '👺', hp: [18, 22], moves: [['buff', 2], ['atk', 7], ['atk', 4, 'x2']] },
+    golem: { name: 'Stone Golem', face: '🗿', hp: [40, 46], moves: [['def', 12], ['atk', 14], ['atk', 9, 'weak', 2]] },
+    cultist: { name: 'Cultist', face: '🧟', hp: [28, 32], moves: [['ritual', 2], ['atk', 6], ['atk', 6]] },
+    wraith: { name: 'Wraith', face: '👻', hp: [26, 30], moves: [['atk', 6, 'x2'], ['curse', 1], ['atk', 10]] },
+    knight: { name: 'Dark Knight', face: '🛡️', hp: [60, 66], elite: true, moves: [['atk', 16], ['def', 14, 'buff', 2], ['atk', 7, 'x2']] },
+    drake: { name: 'Fire Drake', face: '🐉', hp: [55, 60], elite: true, moves: [['atk', 10, 'burn', 4], ['buff', 3], ['atk', 22]] },
+    witch: { name: 'Bog Witch', face: '🧙', hp: [50, 56], elite: true, moves: [['poisonall', 5], ['atk', 9, 'weak', 2], ['def', 12], ['curse', 2]] },
+    lich: { name: 'Lich King', face: '💀', hp: [150, 150], boss: true, moves: [['atk', 12, 'x2'], ['summon', 0], ['def', 20, 'buff', 3], ['atk', 30], ['curse', 2], ['atk', 8, 'vuln', 2]] },
+  };
+  const POOLS = { easy: [['slime', 'rat'], ['bandit'], ['spider', 'rat'], ['slime', 'slime']], mid: [['golem'], ['cultist', 'rat'], ['wraith', 'imp'], ['bandit', 'spider'], ['imp', 'imp']], elite: [['knight'], ['drake'], ['witch']] };
+
+  /* ---------- run state ---------- */
+  let run, battle;
+  function newRun() {
+    run = { hp: 70, max: 70, gold: 99, deck: [], relics: [], floor: 0, map: genMap(), pos: null, cardsPlayed: 0 };
+    for (let i = 0; i < 5; i++) run.deck.push({ id: 'strike' });
+    for (let i = 0; i < 4; i++) run.deck.push({ id: 'guard' });
+    run.deck.push({ id: 'spark' });
+    hudTop(); showMap();
+  }
+  function genMap() {
+    const floors = [];
+    for (let f = 1; f <= 15; f++) {
+      let opts;
+      if (f === 1) opts = ['fight', 'fight'];
+      else if (f === 15) opts = ['boss'];
+      else if (f === 14) opts = ['rest', 'rest'];
+      else if (f === 8) opts = ['chest', 'chest'];
+      else { const n = R(2, 3), pool = f < 4 ? ['fight', 'fight', 'event', 'shop'] : ['fight', 'fight', 'elite', 'rest', 'shop', 'event']; opts = Array.from({ length: n }, () => pick(pool)); }
+      floors.push(opts);
+    }
+    return floors;
+  }
+  const NODE_ICON = { fight: '⚔️', elite: '😈', rest: '🔥', shop: '🛒', event: '❓', chest: '🎁', boss: '💀' };
+  const has = r => run.relics.includes(r);
+  function hudTop() {
+    $('php').textContent = `${run.hp}/${run.max}`; $('gold').textContent = run.gold; $('flr').textContent = run.floor; $('dn').textContent = run.deck.length;
+    $('relics').innerHTML = run.relics.map(r => `<span data-tip="${RELICS[r][1]}: ${RELICS[r][2]}">${RELICS[r][0]}</span>`).join('');
+    if (run.relics.length >= 5) kit && kit.unlock('relics5');
+  }
+  function showMap() {
+    const f = run.floor;
+    view.innerHTML = `<div class="map">${run.map.map((opts, i) => `<div class="floor"><span class="n">${i + 1}</span>${opts.map((o, k) => `<button class="node ${i === f ? 'avail' : i < f ? (run.taken && run.taken[i] === k ? 'taken' : 'done') : ''}" data-f="${i}" data-k="${k}" data-tip="${{ fight: 'Monsters', elite: 'Elite — tough fight, relic reward', rest: 'Campfire — rest or upgrade', shop: 'Shop', event: 'Unknown', chest: 'Treasure', boss: 'The Lich King' }[o]}" ${i === f ? '' : 'disabled'}>${NODE_ICON[o]}</button>`).join('')}</div>`).join('')}</div>`;
+    const cur = view.querySelector('.avail'); if (cur) cur.scrollIntoView({ block: 'center' });
+    view.onclick = e => { const b = e.target.closest('.node.avail'); if (!b) return; enter(+b.dataset.f, +b.dataset.k); };
+  }
+  function enter(f, k) {
+    run.taken = run.taken || {}; run.taken[f] = k; run.floor = f + 1; hudTop(); sfx('click');
+    const t = run.map[f][k];
+    view.onclick = null;
+    if (t === 'fight') startBattle(pick(f < 4 ? POOLS.easy : POOLS.mid), 'fight');
+    else if (t === 'elite') startBattle(pick(POOLS.elite), 'elite');
+    else if (t === 'boss') startBattle(['lich'], 'boss');
+    else if (t === 'rest') rest();
+    else if (t === 'shop') shop();
+    else if (t === 'chest') { const r = randRelic(); screen(`<h2>🎁 Treasure</h2><p>You found <b>${RELICS[r][0]} ${RELICS[r][1]}</b><br><span class="muted">${RELICS[r][2]}</span></p><button id="ok">Take it</button>`, () => { gainRelic(r); next(); }); }
+    else event();
+  }
+  function next() { hudTop(); if (run.hp <= 0) return lose(); showMap(); }
+  function screen(html, onOk) { view.innerHTML = `<div class="center">${html}</div>`; const ok = $('ok'); if (ok) ok.onclick = onOk; }
+  function randRelic() { const left = Object.keys(RELICS).filter(r => !has(r)); return left.length ? pick(left) : null; }
+  function gainRelic(r) { if (!r) { run.gold += 50; return; } run.relics.push(r); if (r === 'heart') { run.max += 12; run.hp += 12; } hudTop(); sfx('power'); }
+
+  /* ---------- card helpers ---------- */
+  const vals = c => { const d = CARDS[c.id], v = {}; for (const k in d.up) if (k !== 'cost') v[k] = d.up[k][c.up ? 1 : 0]; return v; };
+  const costOf = c => { const d = CARDS[c.id]; return d.up.cost ? d.up.cost[c.up ? 1 : 0] : d.cost; };
+  function cardHtml(c, extra = '', i = '') {
+    const d = CARDS[c.id];
+    return `<button class="card ${d.type}${c.up ? ' up' : ''} ${extra}" data-i="${i}"><span class="cost">${d.type === 'cur' ? '✖' : costOf(c)}</span><span class="nm">${d.name}${c.up ? '+' : ''}</span><span class="art">${d.art}</span><span class="tx">${d.text(vals(c))}</span><span class="ty">${{ atk: 'attack', skl: 'skill', pow: 'power', cur: 'curse' }[d.type]}</span></button>`;
+  }
+  function rewardCards(n = 3, rare = false) {
+    const pool = Object.values(CARDS).filter(d => d.rar >= 1 && d.rar < 9), out = [];
+    while (out.length < n) { const d = pick(pool); if (d.rar === 2 && !rare && Math.random() < .55) continue; if (!out.some(o => o.id === d.id)) out.push({ id: d.id, up: rare && Math.random() < .3 }); }
+    return out;
+  }
+
+  /* ---------- battle ---------- */
+  function startBattle(ids, kind) {
+    const enemies = ids.map((id, i) => { const e = EN[id], hp = R(...e.hp) + Math.floor(run.floor * 1.2); return { id, name: e.name, face: e.face, hp, max: hp, block: 0, st: {}, mi: R(0, e.moves.length - 1), def: e, uid: Math.random() }; });
+    if (has('skull')) enemies.forEach(e => e.st.vuln = 1);
+    battle = { kind, enemies, me: { block: has('amulet') ? 6 : 0, st: has('horn') ? { str: 1 } : {} }, draw: shuffle(run.deck.map(c => ({ ...c }))), hand: [], discard: [], exhaust: [], energy: 0, turn: 0, sel: -1, played: 0, log: '' };
+    battle.enemies.forEach(e => e.intent = intentOf(e));
+    renderBattleShell();
+    myTurn();
+  }
+  function intentOf(e) { const m = e.def.moves[e.mi % e.def.moves.length]; return m; }
+  function intentText(e) {
+    const m = e.intent, t = m[0];
+    const dmg = n => { let d = n + (e.st.str || 0); if (e.st.weak) d = Math.floor(d * .75); if (battle.me.st.vuln) d = Math.floor(d * 1.5); return Math.max(0, d); };
+    if (t === 'atk') return `🗡️ ${dmg(m[1])}${m[2] === 'x2' ? '×2' : ''}${m[2] && m[2] !== 'x2' ? ' + ' + STATUS[m[2]][0] : ''}`;
+    if (t === 'def') return `🛡️ Block${m[2] === 'buff' ? ' + 💪' : ''}`;
+    if (t === 'buff') return '💪 Buff'; if (t === 'ritual') return '🕯️ Ritual'; if (t === 'curse') return '🩹 Curse'; if (t === 'summon') return '☠️ Summon'; if (t === 'poisonall') return '🧪 Poison';
+    return '?';
+  }
+  function renderBattleShell() {
+    view.innerHTML = `<div id="battle"><div id="field"></div><div id="hud"><div class="energy" id="en">3</div><span class="muted" id="piles"></span><span style="flex:1" id="log" class="muted"></span><button id="endT">End turn</button></div><div id="hand"></div></div>`;
+    $('endT').onclick = endTurn;
+    $('hand').onclick = e => { const c = e.target.closest('.card'); if (c) clickCard(+c.dataset.i); };
+    $('field').onclick = e => { const u = e.target.closest('.unit.enemy'); if (u && battle.sel >= 0) playCard(battle.sel, battle.enemies.find(x => String(x.uid) === u.dataset.uid)); };
+  }
+  function stHtml(st) { return Object.entries(st).filter(([, v]) => v > 0).map(([k, v]) => `<span data-tip="${STATUS[k][1]}">${STATUS[k][0]}${k === 'keepblock' ? '' : v}</span>`).join(''); }
+  function renderBattle() {
+    const b = battle, needT = b.sel >= 0 && targeted(b.hand[b.sel]);
+    $('field').innerHTML = `<div class="unit" id="meU"><div class="face">🧝</div><div class="bar"><i style="width:${100 * run.hp / run.max}%;background:#4ade80"></i></div><div class="hp">${run.hp}/${run.max} ${b.me.block ? `<span class="blk">🛡️${b.me.block}</span>` : ''}</div><div class="st">${stHtml(b.me.st)}</div></div>` +
+      b.enemies.map(e => `<div class="unit enemy${needT ? ' target' : ''}" data-uid="${e.uid}"><div class="intent">${intentText(e)}</div><div class="face">${e.face}</div><div class="bar"><i style="width:${100 * Math.max(0, e.hp) / e.max}%"></i></div><div class="hp">${e.name} · ${Math.max(0, e.hp)}/${e.max} ${e.block ? `<span class="blk">🛡️${e.block}</span>` : ''}</div><div class="st">${stHtml(e.st)}</div></div>`).join('');
+    $('hand').innerHTML = b.hand.map((c, i) => cardHtml(c, (i === b.sel ? 'sel' : '') + (canPlay(c) ? '' : ' no'), i)).join('');
+    $('en').textContent = b.energy;
+    $('piles').textContent = `Draw ${b.draw.length} · Discard ${b.discard.length}${b.exhaust.length ? ' · Exhausted ' + b.exhaust.length : ''}`;
+    $('log').textContent = b.sel >= 0 ? (needT ? 'Pick a target' : '') : b.log;
+    if (b.me.block >= 40) kit && kit.unlock('wall');
+    hudTop();
+  }
+  const targeted = c => { const d = CARDS[c.id]; return d.type === 'atk' && !/ALL/.test(d.text(vals(c))) || ['expose', 'catalyst', 'ember'].includes(c.id); };
+  const canPlay = c => CARDS[c.id].type !== 'cur' && costOf(c) <= battle.energy;
+  function clickCard(i) {
+    const c = battle.hand[i]; if (!c || !canPlay(c) || battle.busy) { sfx('click'); return; }
+    if (targeted(c)) {
+      const alive = battle.enemies.filter(e => e.hp > 0);
+      if (alive.length === 1) return playCard(i, alive[0]);
+      battle.sel = battle.sel === i ? -1 : i; renderBattle(); return;
+    }
+    playCard(i, null);
+  }
+  function floatAt(el, txt, col) { if (!el) return; const f = document.createElement('div'); f.className = 'float'; f.textContent = txt; f.style.color = col; el.appendChild(f); setTimeout(() => f.remove(), 900); el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
+  const unitEl = e => e === 'me' ? $('meU') : document.querySelector(`.unit[data-uid="${e.uid}"]`);
+  function damage(target, amount, src) {   // returns HP lost
+    let d = amount;
+    if (target === 'me') {
+      if (battle.me.st.vuln) d = Math.floor(d * 1.5);
+      const blk = Math.min(battle.me.block, d); battle.me.block -= blk; d -= blk;
+      run.hp -= d; floatAt(unitEl('me'), d ? '-' + d : 'blocked', d ? '#f87171' : '#60a5fa');
+      if (src && (battle.me.st.thorns || battle.me.st.tthorns)) damage(src, (battle.me.st.thorns || 0) + (battle.me.st.tthorns || 0));
+      if (d) sfx('hurt');
+      return d;
+    }
+    if (target.hp <= 0) return 0;
+    if (target.st.vuln) d = Math.floor(d * 1.5);
+    const blk = Math.min(target.block, d); target.block -= blk; d -= blk;
+    target.hp -= d; floatAt(unitEl(target), d ? '-' + d : 'blocked', d ? '#fca5a5' : '#93c5fd');
+    return d;
+  }
+  function ctx(card, tgt) {
+    const b = battle, str = b.me.st.str || 0, weak = b.me.st.weak;
+    const atk = n => { let d = n + str; if (weak) d = Math.floor(d * .75); return Math.max(0, d); };
+    const c = {
+      me: b.me, tgt,
+      hit(n) { const t = c.tgt && c.tgt.hp > 0 ? c.tgt : b.enemies.find(e => e.hp > 0); if (!t) return 0; const d = damage(t, atk(n)); c.total += d; sfx('hit'); return d; },
+      hitAll(n) { let s = 0; b.enemies.forEach(e => { if (e.hp > 0) s += damage(e, atk(n) + (has('prism') ? 2 : 0)); }); c.total += s; sfx('hit'); return s; },
+      block(n) { b.me.block += n; floatAt(unitEl('me'), '+' + n + '🛡️', '#60a5fa'); },
+      apply(s, n) { const t = c.tgt && c.tgt.hp > 0 ? c.tgt : b.enemies.find(e => e.hp > 0); if (!t || !n) return; if (s === 'poison' && has('vial')) n += 2; t.st[s] = (t.st[s] || 0) + n; if (s === 'poison' && t.st.poison >= 20) kit && kit.unlock('poison'); },
+      applyAll(s, n) { b.enemies.forEach(e => { if (e.hp > 0) { let k = n; if (s === 'poison' && has('vial')) k += 2; e.st[s] = (e.st[s] || 0) + k; if (s === 'poison' && e.st.poison >= 20) kit && kit.unlock('poison'); } }); },
+      self(s, n) { b.me.st[s] = (b.me.st[s] || 0) + n; sfx('power'); },
+      draw(n) { drawCards(n); }, energy(n) { b.energy += n; }, heal(n) { run.hp = Math.min(run.max, run.hp + n); },
+      exhaust() { c.ex = true; }, total: 0, ex: false,
+    };
+    return c;
+  }
+  function playCard(i, tgt) {
+    const b = battle, card = b.hand[i]; if (!card || !canPlay(card)) return;
+    b.energy -= costOf(card); b.hand.splice(i, 1); b.sel = -1;
+    const d = CARDS[card.id], c = ctx(card, tgt);
+    d.fx(vals(card), c);
+    if (c.total >= 40) kit && kit.unlock('big');
+    (c.ex || d.type === 'pow') ? b.exhaust.push(card) : b.discard.push(card);
+    b.played++; if (has('feather') && b.played % 3 === 0) drawCards(1);
+    b.log = `${d.name}${card.up ? '+' : ''}`;
+    renderBattle();
+    checkWin();
+  }
+  function drawCards(n) {
+    const b = battle;
+    for (let k = 0; k < n; k++) {
+      if (!b.draw.length) { if (!b.discard.length) break; b.draw = shuffle(b.discard); b.discard = []; }
+      if (b.hand.length >= 10) break;
+      b.hand.push(b.draw.pop());
+    }
+  }
+  function tickStatus(u, isMe) {
+    const st = isMe ? battle.me.st : u.st;
+    if (st.poison) { const d = st.poison; if (isMe) { run.hp -= d; floatAt(unitEl('me'), '-' + d + '🧪', '#a3e635'); } else { u.hp -= d; floatAt(unitEl(u), '-' + d + '🧪', '#a3e635'); } st.poison--; }
+    if (st.burn) { const d = st.burn; if (isMe) damage('me', d); else damage(u, d); st.burn = Math.floor(st.burn / 2); }
+  }
+  function decay(st) { ['weak', 'vuln'].forEach(k => { if (st[k]) st[k]--; }); st.tthorns = 0; }
+  function myTurn() {
+    const b = battle; b.turn++;
+    if (!b.me.st.keepblock) b.me.block = b.turn === 1 ? b.me.block : 0;
+    b.energy = 3 + (has('crown') ? 1 : 0) + (b.turn === 1 && has('lantern') ? 1 : 0);
+    drawCards(5 + (b.turn === 1 && has('boots') ? 1 : 0));
+    b.busy = false; b.log = `Turn ${b.turn}`;
+    renderBattle();
+  }
+  async function endTurn() {
+    const b = battle; if (b.busy) return; b.busy = true; b.sel = -1;
+    b.discard.push(...b.hand.filter(c => c.id !== 'wound' || true)); b.hand = [];
+    if (b.me.st.regen) { run.hp = Math.min(run.max, run.hp + b.me.st.regen); }
+    decay(b.me.st);
+    renderBattle();
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    for (const e of b.enemies) {
+      if (e.hp <= 0) continue;
+      tickStatus(e, false); renderBattle(); if (checkWin()) return;
+      if (e.hp <= 0) continue;
+      await wait(380);
+      e.block = 0;
+      const m = e.intent, str = e.st.str || 0;
+      const hitMe = n => { let d = n + str; if (e.st.weak) d = Math.floor(d * .75); damage('me', Math.max(0, d), e); };
+      if (m[0] === 'atk') { hitMe(m[1]); if (m[2] === 'x2') { await wait(200); hitMe(m[1]); } else if (m[2]) { b.me.st[m[2]] = (b.me.st[m[2]] || 0) + m[3]; } }
+      else if (m[0] === 'def') { e.block += m[1] + run.floor; if (m[2] === 'buff') e.st.str = (e.st.str || 0) + m[3]; }
+      else if (m[0] === 'buff') e.st.str = (e.st.str || 0) + m[1];
+      else if (m[0] === 'ritual') e.st.ritual = (e.st.ritual || 0) + m[1];
+      else if (m[0] === 'curse') { for (let k = 0; k < m[1]; k++) b.discard.push({ id: 'wound' }); b.log = `${e.name} curses you with Wounds`; }
+      else if (m[0] === 'poisonall') b.me.st.poison = (b.me.st.poison || 0) + m[1];
+      else if (m[0] === 'summon') { const alive = b.enemies.filter(x => x.hp > 0).length; if (alive < 3) { const s = pick(['wraith', 'imp', 'spider']), d = EN[s], hp = R(...d.hp); b.enemies.push({ id: s, name: d.name, face: d.face, hp, max: hp, block: 0, st: {}, mi: 0, def: d, uid: Math.random() }); b.enemies[b.enemies.length - 1].intent = intentOf(b.enemies[b.enemies.length - 1]); } }
+      if (e.st.ritual) e.st.str = (e.st.str || 0) + e.st.ritual;
+      decay(e.st);
+      e.mi++; e.intent = intentOf(e);
+      if (m[0] === 'summon' && e.def.boss) e.intent = e.def.moves[e.mi % e.def.moves.length];
+      renderBattle();
+      if (run.hp <= 0) return lose();
+    }
+    tickStatus(null, true); renderBattle();
+    if (run.hp <= 0) return lose();
+    await wait(250);
+    if (checkWin()) return;
+    myTurn();
+  }
+  function checkWin() {
+    const b = battle;
+    if (b.won || b.enemies.some(e => e.hp > 0)) return false;
+    b.won = true;
+    setTimeout(winBattle, 450);
+    return true;
+  }
+  function winBattle() {
+    const b = battle; sfx('win');
+    if (b.kind === 'boss') return victory();
+    if (has('ring')) run.hp = Math.min(run.max, run.hp + 6);
+    if (b.kind === 'elite') kit && kit.unlock('elite');
+    let gold = (b.kind === 'elite' ? R(30, 45) : R(12, 22)); if (has('purse')) gold = Math.round(gold * 1.5);
+    run.gold += gold; hudTop();
+    const relic = b.kind === 'elite' ? randRelic() : null;
+    if (relic) gainRelic(relic);
+    const opts = rewardCards(3, b.kind === 'elite');
+    view.innerHTML = `<div class="center"><h2>Victory!</h2><p>+${gold} 🪙${relic ? ` · Relic: ${RELICS[relic][0]} <b>${RELICS[relic][1]}</b> — <span class="muted">${RELICS[relic][2]}</span>` : ''}</p><p class="muted">Pick a card to add to your deck</p><div class="row" id="rw">${opts.map((c, i) => cardHtml(c, '', i)).join('')}</div><button class="alt" id="skip">Skip</button></div>`;
+    $('rw').onclick = e => { const c = e.target.closest('.card'); if (!c) return; run.deck.push(opts[+c.dataset.i]); sfx('coin'); next(); };
+    $('skip').onclick = next;
+  }
+  function lose() {
+    battle && (battle.busy = true);
+    sfx('lose');
+    kit && kit.score(run.floor, 'floor');
+    view.innerHTML = `<div class="center"><h1>💀</h1><h2>You fell on floor ${run.floor}</h2><p class="muted">Deck: ${run.deck.length} cards · Relics: ${run.relics.map(r => RELICS[r][0]).join(' ') || 'none'}</p><button id="again">Try again</button></div>`;
+    $('again').onclick = newRun;
+  }
+  function victory() {
+    kit && kit.unlock('win'); if (run.deck.length <= 12) kit && kit.unlock('thin');
+    kit && kit.score(run.floor, 'floor'); kit && kit.stat('wins'); kit && kit.score(run.hp, 'hp-left');
+    view.innerHTML = `<div class="center"><h1>👑 Spellbound!</h1><h2>The Lich King is defeated.</h2><p class="muted">${run.hp}/${run.max} HP left · ${run.deck.length} cards · ${run.relics.length} relics</p><button id="again">New run</button></div>`;
+    $('again').onclick = newRun;
+  }
+
+  /* ---------- rest / shop / events ---------- */
+  function rest() {
+    const heal = Math.round(run.max * .3);
+    screen(`<h2>🔥 Campfire</h2><p class="muted">Rest to heal ${heal} HP, or sharpen one card.</p><div class="row"><button id="rh">Rest (+${heal} ❤️)</button><button class="alt" id="ru">Upgrade a card</button></div>`);
+    $('rh').onclick = () => { run.hp = Math.min(run.max, run.hp + heal); sfx('power'); next(); };
+    $('ru').onclick = () => choose('Upgrade which card?', run.deck.filter(c => !c.up && CARDS[c.id].type !== 'cur'), c => { c.up = true; sfx('power'); next(); });
+  }
+  function choose(title, cards, cb, back) {
+    view.innerHTML = `<div class="center"><h2>${title}</h2><div class="row" id="ch">${cards.map((c, i) => cardHtml(c, '', i)).join('') || '<p class="muted">Nothing to pick.</p>'}</div><button class="alt" id="cb">Back</button></div>`;
+    $('ch').onclick = e => { const el = e.target.closest('.card'); if (el) cb(cards[+el.dataset.i]); };
+    $('cb').onclick = back || next;
+  }
+  function shop() {
+    const stock = rewardCards(5, true).map(c => ({ c, price: CARDS[c.id].rar === 2 ? R(70, 95) : R(40, 60) + (c.up ? 25 : 0) }));
+    const relic = randRelic(), rPrice = R(120, 160);
+    let removed = false;
+    const draw = () => {
+      view.innerHTML = `<div class="center"><h2>🛒 Shop</h2><div class="row" id="sh">${stock.map((s, i) => s.sold ? '' : `<div>${cardHtml(s.c, run.gold < s.price ? 'no' : '', i)}<div>${s.price} 🪙</div></div>`).join('')}</div><div class="row">${relic && !has(relic) ? `<button id="br" ${run.gold < rPrice ? 'disabled' : ''}>${RELICS[relic][0]} ${RELICS[relic][1]} — ${rPrice} 🪙</button>` : ''}<button class="alt" id="rm" ${removed || run.gold < 50 ? 'disabled' : ''}>Remove a card — 50 🪙</button><button class="alt" id="hl" ${run.gold < 30 ? 'disabled' : ''}>Potion +20 ❤️ — 30 🪙</button></div>${relic && !has(relic) ? `<p class="muted">${RELICS[relic][2]}</p>` : ''}<button id="ok">Leave</button></div>`;
+      $('sh').onclick = e => { const el = e.target.closest('.card'); if (!el) return; const s = stock[+el.dataset.i]; if (run.gold < s.price) return; run.gold -= s.price; s.sold = true; run.deck.push(s.c); sfx('coin'); hudTop(); draw(); };
+      const br = $('br'); if (br) br.onclick = () => { run.gold -= rPrice; gainRelic(relic); draw(); };
+      $('rm').onclick = () => choose('Remove which card?', run.deck, c => { run.deck.splice(run.deck.indexOf(c), 1); run.gold -= 50; removed = true; sfx('coin'); hudTop(); draw(); }, draw);
+      $('hl').onclick = () => { run.gold -= 30; run.hp = Math.min(run.max, run.hp + 20); hudTop(); draw(); };
+      $('ok').onclick = next;
+    };
+    draw();
+  }
+  function event() {
+    const E = [
+      () => screen(`<h2>⛲ Wishing Well</h2><p class="muted">Toss 25 gold for a chance at something good.</p><div class="row"><button id="a" ${run.gold < 25 ? 'disabled' : ''}>Toss a coin</button><button class="alt" id="ok">Walk on</button></div>`, next) || ($('a').onclick = () => { run.gold -= 25; if (Math.random() < .5) { const r = randRelic(); gainRelic(r); screen(`<h2>✨ The well glows</h2><p>${r ? RELICS[r][0] + ' ' + RELICS[r][1] : '+50 gold'}</p><button id="ok">Nice</button>`, next); } else screen(`<h2>Plink.</h2><p class="muted">Nothing happens.</p><button id="ok">Oh well</button>`, next); }),
+      () => screen(`<h2>📚 Old Library</h2><p class="muted">Study a tome: upgrade 2 random cards, but lose 6 HP.</p><div class="row"><button id="a">Study</button><button class="alt" id="ok">Leave</button></div>`, next) || ($('a').onclick = () => { run.hp -= 6; shuffle(run.deck.filter(c => !c.up && CARDS[c.id].type !== 'cur')).slice(0, 2).forEach(c => c.up = true); sfx('power'); next(); }),
+      () => screen(`<h2>🧝 Wandering Healer</h2><p class="muted">"Rest a while, traveller."</p><button id="ok">Heal 15 HP</button>`, () => { run.hp = Math.min(run.max, run.hp + 15); next(); }),
+      () => { const c = rewardCards(1, true)[0]; screen(`<h2>🗝️ Locked Chest</h2><p class="muted">Pry it open (lose 8 HP) to take this card:</p><div class="row">${cardHtml(c)}</div><div class="row"><button id="a">Pry it open</button><button class="alt" id="ok">Leave it</button></div>`, next); $('a').onclick = () => { run.hp -= 8; run.deck.push(c); next(); }; },
+      () => screen(`<h2>🎲 Gambler</h2><p class="muted">Double or nothing on 40 gold?</p><div class="row"><button id="a" ${run.gold < 40 ? 'disabled' : ''}>Bet 40</button><button class="alt" id="ok">No thanks</button></div>`, next) || ($('a').onclick = () => { const w = Math.random() < .5; run.gold += w ? 40 : -40; sfx(w ? 'coin' : 'lose'); screen(`<h2>${w ? 'You win!' : 'You lose.'}</h2><button id="ok">Continue</button>`, next); }),
+    ];
+    pick(E)();
+  }
+
+  /* ---------- deck viewer + tooltips ---------- */
+  $('deckBtn').onclick = () => {
+    if (!run) return;
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:15;background:rgba(10,6,18,.92);overflow:auto';
+    ov.innerHTML = `<div class="center"><h2>Your deck (${run.deck.length})</h2><div class="row">${run.deck.slice().sort((a, b) => a.id.localeCompare(b.id)).map(c => cardHtml(c)).join('')}</div><button id="db">Close</button></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#db').onclick = () => ov.remove();
+  };
+  const tip = $('tip');
+  document.addEventListener('pointerover', e => { const t = e.target.closest('[data-tip]'); if (!t) { tip.style.display = 'none'; return; } tip.textContent = t.dataset.tip; tip.style.display = 'block'; const r = t.getBoundingClientRect(); tip.style.left = Math.min(innerWidth - 230, r.left) + 'px'; tip.style.top = (r.bottom + 6) + 'px'; });
+  $('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+  if (kit && kit.muted) $('mute').textContent = '🔇';
+  addEventListener('keydown', e => {
+    if (!battle || battle.busy || !$('hand')) return;
+    if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') endTurn();
+    const n = parseInt(e.key, 10); if (n >= 1 && n <= 9) clickCard(n - 1);
+    if (e.key === 'Escape') { battle.sel = -1; renderBattle(); }
+  });
+
+  /* ---------- title ---------- */
+  view.innerHTML = `<div class="center"><h1>🃏 Spellbound</h1><p class="muted" style="max-width:420px">Climb 15 floors of a cursed tower. Build a deck of spells as you go, collect relics, and defeat the Lich King at the top.</p><button id="go">Begin a run</button><p class="muted" style="font-size:12px">Click a card to play it (attacks then need a target). Keys: 1–9 play cards, E ends the turn.</p>${kit && kit.getStat('wins') ? `<p>👑 Runs won: ${kit.getStat('wins')}</p>` : ''}</div>`;
+  $('go').onclick = newRun;
+  window.__cards = () => ({ run, battle, newRun, endTurn, playCard, startBattle });
+})();
+</script>
+</body></html>

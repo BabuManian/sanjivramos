@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Timer</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0f172a;color:#e2e8f0;font:14px system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;gap:16px;padding:18px;box-sizing:border-box}
+nav{display:flex;gap:8px}
+nav button{background:#1e293b;color:#cbd5e1}
+nav button.on{background:#0ea5e9;color:#fff}
+button{border:none;border-radius:10px;padding:10px 18px;font:inherit;cursor:pointer;background:#334155;color:#fff}
+button.go{background:#22c55e;color:#052e16;font-weight:700}
+#big{font-size:clamp(54px,18vw,108px);font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.sec{display:none;flex-direction:column;align-items:center;gap:14px}
+.sec.on{display:flex}
+input{width:70px;padding:8px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#fff;font:inherit;text-align:center}
+#laps{max-height:180px;overflow:auto;width:min(90vw,340px);font-variant-numeric:tabular-nums;opacity:.85}
+#laps div{display:flex;justify-content:space-between;padding:4px 8px;border-bottom:1px solid #1e293b}
+.flash{animation:fl .5s 4}
+@keyframes fl{50%{background:#7f1d1d}}
+</style></head><body>
+<nav>
+  <button id="t1" class="on">Pomodoro</button>
+  <button id="t2">Stopwatch</button>
+  <button id="t3">Countdown</button>
+</nav>
+
+<section class="sec on" id="s1">
+  <div id="ptag">Focus</div>
+  <div id="big1">25:00</div>
+  <div class="row">
+    <label>Focus <input id="pf" type="number" min="1" max="120" value="25"> min</label>
+    <label>Break <input id="pb" type="number" min="1" max="60" value="5"> min</label>
+  </div>
+  <div class="row"><button class="go" id="p-go">Start</button><button id="p-reset">Reset</button></div>
+  <div style="opacity:.7">Completed focus sessions: <b id="pc">0</b></div>
+</section>
+
+<section class="sec" id="s2">
+  <div id="big2">00:00.00</div>
+  <div class="row"><button class="go" id="w-go">Start</button><button id="w-lap">Lap</button><button id="w-reset">Reset</button></div>
+  <div id="laps"></div>
+</section>
+
+<section class="sec" id="s3">
+  <div id="big3">00:00</div>
+  <div class="row">
+    <label>Minutes <input id="cm" type="number" min="0" max="999" value="1"></label>
+    <label>Seconds <input id="cs" type="number" min="0" max="59" value="0"></label>
+  </div>
+  <div class="row"><button class="go" id="c-go">Start</button><button id="c-reset">Reset</button></div>
+</section>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const pad = (n, w = 2) => String(n).padStart(w, '0');
+  const mmss = s => pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+  let beepCtx = null;
+  function beep(times = 3) {
+    try {
+      beepCtx = beepCtx || new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < times; i++) {
+        const o = beepCtx.createOscillator(), g = beepCtx.createGain(), t = beepCtx.currentTime + i * .35;
+        o.frequency.value = 880; g.gain.setValueAtTime(.2, t); g.gain.exponentialRampToValueAtTime(.001, t + .25);
+        o.connect(g).connect(beepCtx.destination); o.start(t); o.stop(t + .3);
+      }
+    } catch {}
+  }
+  function notify(text) {
+    const t = document.title; let n = 0;
+    const iv = setInterval(() => { document.title = n++ % 2 ? t : '⏰ ' + text; if (n > 8) { clearInterval(iv); document.title = t; } }, 600);
+    if (document.body) document.body.classList.add('flash');
+    setTimeout(() => document.body.classList.remove('flash'), 2000);
+  }
+
+  // Tabs
+  const tabs = [['t1', 's1'], ['t2', 's2'], ['t3', 's3']];
+  tabs.forEach(([t, s]) => $(t).addEventListener('click', () => {
+    tabs.forEach(([tt, ss]) => { $(tt).classList.toggle('on', tt === t); $(ss).classList.toggle('on', ss === s); });
+  }));
+
+  // Pomodoro
+  let pRun = false, pLeft = 25 * 60, pFocus = true, pDone = 0, pEnd = 0, pT = null;
+  try { pDone = +localStorage.getItem('sj-timer-done') || 0; } catch {}
+  $('pc').textContent = pDone;
+  const pSet = () => { pLeft = (pFocus ? +$('pf').value : +$('pb').value) * 60 || 60; $('big1').textContent = mmss(pLeft); $('ptag').textContent = pFocus ? 'Focus' : 'Break'; };
+  const pTick = () => {
+    pLeft = Math.max(0, Math.round((pEnd - Date.now()) / 1000));
+    $('big1').textContent = mmss(pLeft);
+    if (pLeft <= 0) {
+      clearInterval(pT); pRun = false; beep();
+      if (pFocus) { pDone++; try { localStorage.setItem('sj-timer-done', String(pDone)); } catch {} $('pc').textContent = pDone; notify('Break time'); }
+      else notify('Back to focus');
+      pFocus = !pFocus; pSet(); $('p-go').textContent = 'Start';
+    }
+  };
+  $('p-go').addEventListener('click', () => {
+    if (pRun) { clearInterval(pT); pRun = false; $('p-go').textContent = 'Resume'; pLeft = Math.max(0, Math.round((pEnd - Date.now()) / 1000)); return; }
+    pEnd = Date.now() + pLeft * 1000; pRun = true; $('p-go').textContent = 'Pause';
+    pT = setInterval(pTick, 250); pTick();
+  });
+  $('p-reset').addEventListener('click', () => { clearInterval(pT); pRun = false; pFocus = true; pSet(); $('p-go').textContent = 'Start'; });
+  $('pf').addEventListener('change', () => { if (!pRun && pFocus) pSet(); });
+  $('pb').addEventListener('change', () => { if (!pRun && !pFocus) pSet(); });
+  pSet();
+
+  // Stopwatch
+  let wRun = false, wStart = 0, wBase = 0, wT = null;
+  const wShow = () => { const ms = wBase + (wRun ? Date.now() - wStart : 0); const s = Math.floor(ms / 1000);
+    $('big2').textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60) + '.' + pad(Math.floor(ms % 1000 / 10)); };
+  $('w-go').addEventListener('click', () => {
+    if (wRun) { wBase += Date.now() - wStart; wRun = false; clearInterval(wT); $('w-go').textContent = 'Start'; }
+    else { wStart = Date.now(); wRun = true; wT = setInterval(wShow, 50); $('w-go').textContent = 'Stop'; }
+    wShow();
+  });
+  $('w-lap').addEventListener('click', () => {
+    if (!wRun && !wBase) return;
+    const row = document.createElement('div');
+    row.innerHTML = `<span>Lap ${$('laps').children.length + 1}</span><span>${$('big2').textContent}</span>`;
+    $('laps').prepend(row);
+  });
+  $('w-reset').addEventListener('click', () => { wRun = false; clearInterval(wT); wBase = 0; $('w-go').textContent = 'Start'; $('laps').innerHTML = ''; wShow(); });
+
+  // Countdown
+  let cLeft = 60, cRun = false, cEnd = 0, cT = null;
+  const cSet = () => { const s = (+$('cm').value | 0) * 60 + (+$('cs').value | 0); cLeft = s || 60; $('big3').textContent = mmss(cLeft); };
+  const cTick = () => {
+    cLeft = Math.max(0, Math.round((cEnd - Date.now()) / 1000)); $('big3').textContent = mmss(cLeft);
+    if (cLeft <= 0) { clearInterval(cT); cRun = false; $('c-go').textContent = 'Start'; beep(4); notify('Time is up'); }
+  };
+  $('c-go').addEventListener('click', () => {
+    if (cRun) { clearInterval(cT); cRun = false; $('c-go').textContent = 'Resume'; cLeft = Math.max(0, Math.round((cEnd - Date.now()) / 1000)); return; }
+    if (cLeft <= 0) cSet();
+    cEnd = Date.now() + cLeft * 1000; cRun = true; $('c-go').textContent = 'Pause';
+    cT = setInterval(cTick, 250); cTick();
+  });
+  $('c-reset').addEventListener('click', () => { clearInterval(cT); cRun = false; $('c-go').textContent = 'Start'; cSet(); });
+  $('cm').addEventListener('change', () => { if (!cRun) cSet(); });
+  $('cs').addEventListener('change', () => { if (!cRun) cSet(); });
+  cSet();
+})();
+</script>
+</body></html>

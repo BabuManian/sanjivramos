@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chess</title>
+<style>
+:root{--bg:#161a22;--panel:rgba(255,255,255,.04);--ink:#e8ecf4;--mute:#97a0b3;--light:#e9dcc3;--dark:#a47b5a;--acc:#5b84ff;--hl:rgba(255,214,10,.42);--chk:rgba(239,68,68,.75)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;padding:12px;box-sizing:border-box}
+@media (max-width:760px){#app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto;overflow:auto;height:auto;min-height:100%}}
+#left{display:flex;flex-direction:column;gap:8px;min-height:0;align-items:center;justify-content:center}
+.who{display:flex;align-items:center;gap:8px;width:min(100%,calc(100vh - 140px));max-width:640px}
+.who .nm{font-weight:650;flex:1}
+.who .cap{font-size:16px;letter-spacing:-2px;opacity:.8;min-height:20px}
+.clock{font:600 18px ui-monospace,monospace;padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.06);min-width:64px;text-align:center}
+.clock.run{background:#e8ecf4;color:#111}.clock.low{background:#dc2626;color:#fff}
+#board{position:relative;width:min(100%,calc(100vh - 140px));max-width:640px;aspect-ratio:1;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:10px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.45);touch-action:none;user-select:none}
+.sq{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:hidden}
+.sq.l{background:var(--light)}.sq.d{background:var(--dark)}
+.sq.last::before{content:"";position:absolute;inset:0;background:var(--hl)}
+.sq.sel::before{content:"";position:absolute;inset:0;background:rgba(91,132,255,.45)}
+.sq.chk{background:radial-gradient(circle,var(--chk) 0,rgba(239,68,68,.3) 60%,transparent 75%),var(--light)}
+.sq.d.chk{background:radial-gradient(circle,var(--chk) 0,rgba(239,68,68,.3) 60%,transparent 75%),var(--dark)}
+.sq .dot{position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,20,20,.25);pointer-events:none}
+.sq .ring{position:absolute;inset:4%;border-radius:50%;border:5px solid rgba(20,20,20,.25);pointer-events:none}
+.pc{width:88%;height:88%;position:relative;z-index:1;cursor:grab;transition:transform .12s;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+.pc.drag{cursor:grabbing;position:fixed;z-index:50;pointer-events:none;transition:none}
+.coord{position:absolute;font-size:10px;font-weight:700;opacity:.7;pointer-events:none}
+.coord.f{right:3px;bottom:1px}.coord.r{left:3px;top:1px}
+.sq.l .coord{color:var(--dark)}.sq.d .coord{color:var(--light)}
+#side{display:flex;flex-direction:column;gap:10px;min-height:0}
+.card{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:12px}
+.card h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--mute)}
+button,select{font:inherit;color:inherit;border:none;cursor:pointer}
+.btn{background:rgba(255,255,255,.08);padding:8px 12px;border-radius:10px;transition:background .15s,transform .1s}
+.btn:hover{background:rgba(255,255,255,.14)}.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--acc);color:#fff}.btn.pri:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.4;cursor:default}
+select{background:rgba(255,255,255,.08);padding:7px 9px;border-radius:9px}
+select option{background:#1d2230}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#moves{flex:1;min-height:120px;overflow:auto;font:13px ui-monospace,monospace;display:grid;grid-template-columns:34px 1fr 1fr;align-content:start;gap:2px 6px}
+#moves .n{opacity:.5}#moves .m{padding:1px 4px;border-radius:4px}#moves .m.cur{background:rgba(91,132,255,.3)}
+#status{font-weight:600;min-height:20px}
+#chat{display:flex;flex-direction:column;gap:4px;max-height:140px;overflow:auto;font-size:13px}
+#chatf{display:flex;gap:6px}#chatf input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:inherit;padding:7px 9px;font:inherit}
+#promo{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;gap:8px;z-index:60}
+#promo[hidden]{display:none}
+#promo button{width:20%;aspect-ratio:1;background:#f1f5f9;border-radius:12px;padding:6px}
+#over{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,12,18,.6);backdrop-filter:blur(4px);z-index:70;text-align:center}
+#over[hidden]{display:none}
+#over .box{background:rgba(24,28,40,.95);padding:20px 26px;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+#over h2{margin:0 0 6px}
+.hidden{display:none!important}
+.eval{height:6px;border-radius:3px;background:#333;overflow:hidden;width:min(100%,calc(100vh - 140px));max-width:640px}.eval i{display:block;height:100%;background:#f1f5f9;transition:width .4s}
+</style></head><body>
+<div id="app">
+  <div id="left">
+    <div class="who" id="topWho"><span class="nm" id="topName">Black</span><span class="cap" id="topCap"></span><span class="clock" id="topClock">–</span></div>
+    <div id="board" aria-label="Chess board"></div>
+    <div class="who" id="botWho"><span class="nm" id="botName">White</span><span class="cap" id="botCap"></span><span class="clock" id="botClock">–</span></div>
+    <div class="eval" id="evalBar" title="Who's ahead (CPU's estimate)"><i style="width:50%"></i></div>
+  </div>
+  <div id="side">
+    <div class="card">
+      <h3>New game</h3>
+      <div class="row" style="margin-bottom:6px"><select id="mode"><option value="cpu">vs Computer</option><option value="local">2 players (this device)</option><option value="online">Online / LAN</option></select>
+        <select id="level"><option value="1">Beginner</option><option value="2" selected>Casual</option><option value="3">Club</option><option value="4">Expert</option><option value="5">Master</option></select></div>
+      <div class="row" style="margin-bottom:6px"><select id="color"><option value="w">Play White</option><option value="b">Play Black</option><option value="r">Random side</option></select>
+        <select id="tc"><option value="0">No clock</option><option value="60+0">Bullet 1+0</option><option value="180+2">Blitz 3+2</option><option value="300+0">Blitz 5+0</option><option value="600+5">Rapid 10+5</option></select></div>
+      <div class="row"><button class="btn pri" id="newBtn">Start</button></div>
+    </div>
+    <div class="card"><div id="status">Your move</div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="undoBtn" title="Take back (Ctrl+Z)">↶ Undo</button><button class="btn" id="hintBtn">💡 Hint</button><button class="btn" id="flipBtn" title="Flip board (F)">⇅ Flip</button><button class="btn" id="resignBtn">🏳 Resign</button><button class="btn" id="muteBtn">🔊</button></div>
+    </div>
+    <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0"><h3>Moves</h3><div id="moves"></div>
+      <div class="row" style="margin-top:6px"><button class="btn" id="copyPgn">Copy PGN</button></div></div>
+    <div class="card hidden" id="chatCard"><h3>Chat</h3><div id="chat"></div><form id="chatf"><input maxlength="300" placeholder="Message…"><button class="btn">Send</button></form></div>
+  </div>
+</div>
+<div id="promo" hidden></div>
+<div id="over" hidden><div class="box"><h2 id="overT"></h2><p id="overS" style="opacity:.8;margin:0 0 12px"></p><div class="row" style="justify-content:center"><button class="btn pri" id="againBtn">Play again</button><button class="btn" id="closeOver">View board</button></div></div></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+/* ---------------- engine (runs both here and in the AI worker) ---------------- */
+function ChessEngine() {
+  const N = 0, P = 1, Nn = 2, B = 3, R = 4, Q = 5, K = 6;
+  const VAL = [0, 100, 320, 330, 500, 900, 20000];
+  const PST = {
+    1: [0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+    2: [-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+    3: [-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+    4: [0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+    5: [-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+    6: [-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20],
+    7: [-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50],
+  };
+  const CH = { p: 1, n: 2, b: 3, r: 4, q: 5, k: 6 }, LET = ' pnbrqk';
+  // board: 64 ints, + white / - black. index 0 = a8, 63 = h1.
+  const fileOf = s => s & 7, rankOf = s => s >> 3;
+  const sqName = s => 'abcdefgh'[fileOf(s)] + (8 - rankOf(s));
+  const nameSq = n => (8 - +n[1]) * 8 + 'abcdefgh'.indexOf(n[0]);
+  const KN = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]], KG = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+  const DIAG = [[-1, -1], [-1, 1], [1, -1], [1, 1]], ORTH = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  function fromFen(f) {
+    const [pos, turn, cas, ep, half, full] = f.split(' ');
+    const b = new Array(64).fill(0); let i = 0;
+    for (const c of pos) { if (c === '/') continue; if (/\d/.test(c)) i += +c; else { const t = CH[c.toLowerCase()]; b[i++] = c === c.toUpperCase() ? t : -t; } }
+    return { b, w: turn === 'w', cas: cas === '-' ? '' : cas, ep: ep === '-' ? -1 : nameSq(ep), half: +half || 0, full: +full || 1, hist: [] };
+  }
+  function toFen(s, short) {
+    let out = '';
+    for (let r = 0; r < 8; r++) { let e = 0; for (let f = 0; f < 8; f++) { const p = s.b[r * 8 + f]; if (!p) { e++; continue; } if (e) { out += e; e = 0; } const c = LET[Math.abs(p)]; out += p > 0 ? c.toUpperCase() : c; } if (e) out += e; if (r < 7) out += '/'; }
+    out += ` ${s.w ? 'w' : 'b'} ${s.cas || '-'} ${s.ep >= 0 ? sqName(s.ep) : '-'}`;
+    return short ? out : out + ` ${s.half} ${s.full}`;
+  }
+  function attacked(s, sq, byWhite) {
+    const b = s.b, sg = byWhite ? 1 : -1, r0 = rankOf(sq), f0 = fileOf(sq);
+    const pr = r0 + (byWhite ? 1 : -1);
+    if (pr >= 0 && pr < 8) for (const df of [-1, 1]) { const f = f0 + df; if (f >= 0 && f < 8 && b[pr * 8 + f] === sg * P) return true; }
+    for (const [dr, df] of KN) { const r = r0 + dr, f = f0 + df; if (r >= 0 && r < 8 && f >= 0 && f < 8 && b[r * 8 + f] === sg * Nn) return true; }
+    for (const [dr, df] of KG) { const r = r0 + dr, f = f0 + df; if (r >= 0 && r < 8 && f >= 0 && f < 8 && b[r * 8 + f] === sg * K) return true; }
+    for (const [dirs, a, c] of [[DIAG, B, Q], [ORTH, R, Q]]) for (const [dr, df] of dirs) {
+      let r = r0 + dr, f = f0 + df;
+      while (r >= 0 && r < 8 && f >= 0 && f < 8) { const p = b[r * 8 + f]; if (p) { if (p === sg * a || p === sg * c) return true; break; } r += dr; f += df; }
+    }
+    return false;
+  }
+  const kingSq = (s, white) => s.b.indexOf(white ? K : -K);
+  const inCheck = (s, white = s.w) => attacked(s, kingSq(s, white), !white);
+  function pseudo(s, capsOnly) {
+    const out = [], b = s.b, sg = s.w ? 1 : -1;
+    const add = (fr, to, flag, promo) => { if (capsOnly && !b[to] && flag !== 'ep' && !promo) return; out.push({ from: fr, to, cap: flag === 'ep' ? -sg * P : b[to], flag, promo }); };
+    for (let sq = 0; sq < 64; sq++) {
+      const p = b[sq]; if (!p || Math.sign(p) !== sg) continue;
+      const t = Math.abs(p), r0 = rankOf(sq), f0 = fileOf(sq);
+      if (t === P) {
+        const dir = s.w ? -1 : 1, start = s.w ? 6 : 1, last = s.w ? 0 : 7, one = sq + dir * 8;
+        if (r0 + dir >= 0 && r0 + dir < 8 && !b[one]) {
+          if (r0 + dir === last) for (const pr of [Q, R, B, Nn]) add(sq, one, '', pr); else { add(sq, one); if (r0 === start && !b[one + dir * 8]) add(sq, one + dir * 8, 'double'); }
+        }
+        for (const df of [-1, 1]) {
+          const f = f0 + df; if (f < 0 || f > 7) continue; const to = (r0 + dir) * 8 + f;
+          if (b[to] && Math.sign(b[to]) === -sg) { if (r0 + dir === last) for (const pr of [Q, R, B, Nn]) add(sq, to, '', pr); else add(sq, to); }
+          else if (to === s.ep) add(sq, to, 'ep');
+        }
+      } else if (t === Nn || t === K) {
+        for (const [dr, df] of t === Nn ? KN : KG) { const r = r0 + dr, f = f0 + df; if (r < 0 || r > 7 || f < 0 || f > 7) continue; const to = r * 8 + f; if (!b[to] || Math.sign(b[to]) === -sg) add(sq, to); }
+        if (t === K && !capsOnly) {
+          const home = s.w ? 60 : 4;
+          if (sq === home && !inCheck(s)) {
+            if (s.cas.includes(s.w ? 'K' : 'k') && !b[home + 1] && !b[home + 2] && b[home + 3] === sg * R && !attacked(s, home + 1, !s.w) && !attacked(s, home + 2, !s.w)) add(sq, home + 2, 'O-O');
+            if (s.cas.includes(s.w ? 'Q' : 'q') && !b[home - 1] && !b[home - 2] && !b[home - 3] && b[home - 4] === sg * R && !attacked(s, home - 1, !s.w) && !attacked(s, home - 2, !s.w)) add(sq, home - 2, 'O-O-O');
+          }
+        }
+      } else {
+        const dirs = t === B ? DIAG : t === R ? ORTH : DIAG.concat(ORTH);
+        for (const [dr, df] of dirs) { let r = r0 + dr, f = f0 + df; while (r >= 0 && r < 8 && f >= 0 && f < 8) { const to = r * 8 + f; if (b[to]) { if (Math.sign(b[to]) === -sg) add(sq, to); break; } add(sq, to); r += dr; f += df; } }
+      }
+    }
+    return out;
+  }
+  function make(s, m) {
+    const b = s.b, p = b[m.from], sg = s.w ? 1 : -1;
+    s.hist.push({ m, cas: s.cas, ep: s.ep, half: s.half, cap: m.cap, key: null });
+    b[m.to] = m.promo ? sg * m.promo : p; b[m.from] = 0;
+    if (m.flag === 'ep') b[m.to + (s.w ? 8 : -8)] = 0;
+    if (m.flag === 'O-O') { b[m.to - 1] = b[m.to + 1]; b[m.to + 1] = 0; }
+    if (m.flag === 'O-O-O') { b[m.to + 1] = b[m.to - 2]; b[m.to - 2] = 0; }
+    s.ep = m.flag === 'double' ? (m.from + m.to) / 2 : -1;
+    if (s.cas) {
+      if (Math.abs(p) === K) s.cas = s.cas.replace(s.w ? /[KQ]/g : /[kq]/g, '');
+      for (const [sq, c] of [[63, 'K'], [56, 'Q'], [7, 'k'], [0, 'q']]) if (m.from === sq || m.to === sq) s.cas = s.cas.replace(c, '');
+    }
+    s.half = Math.abs(p) === P || m.cap ? 0 : s.half + 1;
+    if (!s.w) s.full++;
+    s.w = !s.w;
+  }
+  function unmake(s) {
+    const h = s.hist.pop(), m = h.m, b = s.b;
+    s.w = !s.w; if (!s.w) s.full--;
+    const sg = s.w ? 1 : -1;
+    b[m.from] = m.promo ? sg * P : b[m.to]; b[m.to] = m.flag === 'ep' ? 0 : h.cap;
+    if (m.flag === 'ep') b[m.to + (s.w ? 8 : -8)] = -sg * P;
+    if (m.flag === 'O-O') { b[m.to + 1] = b[m.to - 1]; b[m.to - 1] = 0; }
+    if (m.flag === 'O-O-O') { b[m.to - 2] = b[m.to + 1]; b[m.to + 1] = 0; }
+    s.cas = h.cas; s.ep = h.ep; s.half = h.half;
+  }
+  function legal(s) { const out = []; for (const m of pseudo(s)) { make(s, m); if (!inCheck(s, !s.w)) out.push(m); unmake(s); } return out; }
+  function san(s, m, all) {
+    const p = Math.abs(s.b[m.from]);
+    let out;
+    if (m.flag === 'O-O' || m.flag === 'O-O-O') out = m.flag;
+    else {
+      const to = sqName(m.to), cap = m.cap || m.flag === 'ep';
+      if (p === P) out = (cap ? 'abcdefgh'[fileOf(m.from)] + 'x' : '') + to + (m.promo ? '=' + LET[m.promo].toUpperCase() : '');
+      else {
+        const same = all.filter(o => o !== m && o.to === m.to && Math.abs(s.b[o.from]) === p);
+        let dis = '';
+        if (same.length) { if (!same.some(o => fileOf(o.from) === fileOf(m.from))) dis = 'abcdefgh'[fileOf(m.from)]; else if (!same.some(o => rankOf(o.from) === rankOf(m.from))) dis = String(8 - rankOf(m.from)); else dis = sqName(m.from); }
+        out = LET[p].toUpperCase() + dis + (cap ? 'x' : '') + to;
+      }
+    }
+    make(s, m); const chk = inCheck(s), mate = chk && !legal(s).length; unmake(s);
+    return out + (mate ? '#' : chk ? '+' : '');
+  }
+  function material(s) { const c = { w: [], b: [] }; for (const p of s.b) if (p && Math.abs(p) !== K) c[p > 0 ? 'w' : 'b'].push(Math.abs(p)); return c; }
+  function insufficient(s) {
+    const m = material(s), all = m.w.concat(m.b);
+    if (all.some(t => t === P || t === R || t === Q)) return false;
+    return m.w.length <= 1 && m.b.length <= 1;
+  }
+  /* search */
+  function evaluate(s) {
+    let sc = 0, mat = 0;
+    for (let i = 0; i < 64; i++) { const p = s.b[i]; if (!p) continue; const t = Math.abs(p); if (t !== K && t !== P) mat += VAL[t]; }
+    const endgame = mat < 2600;
+    for (let i = 0; i < 64; i++) {
+      const p = s.b[i]; if (!p) continue; const t = Math.abs(p), tbl = PST[t === K && endgame ? 7 : t];
+      const v = VAL[t] + tbl[p > 0 ? i : (7 - rankOf(i)) * 8 + fileOf(i)];
+      sc += p > 0 ? v : -v;
+    }
+    return s.w ? sc : -sc;
+  }
+  let nodes = 0, deadline = 0, stop = false;
+  const order = (s, ms, best) => ms.sort((a, b) => ((b === best) - (a === best)) * 1e6 || ((b.cap ? VAL[Math.abs(b.cap)] * 10 - VAL[Math.abs(s.b[b.from])] : 0) + (b.promo ? 800 : 0)) - ((a.cap ? VAL[Math.abs(a.cap)] * 10 - VAL[Math.abs(s.b[a.from])] : 0) + (a.promo ? 800 : 0)));
+  function quiesce(s, a, b, d) {
+    nodes++; const stand = evaluate(s); if (stand >= b) return b; if (a < stand) a = stand; if (d > 6) return a;
+    for (const m of order(s, pseudo(s, true))) { make(s, m); if (inCheck(s, !s.w)) { unmake(s); continue; } const sc = -quiesce(s, -b, -a, d + 1); unmake(s); if (sc >= b) return b; if (sc > a) a = sc; }
+    return a;
+  }
+  function negamax(s, depth, a, b, ply) {
+    if ((++nodes & 1023) === 0 && Date.now() > deadline) stop = true;
+    if (stop) return 0;
+    if (depth <= 0) return quiesce(s, a, b, 0);
+    const ms = order(s, legal(s));
+    if (!ms.length) return inCheck(s) ? -100000 + ply : 0;
+    if (s.half >= 100) return 0;
+    for (const m of ms) { make(s, m); const sc = -negamax(s, depth - 1, -b, -a, ply + 1); unmake(s); if (stop) return 0; if (sc >= b) return b; if (sc > a) a = sc; }
+    return a;
+  }
+  function think(fen, level, history) {
+    const s = fromFen(fen); s.hist = [];
+    const ms = legal(s); if (!ms.length) return null;
+    const cfg = [null, { d: 1, t: 300, noise: 120 }, { d: 2, t: 600, noise: 40 }, { d: 3, t: 1200, noise: 12 }, { d: 4, t: 2500, noise: 0 }, { d: 6, t: 4500, noise: 0 }][level] || { d: 3, t: 1500, noise: 0 };
+    deadline = Date.now() + cfg.t; stop = false; nodes = 0;
+    let best = null, bestScore = 0;
+    for (let d = 1; d <= cfg.d; d++) {
+      let a = -1e9, chosen = null; const scored = [];
+      for (const m of order(s, ms, best)) {
+        make(s, m); let sc = -negamax(s, d - 1, -1e9, -a, 1); unmake(s);
+        if (stop) break;
+        if (Math.abs(sc) < 50000) sc += (Math.random() - .5) * cfg.noise;   // play imperfectly on easy levels, but never miss a forced mate
+        scored.push([m, sc]); if (sc > a) { a = sc; chosen = m; }
+      }
+      if (stop && d > 1) break;
+      if (chosen) { best = chosen; bestScore = a; }
+      if (stop) break;
+    }
+    return { from: best.from, to: best.to, promo: best.promo, score: bestScore * (s.w ? 1 : -1), nodes };
+  }
+  return { fromFen, toFen, legal, make, unmake, san, inCheck, insufficient, material, think, evaluate, sqName, nameSq, LET, START: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' };
+}
+</script>
+<script>
+(() => {
+  const E = ChessEngine(), $ = id => document.getElementById(id);
+  const kit = window.SJG ? SJG.init('chess', { vs: false, title: 'Chess', trophies: [
+    { id: 'win1', name: 'Checkmate!', desc: 'Beat the computer', icon: '♟️' },
+    { id: 'club', name: 'Club Player', desc: 'Beat the computer on Club', icon: '♞' },
+    { id: 'expert', name: 'Expert', desc: 'Beat the computer on Expert', icon: '♜' },
+    { id: 'master', name: 'Grandmaster', desc: 'Beat the computer on Master', icon: '♛' },
+    { id: 'online', name: 'Online Victor', desc: 'Win an online game', icon: '🌐' },
+    { id: 'promo', name: 'Promotion', desc: 'Promote a pawn', icon: '👑' },
+    { id: 'castle', name: 'Safe and Sound', desc: 'Castle', icon: '🏰' },
+    { id: 'fast', name: "Scholar's Revenge", desc: 'Checkmate in 15 moves or fewer', icon: '⚡' },
+  ] }) : null;
+  const sfx = n => kit && kit.sfx(n);
+  // pieces: crisp inline SVGs (original simple designs)
+  const PIECE = {
+    p: 'M50 22a11 11 0 0 1 8 18.5c6 3 10 9 10 16.5H32c0-7.5 4-13.5 10-16.5A11 11 0 0 1 50 22zM28 62h44l4 16H24z',
+    n: 'M38 22c14-4 28 4 32 20 3 12 2 22 2 22H34c0-8 6-12 12-16-6 0-12 2-16 6l-6-8c4-10 8-14 14-16l-2-6 2-2zM26 68h48l4 12H22z',
+    b: 'M50 16a6 6 0 0 1 4 10c8 6 14 14 14 24 0 8-6 12-12 14h10l2 8H32l2-8h10c-6-2-12-6-12-14 0-10 6-18 14-24a6 6 0 0 1 4-10zM48 34v8h-6v4h6v8h4v-8h6v-4h-6v-8zM24 76h52l2 6H22z',
+    r: 'M26 20h10v8h8v-8h12v8h8v-8h10v18l-8 6v22l6 6H28l6-6V44l-8-6zM22 76h56v8H22z',
+    q: 'M20 30a5 5 0 1 1 7 4l7 22 8-28a5 5 0 1 1 6 0l2 26 2-26a5 5 0 1 1 6 0l8 28 7-22a5 5 0 1 1 7-4L72 66H28zM26 70h48l4 12H22z',
+    k: 'M47 10h6v7h7v6h-7v7c10 2 20 10 20 22 0 6-3 10-7 14H30c-4-4-7-8-7-14 0-12 10-20 20-22v-7h-7v-6h7zM26 70h48l4 12H22z',
+  };
+  const pieceSvg = (p, cls = 'pc') => { const white = p > 0, t = E.LET[Math.abs(p)]; return `<svg class="${cls}" viewBox="0 0 100 100"><path d="${PIECE[t]}" fill="${white ? '#f8fafc' : '#1e1b2e'}" stroke="${white ? '#1e1b2e' : '#cbd5e1'}" stroke-width="3" stroke-linejoin="round"/></svg>`; };
+
+  let S, mode = 'cpu', level = 2, myColor = 'w', flipped = false, sel = -1, legalNow = [], sans = [], fens = [], lastMove = null, over = null, clocks = null, tc = null, clockT = null, thinking = false, worker = null, net = null, names = { w: 'White', b: 'Black' }, viewPly = -1;
+
+  /* AI in a worker so the board stays smooth */
+  function startWorker() {
+    try { const src = `${ChessEngine.toString()}\nconst E = ChessEngine(); onmessage = e => postMessage({ id: e.data.id, r: E.think(e.data.fen, e.data.level) });`; worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))); } catch { worker = null; }
+  }
+  let reqId = 0;
+  const think = (fen, lvl) => new Promise(res => { if (!worker) return res(E.think(fen, lvl)); const id = ++reqId; const h = e => { if (e.data.id === id) { worker.removeEventListener('message', h); res(e.data.r); } }; worker.addEventListener('message', h); worker.postMessage({ id, fen, level: lvl }); });
+
+  function newGame(opts = {}) {
+    S = E.fromFen(opts.fen || E.START); S.hist = [];
+    sans = []; fens = [E.toFen(S, true)]; lastMove = null; over = null; sel = -1; viewPly = -1;
+    mode = opts.mode || $('mode').value; level = +$('level').value;
+    myColor = opts.color || ($('color').value === 'r' ? (Math.random() < .5 ? 'w' : 'b') : $('color').value);
+    flipped = myColor === 'b' && mode !== 'local';
+    const t = opts.tc !== undefined ? opts.tc : $('tc').value;
+    tc = t && t !== '0' ? t.split('+').map(Number) : null;
+    clocks = tc ? { w: tc[0] * 1000, b: tc[0] * 1000 } : null;
+    names = mode === 'cpu' ? (myColor === 'w' ? { w: 'You', b: `Computer (${$('level').selectedOptions[0].text})` } : { w: `Computer (${$('level').selectedOptions[0].text})`, b: 'You' }) : mode === 'local' ? { w: 'White', b: 'Black' } : names;
+    $('over').hidden = true;
+    ['undoBtn', 'hintBtn'].forEach(id => $(id).classList.toggle('hidden', mode === 'online'));
+    $('chatCard').classList.toggle('hidden', mode !== 'online');
+    $('evalBar').classList.toggle('hidden', mode !== 'cpu'); $('evalBar').firstElementChild.style.width = '50%';
+    refresh(); saveLocal();
+    maybeCpu();
+  }
+  const turnColor = () => S.w ? 'w' : 'b';
+  const myTurn = () => !over && viewPly < 0 && (mode === 'local' || turnColor() === myColor) && !(net && net.spectating());
+
+  function refresh() {
+    legalNow = over ? [] : E.legal(S);
+    render(); status(); moveList(); clockView();
+  }
+  function render() {
+    const b = $('board'), shown = viewPly >= 0 ? E.fromFen(fens[viewPly] + ' 0 1') : S;
+    const chk = !over && viewPly < 0 && E.inCheck(S) ? S.b.indexOf(S.w ? 6 : -6) : -1;
+    const targets = sel >= 0 ? legalNow.filter(m => m.from === sel) : [];
+    let h = '';
+    for (let i = 0; i < 64; i++) {
+      const sq = flipped ? 63 - i : i, r = sq >> 3, f = sq & 7, light = (r + f) % 2 === 0;
+      const isT = targets.find(m => m.to === sq);
+      const cls = `sq ${light ? 'l' : 'd'}${lastMove && viewPly < 0 && (lastMove.from === sq || lastMove.to === sq) ? ' last' : ''}${sq === sel ? ' sel' : ''}${sq === chk ? ' chk' : ''}`;
+      h += `<div class="${cls}" data-sq="${sq}">${shown.b[sq] ? pieceSvg(shown.b[sq]) : ''}${isT ? (shown.b[sq] ? '<span class="ring"></span>' : '<span class="dot"></span>') : ''}${(flipped ? r === 0 : r === 7) ? `<span class="coord f">${'abcdefgh'[f]}</span>` : ''}${(flipped ? f === 7 : f === 0) ? `<span class="coord r">${8 - r}</span>` : ''}</div>`;
+    }
+    b.innerHTML = h;
+    const top = flipped ? 'w' : 'b', bot = flipped ? 'b' : 'w';
+    $('topName').textContent = names[top]; $('botName').textContent = names[bot];
+    const m = E.material(S), lost = side => { const start = { 1: 8, 2: 2, 3: 2, 4: 2, 5: 1 }, have = {}; for (const t of m[side]) have[t] = (have[t] || 0) + 1; let s = ''; for (const t of [5, 4, 3, 2, 1]) for (let k = 0; k < Math.max(0, start[t] - (have[t] || 0)); k++) s += { 1: '♟', 2: '♞', 3: '♝', 4: '♜', 5: '♛' }[t]; return s; };
+    $('topCap').textContent = lost(bot); $('botCap').textContent = lost(top);
+  }
+  function status() {
+    let t;
+    if (over) t = over.text;
+    else if (viewPly >= 0) t = `Viewing move ${viewPly} — press → or click the last move to return`;
+    else if (thinking) t = 'Computer is thinking…';
+    else if (net && net.spectating()) t = `Watching · ${names[turnColor()]} to move`;
+    else t = (myTurn() ? (mode === 'local' ? `${names[turnColor()]} to move` : 'Your move') : `Waiting for ${names[turnColor()]}…`) + (E.inCheck(S) ? ' — check!' : '');
+    $('status').textContent = t;
+  }
+  function moveList() {
+    let h = '';
+    for (let i = 0; i < sans.length; i += 2) h += `<span class="n">${i / 2 + 1}.</span><span class="m${viewPly === i + 1 ? ' cur' : ''}" data-ply="${i + 1}">${sans[i]}</span><span class="m${viewPly === i + 2 ? ' cur' : ''}" data-ply="${i + 2}">${sans[i + 1] || ''}</span>`;
+    $('moves').innerHTML = h; $('moves').scrollTop = 1e9;
+  }
+  const fmt = ms => { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : (ms < 10000 ? (ms / 1000).toFixed(1) : String(s)); };
+  function clockView() {
+    const top = flipped ? 'w' : 'b', bot = flipped ? 'b' : 'w';
+    for (const [el, c] of [[$('topClock'), top], [$('botClock'), bot]]) {
+      if (!clocks) { el.textContent = '∞'; el.className = 'clock'; continue; }
+      el.textContent = fmt(clocks[c]); el.className = 'clock' + (!over && turnColor() === c && sans.length ? ' run' : '') + (clocks[c] < 10000 ? ' low' : '');
+    }
+  }
+  let lastTick = 0;
+  function tick() {
+    const now = performance.now(), dt = now - lastTick; lastTick = now;
+    if (clocks && !over && sans.length >= 1) {
+      // in online games the host is the referee for flags
+      clocks[turnColor()] -= dt;
+      if (clocks[turnColor()] <= 0 && (!net || net.isHost)) { clocks[turnColor()] = 0; finish(turnColor() === 'w' ? 'b' : 'w', 'on time'); }
+      clockView();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function applyMove(m, fromNet) {
+    const all = E.legal(S), real = all.find(x => x.from === m.from && x.to === m.to && (x.promo || 0) === (m.promo || 0));
+    if (!real) return false;
+    const s = E.san(S, real, all), mover = turnColor();
+    E.make(S, real);
+    if (clocks && sans.length >= 1 && tc) clocks[mover] += tc[1] * 1000;
+    sans.push(s); fens.push(E.toFen(S, true)); lastMove = real; sel = -1; viewPly = -1;
+    sfx(/#/.test(s) ? 'win' : /\+/.test(s) ? 'power' : real.cap || real.flag === 'ep' ? 'hit' : 'click');
+    if (mover === myColor || mode === 'local') { if (real.promo) kit && kit.unlock('promo'); if (/O-O/.test(s)) kit && kit.unlock('castle'); }
+    // end?
+    const next = E.legal(S);
+    if (!next.length) finish(E.inCheck(S) ? mover : 'draw', E.inCheck(S) ? 'by checkmate' : 'by stalemate');
+    else if (S.half >= 100) finish('draw', 'by the 50-move rule');
+    else if (E.insufficient(S)) finish('draw', '— not enough pieces to mate');
+    else if (fens.filter(f => f === fens[fens.length - 1]).length >= 3) finish('draw', 'by threefold repetition');
+    refresh(); saveLocal();
+    if (net && net.isHost && !fromNet) broadcastState();
+    if (!over) maybeCpu();
+    return true;
+  }
+  function finish(winner, how) {
+    over = { winner, how, text: winner === 'draw' ? `Draw ${how}` : `${names[winner]} win${names[winner] === 'You' ? '' : 's'} ${how}` };
+    const iWon = winner === myColor && mode !== 'local';
+    if (mode === 'cpu') {
+      if (iWon) { kit && kit.unlock('win1'); if (level >= 3) kit && kit.unlock('club'); if (level >= 4) kit && kit.unlock('expert'); if (level >= 5) kit && kit.unlock('master'); if (sans.length <= 30) kit && kit.unlock('fast'); kit && kit.stat('cpuWins'); kit && kit.score(kit.getStat('cpuWins'), 'wins vs CPU'); }
+    }
+    if (mode === 'online' && iWon) { kit && kit.unlock('online'); kit && kit.stat('onlineWins'); kit && kit.score(kit.getStat('onlineWins'), 'online wins'); }
+    sfx(winner === 'draw' ? 'click' : iWon || mode === 'local' ? 'win' : 'lose');
+    $('overT').textContent = winner === 'draw' ? '½–½ Draw' : iWon ? '🏆 You win!' : mode === 'local' ? `${names[winner]} wins` : `${names[winner]} wins`;
+    $('overS').textContent = (winner === 'draw' ? 'Draw ' : '') + how;
+    $('againBtn').textContent = mode === 'online' ? (net && net.isHost ? 'Rematch' : 'Waiting for host…') : 'Play again';
+    $('againBtn').disabled = mode === 'online' && !(net && net.isHost);
+    setTimeout(() => { $('over').hidden = false; }, 500);
+    if (net && net.isHost) broadcastState();
+    try { localStorage.removeItem('sj-chess.save'); } catch {}
+  }
+  async function maybeCpu() {
+    if (mode !== 'cpu' || over || turnColor() === myColor || thinking) return;
+    thinking = true; status();
+    const t0 = performance.now();
+    const r = await think(E.toFen(S), level);
+    await new Promise(res => setTimeout(res, Math.max(0, 350 - (performance.now() - t0))));
+    thinking = false;
+    if (mode !== 'cpu' || over || !r) return;
+    applyMove(r);
+    const pct = Math.max(3, Math.min(97, 50 + Math.atan(r.score / 400) * 32));
+    $('evalBar').firstElementChild.style.width = pct + '%';
+  }
+
+  /* ---------- input: click or drag ---------- */
+  let drag = null;
+  const sqAt = (x, y) => { const el = document.elementFromPoint(x, y); const c = el && el.closest && el.closest('.sq'); return c ? +c.dataset.sq : -1; };
+  $('board').addEventListener('pointerdown', e => {
+    const c = e.target.closest('.sq'); if (!c) return;
+    const sq = +c.dataset.sq;
+    if (!myTurn()) { if (viewPly >= 0) { viewPly = -1; refresh(); } return; }
+    if (sel >= 0 && legalNow.some(m => m.from === sel && m.to === sq)) { tryMove(sel, sq); return; }
+    const p = S.b[sq];
+    if (p && (p > 0) === S.w) {
+      sel = sq; render();
+      const pc = $('board').querySelector(`[data-sq="${sq}"] .pc`); if (!pc) return;
+      const r = pc.getBoundingClientRect();
+      drag = { sq, el: pc, w: r.width, sx: e.clientX, sy: e.clientY, moved: false };
+      try { $('board').setPointerCapture(e.pointerId); } catch {}
+    } else { sel = -1; render(); }
+  });
+  $('board').addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    if (!drag.moved) { drag.moved = true; drag.el.classList.add('drag'); drag.el.style.width = drag.el.style.height = drag.w + 'px'; }
+    drag.el.style.left = (e.clientX - drag.w / 2) + 'px'; drag.el.style.top = (e.clientY - drag.w / 2) + 'px';
+  });
+  $('board').addEventListener('pointerup', e => {
+    if (!drag) return; const d = drag; drag = null;
+    if (!d.moved) return;
+    d.el.style.display = 'none'; const to = sqAt(e.clientX, e.clientY); d.el.style.display = '';
+    if (to >= 0 && legalNow.some(m => m.from === d.sq && m.to === to)) tryMove(d.sq, to); else render();
+  });
+  function tryMove(from, to) {
+    const opts = legalNow.filter(m => m.from === from && m.to === to);
+    if (opts.length > 1 || (opts[0] && opts[0].promo)) {
+      const white = S.w; $('promo').innerHTML = [5, 4, 3, 2].map(t => `<button data-p="${t}" title="${['', '', 'Knight', 'Bishop', 'Rook', 'Queen'][t]}">${pieceSvg(white ? t : -t, 'pp')}</button>`).join(''); $('promo').hidden = false;
+      $('promo').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; $('promo').hidden = true; send({ from, to, promo: +b.dataset.p }); };
+      return;
+    }
+    send({ from, to });
+  }
+  function send(m) {
+    if (mode === 'online' && net && !net.isHost) { net.send({ mv: m }); sel = -1; render(); return; }
+    applyMove(m);
+  }
+
+  /* ---------- online (host is the referee: checks every move, owns the clock) ---------- */
+  function broadcastState() { net.send({ st: { fen: E.toFen(S), sans, fens, last: lastMove && { from: lastMove.from, to: lastMove.to }, clocks, over, names, white: hostWhite } }); }
+  let hostWhite = true;
+  async function goOnline() {
+    if (!window.SJNet) return alert('Online play needs the SanjivramOS server.');
+    try {
+      net = await SJNet.lobby({ game: 'chess', gameName: 'Chess', max: 2, min: 2, modes: ['No clock', 'Bullet 1+0', 'Blitz 3+2', 'Blitz 5+0', 'Rapid 10+5'] });
+    } catch { $('mode').value = 'cpu'; return; }
+    startOnline();
+    net.on('start', () => startOnline());
+    net.on('m', (d, from) => {
+      if (d.mv && net.isHost) { const fromColor = from === guestId() ? (hostWhite ? 'b' : 'w') : null; if (fromColor && fromColor === turnColor() && !over) { if (!applyMove(d.mv, true)) broadcastState(); else broadcastState(); } else broadcastState(); }
+      if (d.st && !net.isHost) loadState(d.st);
+      if (d.resign && net.isHost && !over) { finish(from === guestId() ? (hostWhite ? 'w' : 'b') : (hostWhite ? 'b' : 'w'), 'by resignation'); }
+      if (d.hello && net.isHost) broadcastState();
+    });
+    net.on('chat', d => addChat(d.line)); net.on('host', () => { refresh(); });
+    net.on('peer-left', () => { if (!over && mode === 'online') { if (net.isHost) finish(myColor, '— opponent left'); } });
+    net.on('peer-drop', () => addChat({ sys: true, text: 'Opponent disconnected — waiting 20 s for them to come back…' }));
+    net.on('peer-back', () => { addChat({ sys: true, text: 'Opponent reconnected' }); if (net.isHost) broadcastState(); });
+    net.on('closed', () => addChat({ sys: true, text: 'The room closed.' }));
+  }
+  const guestId = () => { const p = net.players().find(m => m.id !== net.room.hostId); return p && p.id; };
+  function startOnline() {
+    const r = net.room, host = r.members.find(m => m.id === r.hostId), guest = r.members.find(m => m.id !== r.hostId && !m.spectator);
+    hostWhite = (net.seed || 1) % 2 === 1;
+    const tcMap = { 'No clock': '0', 'Bullet 1+0': '60+0', 'Blitz 3+2': '180+2', 'Blitz 5+0': '300+0', 'Rapid 10+5': '600+5' };
+    const meIsHost = net.isHost;
+    names = { w: (hostWhite ? host : guest || {}).display || 'White', b: (hostWhite ? guest || {} : host).display || 'Black' };
+    const color = net.spectating() ? 'w' : (meIsHost === hostWhite ? 'w' : 'b');
+    $('mode').value = 'online';
+    newGame({ mode: 'online', color, tc: tcMap[r.mode] || '0' });
+    $('chat').innerHTML = ''; addChat({ sys: true, text: `Room ${r.code}: ${names.w} (White) vs ${names.b} (Black)` });
+    if (!meIsHost) net.send({ hello: 1 });
+    kit && SJG.stat('online');
+  }
+  function loadState(st) {
+    S = E.fromFen(st.fen); S.hist = []; sans = st.sans; fens = st.fens; lastMove = st.last; clocks = st.clocks; names = st.names;
+    const wasOver = over; over = st.over;
+    sel = -1; viewPly = -1;
+    if (st.last && !wasOver) sfx(E.inCheck(S) ? 'power' : 'click');
+    refresh();
+    if (over && !wasOver) { const iWon = over.winner === myColor; if (iWon) { kit && kit.unlock('online'); } $('overT').textContent = over.winner === 'draw' ? '½–½ Draw' : iWon ? '🏆 You win!' : `${names[over.winner]} wins`; $('overS').textContent = over.how; $('againBtn').textContent = 'Waiting for host…'; $('againBtn').disabled = true; $('over').hidden = false; sfx(iWon ? 'win' : 'lose'); }
+  }
+  function addChat(l) { const d = document.createElement('div'); d.innerHTML = l.sys ? `<i style="opacity:.6"></i>` : '<b></b> <span></span>'; if (l.sys) d.firstChild.textContent = l.text; else { d.querySelector('b').textContent = l.name + ':'; d.querySelector('span').textContent = l.text; } $('chat').appendChild(d); $('chat').scrollTop = 1e9; }
+  $('chatf').onsubmit = e => { e.preventDefault(); const i = e.target.querySelector('input'); if (net && i.value.trim()) net.say(i.value); i.value = ''; };
+
+  /* ---------- buttons ---------- */
+  $('newBtn').onclick = () => { if ($('mode').value === 'online') { if (net) { try { net.leave(); } catch {} net = null; } goOnline(); } else { if (net) { try { net.leave(); } catch {} net = null; } newGame(); } };
+  $('mode').onchange = () => { $('level').disabled = $('mode').value !== 'cpu'; $('color').disabled = $('mode').value === 'online'; };
+  $('againBtn').onclick = () => { if (mode === 'online') { if (net && net.isHost) net.rematch(); } else newGame({ mode, color: mode === 'cpu' ? (myColor === 'w' ? 'b' : 'w') : 'w' }); };
+  $('closeOver').onclick = () => { $('over').hidden = true; };
+  $('flipBtn').onclick = () => { flipped = !flipped; render(); clockView(); };
+  $('undoBtn').onclick = () => {
+    if (mode === 'online' || thinking || !S.hist.length) return;
+    const n = mode === 'cpu' ? (turnColor() === myColor ? 2 : 1) : 1;
+    for (let k = 0; k < n && S.hist.length; k++) { E.unmake(S); sans.pop(); fens.pop(); }
+    over = null; lastMove = S.hist.length ? S.hist[S.hist.length - 1].m : null; $('over').hidden = true; refresh(); saveLocal();
+  };
+  $('hintBtn').onclick = async () => { if (!myTurn() || mode === 'online') return; $('status').textContent = 'Thinking of a hint…'; const r = await think(E.toFen(S), 3); if (r) { sel = r.from; render(); const t = $('board').querySelector(`[data-sq="${r.to}"]`); if (t) t.style.boxShadow = 'inset 0 0 0 4px #22c55e'; status(); } };
+  $('resignBtn').onclick = () => {
+    if (over || !confirm('Resign this game?')) return;
+    if (mode === 'online') { if (net.isHost) finish(myColor === 'w' ? 'b' : 'w', 'by resignation'); else net.send({ resign: 1 }); return; }
+    finish(mode === 'local' ? (turnColor() === 'w' ? 'b' : 'w') : (myColor === 'w' ? 'b' : 'w'), 'by resignation');
+    refresh();
+  };
+  $('muteBtn').onclick = () => { const m = kit ? kit.mute() : true; $('muteBtn').textContent = m ? '🔇' : '🔊'; };
+  if (kit && kit.muted) $('muteBtn').textContent = '🔇';
+  $('moves').onclick = e => { const m = e.target.closest('[data-ply]'); if (!m) return; const p = +m.dataset.ply; viewPly = p === sans.length ? -1 : p; render(); moveList(); status(); };
+  $('copyPgn').onclick = () => {
+    let pgn = `[Event "SanjivramOS Chess"]\n[Date "${new Date().toISOString().slice(0, 10).replace(/-/g, '.')}"]\n[White "${names.w}"]\n[Black "${names.b}"]\n[Result "${over ? (over.winner === 'w' ? '1-0' : over.winner === 'b' ? '0-1' : '1/2-1/2') : '*'}"]\n\n`;
+    for (let i = 0; i < sans.length; i += 2) pgn += `${i / 2 + 1}. ${sans[i]} ${sans[i + 1] || ''} `;
+    (navigator.clipboard ? navigator.clipboard.writeText(pgn.trim()) : Promise.reject()).then(() => SJNet && SJNet.toast('PGN copied'), () => prompt('PGN', pgn));
+  };
+  addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === 'f' || e.key === 'F') $('flipBtn').click();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); $('undoBtn').click(); }
+    if (e.key === 'ArrowLeft') { viewPly = viewPly < 0 ? Math.max(0, sans.length - 1) : Math.max(0, viewPly - 1); render(); moveList(); status(); }
+    if (e.key === 'ArrowRight') { if (viewPly >= 0) { viewPly++; if (viewPly >= sans.length) viewPly = -1; render(); moveList(); status(); } }
+    if (e.key === 'Escape') { sel = -1; $('promo').hidden = true; render(); }
+  });
+
+  /* ---------- save / resume games vs the computer and local games ---------- */
+  function saveLocal() { if (mode === 'online' || over) return; try { localStorage.setItem('sj-chess.save', JSON.stringify({ moves: S.hist.map(h => ({ from: h.m.from, to: h.m.to, promo: h.m.promo || 0 })), mode, level, myColor, tc: tc ? tc.join('+') : '0', clocks })); } catch {} }
+  function resume() {
+    let sv; try { sv = JSON.parse(localStorage.getItem('sj-chess.save')); } catch {}
+    if (!sv || !sv.moves || !sv.moves.length) return false;
+    $('mode').value = sv.mode; $('level').value = sv.level;
+    newGame({ mode: sv.mode, color: sv.myColor, tc: sv.tc });
+    for (const m of sv.moves) applyMove(m);
+    if (sv.clocks) clocks = sv.clocks;
+    refresh(); maybeCpu();
+    return true;
+  }
+  startWorker();
+  window.__chess = () => ({ fen: E.toFen(S), sans: sans.slice(), over, mode, myColor, turn: turnColor(), thinking, applyMove: m => applyMove(typeof m === 'string' ? { from: E.nameSq(m.slice(0, 2)), to: E.nameSq(m.slice(2, 4)), promo: m[4] ? ' pnbrqk'.indexOf(m[4]) : 0 } : m), E, newGame, perft: d => { const s = E.fromFen(E.toFen(S)); s.hist = []; const go = n => { if (!n) return 1; let c = 0; for (const m of E.legal(s)) { E.make(s, m); c += go(n - 1); E.unmake(s); } return c; }; return go(d); } });
+  const join = new URLSearchParams(location.search).get('join') || new URLSearchParams(location.search).get('online');
+  if (join) { $('mode').value = 'online'; goOnline(); newGame({ mode: 'cpu', color: 'w' }); }
+  else if (!resume()) newGame({ mode: 'cpu', color: 'w', tc: '0' });
+  lastTick = performance.now(); requestAnimationFrame(tick);
+})();
+</script>
+</body></html>

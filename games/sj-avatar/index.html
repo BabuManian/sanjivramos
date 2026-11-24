@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Character Creator</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;background:#0b1020;color:#e5e7eb;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}p.sub{margin:0 0 14px;opacity:.7}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.bar button{border:none;border-radius:10px;padding:9px 16px;font:600 14px system-ui;cursor:pointer;background:rgba(255,255,255,.1);color:#fff}
+.bar button.pri{background:#3b6cff}
+#msg{opacity:.8}
+.saved{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.saved button{border:none;border-radius:12px;padding:4px;background:rgba(255,255,255,.06);cursor:pointer;position:relative}
+.saved img{width:56px;height:56px;border-radius:10px;display:block}
+.saved .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;font-size:12px;line-height:20px;padding:0}
+h3{margin:18px 0 6px;font-size:13px;opacity:.7;text-transform:uppercase;letter-spacing:.06em}
+</style></head>
+<body><main>
+<h1>🧍 Character Creator</h1>
+<p class="sub">Design the character that represents you in online games. It's saved to your SanjivramOS account, so friends see it on every device.</p>
+<div id="ed"></div>
+<div class="bar"><button class="pri" id="save">Save as my character</button><button id="keep">☆ Keep in wardrobe</button><span id="msg"></span></div>
+<h3>Wardrobe</h3><div class="saved" id="saved"></div>
+</main>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script>
+(async () => {
+  window.SJG && SJG.init('avatar', { title: 'Character Creator', vs: false, trophies: [{ id: 'made', name: 'Looking Good', desc: 'Save your character', icon: '🧍' }] });
+  const $ = id => document.getElementById(id);
+  const ed = SJLook.editor($('ed'), await SJLook.get());
+  const W = { get() { try { return JSON.parse(localStorage.getItem('sjlook.wardrobe')) || []; } catch { return []; } }, set(v) { try { localStorage.setItem('sjlook.wardrobe', JSON.stringify(v.slice(0, 24))); } catch {} } };
+  const paint = () => { const list = W.get(); $('saved').innerHTML = list.length ? list.map((l, i) => `<button data-i="${i}" title="Wear this"><img src="${SJLook.face(l, 112)}" alt=""><span class="x" data-del="${i}">×</span></button>`).join('') : '<span style="opacity:.6">Outfits you keep show up here.</span>'; };
+  $('saved').onclick = e => { const d = e.target.closest('[data-del]'); if (d) { const l = W.get(); l.splice(+d.dataset.del, 1); W.set(l); paint(); return; } const b = e.target.closest('[data-i]'); if (b) ed.set(W.get()[+b.dataset.i]); };
+  $('keep').onclick = () => { W.set([ed.get(), ...W.get()]); paint(); };
+  $('save').onclick = async () => { const w = await SJLook.save(ed.get()); window.SJG && SJG.unlock('made'); $('msg').textContent = w === 'account' ? 'Saved to your account ✓ — everyone sees it in online games' : w === 'local' ? 'Saved on this device ✓ (sign in to Messages to keep it on your account)' : 'Couldn’t reach the server — saved on this device'; };
+  paint();
+  window.__avatar = () => ed.get();
+})();
+</script>
+</body></html>

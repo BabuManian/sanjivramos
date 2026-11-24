@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snake Brawl</title>
+<style>
+html,body{margin:0;height:100%;background:#020617;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#wrap{position:absolute;inset:0;display:flex;flex-direction:column}
+#bar{display:flex;gap:10px;align-items:center;padding:6px 10px;background:#0f172a;border-bottom:1px solid #1e293b;flex-wrap:wrap}
+#bar .sp{flex:1}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative;touch-action:none}
+canvas{display:block;max-width:100%;max-height:100%}
+#board{position:absolute;right:10px;top:10px;background:rgba(15,23,42,.75);border-radius:10px;padding:6px 10px;font-size:12px;min-width:140px;pointer-events:none}
+#board div{display:flex;gap:6px;align-items:center}#board i{width:10px;height:10px;border-radius:3px;display:inline-block}
+#board .me{font-weight:700;color:#fde68a}
+button{border:none;background:#1e293b;color:#fff;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:hover{background:#334155}button.on,button.pri{background:#16a34a}
+.ov{position:absolute;inset:0;background:rgba(2,6,23,.85);display:flex;align-items:center;justify-content:center}
+.ov[hidden]{display:none}
+.card{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:16px 20px;max-width:480px;width:calc(100% - 32px);box-sizing:border-box}
+.card h1{margin:0 0 4px}.card p{opacity:.75;margin:0 0 10px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.row label{min-width:84px;opacity:.75}
+.hint{font-size:12px;opacity:.6}
+#msg{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font:800 32px system-ui;color:#fde68a;text-shadow:0 3px 0 #000;pointer-events:none;text-align:center}
+</style></head><body>
+<div id="wrap">
+  <div id="bar"><b>🐍 Snake Brawl</b><span id="info"></span><span class="sp"></span><span id="net"></span><button id="mute">🔊</button><button id="menuBtn">Menu</button></div>
+  <div id="stage"><canvas id="c"></canvas><div id="board"></div><div id="msg"></div>
+    <div class="ov" id="menu"><div class="card">
+      <h1>🐍 Snake Brawl</h1><p>Eat glowing food to grow. Make other snakes crash into your body — but don't hit theirs. When a snake crashes it turns into food. Biggest snake when time runs out wins!</p>
+      <div class="row"><label>Mode</label><button class="m on" data-m="cpu">vs CPU</button><button class="m" data-m="online">🌐 Online</button></div>
+      <div class="row" id="botRow"><label>Rivals</label><button class="b" data-b="3">3</button><button class="b on" data-b="5">5</button><button class="b" data-b="7">7</button></div>
+      <div class="row"><label>Time</label><button class="t" data-t="90">1:30</button><button class="t on" data-t="180">3:00</button><button class="t" data-t="300">5:00</button></div>
+      <div class="row"><button class="pri" id="go">Play ▶</button></div>
+      <div class="hint">Arrows / WASD to turn, hold Space to boost (costs length). Touch: swipe to turn, two fingers to boost. Online: up to 8 players, empty seats are CPU snakes.</div>
+    </div></div>
+  </div>
+</div>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/net.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('snakes', { vs: false, title: 'Snake Brawl', trophies: [
+  { id: 'win', name: 'Top Snake', desc: 'Finish a match as the biggest snake', icon: '🐍' },
+  { id: 'len50', name: 'Long Boi', desc: 'Grow to length 50', icon: '📏' },
+  { id: 'len100', name: 'Titan', desc: 'Grow to length 100', icon: '🐉' },
+  { id: 'kill5', name: 'Trapper', desc: 'Make 5 snakes crash into you in one match', icon: '🪤' },
+  { id: 'online', name: 'Net Serpent', desc: 'Win an online match', icon: '🌐' },
+] }) : null;
+const sfx = n => kit && kit.sfx(n);
+const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
+const GW = 64, GH = 40, T = 16, TICK = 1 / 10;
+cv.width = GW * T; cv.height = GH * T;
+const COLS = ['#22c55e', '#f43f5e', '#38bdf8', '#f59e0b', '#a855f7', '#f472b6', '#2dd4bf', '#facc15'];
+const NAMES = ['Viper', 'Cobra', 'Mamba', 'Python', 'Adder', 'Krait', 'Boa', 'Asp'];
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }, OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+let opts = { m: 'cpu', b: 5, t: 180 };
+try { Object.assign(opts, JSON.parse(localStorage.getItem('snakes.opts')) || {}); } catch {}
+let S = null, mode = 'cpu', mySlot = 0, net = null, acc = 0, menuOpen = true, netIn = {}, snapT = 0, lastSent = '';
+
+function newMatch(n, humans, time) {
+  S = { n, humans, names: humans.map((h, i) => h ? h.name : NAMES[i] + ' (CPU)'), time, left: time, food: [], snakes: [], phase: 'ready', phaseT: 2, kills: Array(n).fill(0), best: Array(n).fill(0), ev: [] };
+  for (let i = 0; i < n; i++) S.snakes.push(spawnSnake(i));
+  for (let k = 0; k < 70; k++) addFood();
+}
+function spawnSnake(id) {
+  for (let tries = 0; tries < 200; tries++) {
+    const x = 5 + Math.floor(Math.random() * (GW - 10)), y = 5 + Math.floor(Math.random() * (GH - 10));
+    const dir = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)], [dx, dy] = DIRS[dir];
+    const body = [0, 1, 2, 3].map(k => [x - dx * k, y - dy * k]);
+    if (body.some(([bx, by]) => occupied(bx, by))) continue;
+    return { id, body, dir, next: dir, grow: 0, alive: true, respawn: 0, boost: false, boostT: 0 };
+  }
+  return { id, body: [[2, 2]], dir: 'right', next: 'right', grow: 3, alive: true, respawn: 0 };
+}
+function occupied(x, y) { return S.snakes.some(s => s.alive && s.body.some(([a, b]) => a === x && b === y)); }
+function addFood(x, y, big) {
+  if (x == null) { x = Math.floor(Math.random() * GW); y = Math.floor(Math.random() * GH); }
+  S.food.push([x, y, big ? 3 : 1]);
+}
+function tickSim(inputs) {
+  if (S.phase !== 'play') return;
+  const heads = new Map();
+  for (const s of S.snakes) {
+    if (!s.alive) { s.respawn -= TICK; if (s.respawn <= 0 && S.left > 3) Object.assign(s, spawnSnake(s.id)); continue; }
+    const inp = inputs[s.id] || {};
+    if (inp.dir && inp.dir !== OPP[s.dir]) s.next = inp.dir;
+    s.boost = !!inp.boost && s.body.length > 6;
+    const steps = s.boost ? 2 : 1;
+    s.steps = steps;
+  }
+  for (let st = 0; st < 2; st++) {
+    const moving = S.snakes.filter(s => s.alive && s.steps > st);
+    for (const s of moving) {
+      s.dir = s.next;
+      const [dx, dy] = DIRS[s.dir], [hx, hy] = s.body[0];
+      let nx = (hx + dx + GW) % GW, ny = (hy + dy + GH) % GH;
+      s.body.unshift([nx, ny]);
+      if (s.grow > 0) s.grow--; else s.body.pop();
+      if (st === 1) { s.boostT++; if (s.boostT % 3 === 0) { const t = s.body.pop(); addFood(t[0], t[1]); } }
+    }
+    // food
+    for (const s of moving) {
+      const [hx, hy] = s.body[0];
+      for (let i = S.food.length - 1; i >= 0; i--) if (S.food[i][0] === hx && S.food[i][1] === hy) { s.grow += S.food[i][2]; S.food.splice(i, 1); S.ev.push({ t: 'eat', p: s.id }); }
+    }
+    // collisions
+    const dead = [];
+    for (const s of moving) {
+      const [hx, hy] = s.body[0];
+      for (const o of S.snakes) {
+        if (!o.alive) continue;
+        const start = o === s ? 1 : 0;
+        for (let k = start; k < o.body.length; k++) if (o.body[k][0] === hx && o.body[k][1] === hy) {
+          if (k === 0 && o !== s) { dead.push([s, -1]); }
+          else dead.push([s, o === s ? -1 : o.id]);
+          break;
+        }
+      }
+    }
+    for (const [s, by] of dead) if (s.alive) killSnake(s, by);
+  }
+  for (const s of S.snakes) if (s.alive) S.best[s.id] = Math.max(S.best[s.id], s.body.length);
+  while (S.food.length < 60) addFood();
+}
+function killSnake(s, by) {
+  s.alive = false; s.respawn = 3;
+  s.body.forEach(([x, y], k) => { if (k % 2 === 0) addFood(x, y, true); });
+  if (by >= 0) S.kills[by]++;
+  S.ev.push({ t: 'die', p: s.id, by });
+}
+const meSlot = () => mode === 'online' ? mySlot : 0;
+
+/* ---------------- CPU ---------------- */
+function cpuInput(s) {
+  if (!s.alive) return {};
+  const [hx, hy] = s.body[0];
+  const blocked = new Set();
+  for (const o of S.snakes) if (o.alive) o.body.forEach(([x, y], k) => { if (k < o.body.length - 1) blocked.add(x + ',' + y); });
+  for (const o of S.snakes) if (o.alive && o !== s) for (const d of Object.values(DIRS)) blocked.add(((o.body[0][0] + d[0] + GW) % GW) + ',' + ((o.body[0][1] + d[1] + GH) % GH));
+  let target = null, bd = 1e9;
+  for (const f of S.food) { const dx = Math.min(Math.abs(f[0] - hx), GW - Math.abs(f[0] - hx)), dy = Math.min(Math.abs(f[1] - hy), GH - Math.abs(f[1] - hy)), d = dx + dy - f[2] * 2; if (d < bd) { bd = d; target = f; } }
+  let best = s.dir, bv = -1e9;
+  for (const d of Object.keys(DIRS)) {
+    if (d === OPP[s.dir]) continue;
+    const nx = (hx + DIRS[d][0] + GW) % GW, ny = (hy + DIRS[d][1] + GH) % GH;
+    if (blocked.has(nx + ',' + ny)) continue;
+    let v = flood(nx, ny, blocked, 40) * 3;
+    if (target) { const dx = Math.min(Math.abs(target[0] - nx), GW - Math.abs(target[0] - nx)), dy = Math.min(Math.abs(target[1] - ny), GH - Math.abs(target[1] - ny)); v -= (dx + dy) * 2; }
+    if (d === s.dir) v += 1;
+    v += Math.random() * 2;
+    if (v > bv) { bv = v; best = d; }
+  }
+  return { dir: best, boost: bd < 4 && s.body.length > 20 && Math.random() < .3 };
+}
+function flood(x, y, blocked, cap) {
+  const seen = new Set([x + ',' + y]), q = [[x, y]];
+  while (q.length && seen.size < cap) { const [a, b] = q.shift(); for (const d of Object.values(DIRS)) { const nx = (a + d[0] + GW) % GW, ny = (b + d[1] + GH) % GH, k = nx + ',' + ny; if (!seen.has(k) && !blocked.has(k)) { seen.add(k); q.push([nx, ny]); } } }
+  return seen.size;
+}
+
+/* ---------------- input ---------------- */
+let myDir = null, myBoost = false, dirQueue = [];
+addEventListener('keydown', e => {
+  const map = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+  if (map[e.code]) { dirQueue.push(map[e.code]); if (dirQueue.length > 3) dirQueue.shift(); e.preventDefault(); }
+  if (e.code === 'Space') { myBoost = true; e.preventDefault(); }
+});
+addEventListener('keyup', e => { if (e.code === 'Space') myBoost = false; });
+let tStart = null;
+$('stage').addEventListener('touchstart', e => { if (e.touches.length >= 2) myBoost = true; const t = e.touches[0]; tStart = [t.clientX, t.clientY]; }, { passive: true });
+$('stage').addEventListener('touchmove', e => {
+  if (!tStart) return; const t = e.touches[0], dx = t.clientX - tStart[0], dy = t.clientY - tStart[1];
+  if (Math.hypot(dx, dy) > 24) { dirQueue.push(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); tStart = [t.clientX, t.clientY]; }
+}, { passive: true });
+$('stage').addEventListener('touchend', e => { if (e.touches.length < 2) myBoost = false; if (!e.touches.length) tStart = null; });
+function myInput() {
+  const s = S.snakes[meSlot()];
+  while (dirQueue.length) { const d = dirQueue.shift(); if (!s || d !== OPP[s.next || s.dir] && d !== (s.next || s.dir)) { myDir = d; break; } }
+  const out = { dir: myDir, boost: myBoost }; myDir = null; return out;
+}
+
+/* ---------------- online ---------------- */
+let slotOf = {};
+async function goOnline() {
+  if (!window.SJNet) { $('msg').textContent = 'Online needs SanjivramOS'; return; }
+  try { net = await SJNet.lobby({ game: 'snakes', gameName: 'Snake Brawl', max: 8, min: 2, modes: ['3:00', '1:30', '5:00'] }); } catch { setMode('cpu'); return; }
+  mode = 'online';
+  const players = net.players(); players.forEach((m, i) => { slotOf[m.id] = i; }); mySlot = slotOf[net.me.id] ?? 0;
+  const time = { '1:30': 90, '5:00': 300 }[net.room.mode] || 180;
+  if (net.isHost) { const n = Math.max(6, players.length); newMatch(n, Array.from({ length: n }, (_, i) => players[i] ? { name: players[i].display } : null), time); }
+  net.on('m', (d, from) => {
+    if (net.isHost && d.in) { const s = slotOf[from]; if (s != null) netIn[s] = d.in; }
+    if (net.isHost && d.hi) sendSnap();
+    if (!net.isHost && d.s) { S = d.s; for (const e of S.ev || []) evFx(e); }
+  });
+  net.on('peer-left', d => { if (net.isHost && S) { const s = slotOf[d && d.id]; if (s != null && S.humans[s]) { S.humans[s] = null; S.names[s] += ' (left)'; } } });
+  menuOpen = false; $('menu').hidden = true;
+  if (!net.isHost) net.send({ hi: 1 });
+}
+function sendSnap() { if (net && net.isHost && S) { while ((S.evSeen || 0) < S.ev.length) evFx(S.ev[S.evSeen = (S.evSeen || 0) + 1, S.evSeen - 1]); net.send({ s: { ...S, evSeen: 0 } }); S.ev = []; S.evSeen = 0; } }
+
+/* ---------------- loop ---------------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (S && !menuOpen) {
+    const host = mode !== 'online' || net.isHost;
+    if (host) {
+      if (S.phase === 'ready') { S.phaseT -= dt; if (S.phaseT <= 0) S.phase = 'play'; }
+      else if (S.phase === 'play') {
+        S.left = Math.max(0, S.left - dt);
+        acc += dt;
+        while (acc >= TICK) {
+          acc -= TICK;
+          const inputs = {};
+          for (const s of S.snakes) inputs[s.id] = s.id === meSlot() ? myInput() : (mode === 'online' && S.humans[s.id]) ? (netIn[s.id] || {}) : cpuInput(s);
+          tickSim(inputs);
+        }
+        if (S.left <= 0) endMatch();
+      } else if (S.phase === 'over') { S.phaseT -= dt; if (S.phaseT <= 0 && mode === 'online') { const o = S; newMatch(o.n, o.humans, o.time); S.names = o.names; } }
+      while ((S.evSeen || 0) < S.ev.length) evFx(S.ev[S.evSeen = (S.evSeen || 0) + 1, S.evSeen - 1]);
+      if (mode !== 'online') { S.ev = []; S.evSeen = 0; }
+      else { snapT -= dt; if (snapT <= 0) { snapT = 1 / 12; sendSnap(); } }
+    } else {
+      const inp = myInput(), s = S.snakes[mySlot];
+      if (inp.dir || inp.boost !== frame.b || now - (frame.ka || 0) > 400) { net.send({ in: { dir: inp.dir || (s && s.next), boost: inp.boost } }); frame.b = inp.boost; frame.ka = now; }
+    }
+    draw();
+  }
+  requestAnimationFrame(frame);
+}
+function evFx(e) { const me = meSlot(); if (e.t === 'eat' && e.p === me) sfx('pop'); else if (e.t === 'die' && e.p === me) sfx('hurt'); else if (e.t === 'die' && e.by === me) sfx('coin'); else if (e.t === 'end') matchFx(); }
+function endMatch() {
+  S.phase = 'over'; S.phaseT = 8;
+  S.ev.push({ t: 'end' });
+}
+function matchFx() {
+  const me = meSlot(), lens = S.snakes.map(s => s.alive ? s.body.length : 0), top = lens.indexOf(Math.max(...lens));
+  if (top === me) { sfx('win'); kit && kit.unlock('win'); if (mode === 'online') kit && kit.unlock('online'); } else sfx('lose');
+  if (S.best[me] >= 50) kit && kit.unlock('len50'); if (S.best[me] >= 100) kit && kit.unlock('len100'); if (S.kills[me] >= 5) kit && kit.unlock('kill5');
+  if (mode === 'cpu') { kit && kit.score(S.best[me], 'length'); setTimeout(() => { menuOpen = true; $('menu').hidden = false; }, 4000); }
+}
+
+/* ---------------- draw ---------------- */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function draw() {
+  g.fillStyle = '#020617'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#0b1328'; for (let y = 0; y < GH; y++) for (let x = (y % 2); x < GW; x += 2) g.fillRect(x * T, y * T, T, T);
+  const t = performance.now() / 1000;
+  for (const [x, y, v] of S.food) { g.fillStyle = v > 1 ? '#fde047' : '#4ade80'; g.shadowColor = g.fillStyle; g.shadowBlur = 8; g.beginPath(); g.arc(x * T + T / 2, y * T + T / 2, (v > 1 ? 5 : 3.5) + Math.sin(t * 5 + x) * .8, 0, 7); g.fill(); }
+  g.shadowBlur = 0;
+  for (const s of S.snakes) {
+    if (!s.alive) continue;
+    const col = COLS[s.id % COLS.length];
+    s.body.forEach(([x, y], k) => {
+      g.fillStyle = col; g.globalAlpha = k ? Math.max(.45, 1 - k / (s.body.length * 1.4)) : 1;
+      const pad = k ? 2 : 0; g.beginPath(); g.roundRect(x * T + pad, y * T + pad, T - pad * 2, T - pad * 2, 5); g.fill();
+    });
+    g.globalAlpha = 1;
+    const [hx, hy] = s.body[0], [dx, dy] = DIRS[s.dir];
+    g.fillStyle = '#fff'; for (const sd of [-1, 1]) { g.beginPath(); g.arc(hx * T + T / 2 + dx * 3 + (dy ? sd * 4 : 0), hy * T + T / 2 + dy * 3 + (dx ? sd * 4 : 0), 3, 0, 7); g.fill(); }
+    g.fillStyle = '#000'; for (const sd of [-1, 1]) { g.beginPath(); g.arc(hx * T + T / 2 + dx * 4 + (dy ? sd * 4 : 0), hy * T + T / 2 + dy * 4 + (dx ? sd * 4 : 0), 1.5, 0, 7); g.fill(); }
+    if (s.id === meSlot()) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(hx * T - 1, hy * T - 1, T + 2, T + 2); }
+  }
+  const rows = S.snakes.map(s => ({ id: s.id, len: s.alive ? s.body.length : 0, alive: s.alive })).sort((a, b) => b.len - a.len);
+  $('board').innerHTML = rows.map((r, i) => `<div class="${r.id === meSlot() ? 'me' : ''}">${i + 1}. <i style="background:${COLS[r.id % COLS.length]}"></i>${esc(S.names[r.id])} <span style="margin-left:auto">${r.alive ? r.len : '💀'}</span></div>`).join('');
+  const me = S.snakes[meSlot()], l = Math.ceil(S.left);
+  $('info').textContent = `⏱ ${Math.floor(l / 60)}:${String(l % 60).padStart(2, '0')} · length ${me && me.alive ? me.body.length : 0} · crashes caused ${S.kills[meSlot()]}`;
+  let m = '';
+  if (S.phase === 'ready') m = 'Get ready…';
+  else if (S.phase === 'over') { const top = rows[0]; m = `🏆 ${esc(S.names[top.id])} wins!` + (mode === 'online' ? '<br><small style="font-size:16px">Next match soon…</small>' : ''); }
+  else if (me && !me.alive) m = '💀 Respawning…';
+  $('msg').innerHTML = m;
+  $('net').textContent = mode === 'online' && net ? `Room ${net.room ? net.room.code : ''} · ${net.ping || '–'} ms` : '';
+}
+
+/* ---------------- menu ---------------- */
+function renderOpts() { for (const k of ['m', 'b', 't']) document.querySelectorAll('.' + k).forEach(b => b.classList.toggle('on', String(opts[k]) === b.dataset[k])); $('botRow').style.display = opts.m === 'online' ? 'none' : ''; }
+$('menu').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const k of ['m', 'b', 't']) if (b.dataset[k] != null) opts[k] = isNaN(+b.dataset[k]) ? b.dataset[k] : +b.dataset[k];
+  try { localStorage.setItem('snakes.opts', JSON.stringify(opts)); } catch {}
+  if (b.id === 'go') setMode(opts.m); else { renderOpts(); sfx('click'); }
+});
+function setMode(m) {
+  if (net && m !== 'online') { try { net.leave(); } catch {} net = null; }
+  mode = m;
+  if (m === 'online') { goOnline(); return; }
+  newMatch(1 + opts.b, Array.from({ length: 1 + opts.b }, (_, i) => i === 0 ? { name: 'You' } : null), opts.t);
+  menuOpen = false; $('menu').hidden = true;
+}
+$('menuBtn').onclick = () => { if (net) { try { net.leave(); } catch {} net = null; mode = 'cpu'; } menuOpen = true; $('menu').hidden = false; renderOpts(); };
+$('mute').onclick = () => { const m = kit ? kit.mute() : true; $('mute').textContent = m ? '🔇' : '🔊'; };
+if (kit && kit.muted) $('mute').textContent = '🔇';
+renderOpts();
+const q = new URLSearchParams(location.search);
+if (q.get('join') || q.get('online')) setMode('online');
+window.__snakes = () => ({ S, mode, setMode, tickSim, cpuInput, get net() { return net; } });
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

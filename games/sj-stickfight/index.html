@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Stickman Fight</title>
+<style>
+html,body{margin:0;height:100%;background:#0f172a;color:#e2e8f0;font:14px system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+body{display:flex;align-items:center;justify-content:center}
+canvas{display:block;touch-action:none}
+.ov{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(15,23,42,.92);padding:14px;box-sizing:border-box;overflow:auto}
+.ov.on{display:flex}
+h1{margin:0;font-size:40px;font-weight:900;letter-spacing:1px}
+button{font:inherit;border:none;border-radius:8px;padding:8px 13px;cursor:pointer;background:#1e293b;color:#e2e8f0}
+button.sel{outline:2px solid #f59e0b;background:#334155}
+button.pri{background:#f59e0b;color:#1c1917;font-weight:800;padding:12px 30px;font-size:17px}
+.row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
+.chars{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.chars button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;min-width:84px}
+.chars small{opacity:.7;font-size:11px}
+#touch{position:fixed;inset:0;pointer-events:none;display:none}
+#touch.on{display:block}
+#touch button{position:absolute;pointer-events:auto;width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;font-weight:700;touch-action:none;padding:0}
+</style></head><body>
+<canvas id="cv" width="960" height="540" aria-label="Stickman Fight"></canvas>
+<div id="touch">
+  <button data-k="left" style="left:16px;bottom:70px">◀</button><button data-k="right" style="left:142px;bottom:70px">▶</button>
+  <button data-k="up" style="left:79px;bottom:132px">▲</button><button data-k="down" style="left:79px;bottom:10px">🛡</button>
+  <button data-k="punch" style="right:86px;bottom:16px">👊</button><button data-k="kick" style="right:16px;bottom:76px">🦶</button><button data-k="special" style="right:86px;bottom:136px">★</button>
+</div>
+<div class="ov on" id="menu">
+  <h1>STICKMAN FIGHT</h1>
+  <div class="row" id="modes"></div>
+  <div><b id="p1l">Player 1</b></div><div class="chars" id="c1"></div>
+  <div><b id="p2l">CPU</b></div><div class="chars" id="c2"></div>
+  <div class="row" id="stages"></div>
+  <div class="row" id="diffs"></div>
+  <button class="pri" id="fight">FIGHT!</button>
+  <div style="opacity:.65;font-size:12px;text-align:center;max-width:640px">P1: A/D move · W jump (twice for double jump) · S block · F or J punch · G or K kick · H or L special (needs ½ meter) · walk over weapons to grab them.<br>P2: ←/→ · ↑ jump · ↓ block · , punch · . kick · / special (or numpad 1 2 3).</div>
+</div>
+<div class="ov" id="end"><h1 id="endT">WINNER</h1><div id="endS"></div><div class="row"><button class="pri" id="rematch">Rematch</button><button id="toMenu">Menu</button></div></div>
+<script src="../sj-gamekit/kit.js"></script>
+<script>window.SJG && SJG.init("stickfight", { vs: false, remote: { canvas: '#cv', field: 'code', help: 'A/D move · W jump · S block · F punch · G kick · H special',
+  map: { KeyA: 'ArrowLeft', KeyD: 'ArrowRight', KeyW: 'ArrowUp', KeyS: 'ArrowDown', Space: 'ArrowUp', KeyF: 'Comma', KeyJ: 'Comma', KeyG: 'Period', KeyK: 'Period', KeyH: 'Slash', KeyL: 'Slash', Numpad1: 'Comma', Numpad2: 'Period', Numpad3: 'Slash' },
+  blockHost: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Comma', 'Period', 'Slash', 'Numpad1', 'Numpad2', 'Numpad3'],
+  pad: [['Punch', 'KeyF'], ['Kick', 'KeyG'], ['Special', 'KeyH']],
+  hide: '#touch', snap: full => window.__stickNet.snap(full), load: s => window.__stickNet.load(s), inMenu: s => s.state === 'menu' || s.state === 'over',
+  menuText: s => s.state === 'over' ? `${s.endT} — ${s.endS}. The host can start a rematch.` : 'They pick the fighters and the stage — you’re player 2 (right side).',
+  start: () => { const c = [...document.querySelectorAll('#modes button')].find(x => /2 Players/.test(x.textContent)); if (c) c.click(); } }, title: "Stickman Fight", lower: false, trophies: [{"id": "win", "name": "Champion", "desc": "Beat the CPU", "icon": "🥊"}, {"id": "s10", "name": "Last One Standing", "desc": "Survive 10 fights", "icon": "🔥"}] });</script>
+<script>
+(() => {
+'use strict';
+const VW = 960, VH = 540, FLOOR = 470, GRAV = 1900;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), $ = id => document.getElementById(id);
+const CHARS = [
+  { id: 'ninja', name: 'Shadow', color: '#e5e7eb', band: '#ef4444', speed: 300, jump: 740, power: 1, hp: 100, sp: 'Shadow Dash', desc: 'Teleport slash' },
+  { id: 'brawler', name: 'Brick', color: '#fca5a5', band: '#b91c1c', speed: 235, jump: 660, power: 1.25, hp: 110, sp: 'Ground Pound', desc: 'Shockwave slam' },
+  { id: 'mage', name: 'Ember', color: '#c4b5fd', band: '#7c3aed', speed: 255, jump: 690, power: 0.9, hp: 95, sp: 'Fireball', desc: 'Ranged fire' },
+  { id: 'gunner', name: 'Trigger', color: '#99f6e4', band: '#0f766e', speed: 265, jump: 700, power: 0.95, hp: 100, sp: 'Triple Shot', desc: '3 bullets' },
+  { id: 'speed', name: 'Zip', color: '#fde68a', band: '#ca8a04', speed: 345, jump: 760, power: 0.85, hp: 90, sp: 'Flurry', desc: 'Kick barrage' },
+  { id: 'tank', name: 'Bulwark', color: '#93c5fd', band: '#1d4ed8', speed: 205, jump: 610, power: 1.35, hp: 135, sp: 'Shield Charge', desc: 'Armored rush' },
+];
+const STAGES = [
+  { name: 'Dojo', sky: ['#7c2d12', '#fdba74'], ground: '#78350f', plats: [[180, 340, 170], [610, 340, 170], [395, 230, 170]] },
+  { name: 'Rooftops', sky: ['#0f172a', '#4338ca'], ground: '#334155', plats: [[100, 360, 200], [660, 360, 200], [380, 280, 200]], night: true },
+  { name: 'Forest', sky: ['#14532d', '#86efac'], ground: '#365314', plats: [[260, 350, 140], [560, 350, 140], [410, 250, 140], [100, 260, 110], [750, 260, 110]] },
+  { name: 'Final Destination', sky: ['#020617', '#581c87'], ground: '#1e1b4b', plats: [], night: true },
+];
+const WEAPONS = {
+  sword: { name: 'Sword', dmg: 14, reach: 92, dur: 0.34, act: [0.1, 0.2], kb: 380, uses: 8, color: '#e5e7eb', len: 46 },
+  hammer: { name: 'Hammer', dmg: 22, reach: 84, dur: 0.55, act: [0.25, 0.35], kb: 700, uses: 6, color: '#a8a29e', len: 40 },
+  bat: { name: 'Bat', dmg: 12, reach: 80, dur: 0.3, act: [0.1, 0.18], kb: 520, uses: 9, color: '#d97706', len: 38 },
+  pistol: { name: 'Pistol', dmg: 9, gun: true, dur: 0.25, uses: 7, color: '#334155', len: 16 },
+  spear: { name: 'Spear', dmg: 13, reach: 120, dur: 0.38, act: [0.12, 0.22], kb: 300, uses: 8, color: '#a16207', len: 62 },
+};
+let mode = 0, sel = [0, 2], stage = 0, diff = 1, fighters = [], projs = [], parts = [], items = [], shake = 0, slow = 0, state = 'menu', stateT = 0, wins = [0, 0], round = 1, survival = 0, itemT = 6, popups = [];
+const keys = {};
+
+function mkFighter(ci, side, cpu) {
+  const c = CHARS[ci];
+  return { c, x: side ? 700 : 260, y: FLOOR, vx: 0, vy: 0, face: side ? -1 : 1, hp: c.hp, max: c.hp, meter: 0, onGround: true, jumps: 0, state: 'idle', t: 0, atk: null, combo: 0, comboT: 0, hurtT: 0, blockT: 0, walkT: 0, cpu, side, weapon: null, ai: { t: 0, plan: null }, inv: 0, armor: 0, ragdoll: null, dropT: 0 };
+}
+function input(f) {
+  if (f.cpu) return f.aiIn || {};
+  const two = mode === 1;
+  if (f.side === 0) return { left: keys.KeyA || tk.left, right: keys.KeyD || tk.right, up: keys.KeyW || tk.up, down: keys.KeyS || tk.down, punch: keys.KeyF || (!two && keys.KeyJ) || tk.punch, kick: keys.KeyG || (!two && keys.KeyK) || tk.kick, special: keys.KeyH || (!two && keys.KeyL) || tk.special };
+  return { left: keys.ArrowLeft, right: keys.ArrowRight, up: keys.ArrowUp, down: keys.ArrowDown, punch: keys.Comma || keys.Numpad1, kick: keys.Period || keys.Numpad2, special: keys.Slash || keys.Numpad3 };
+}
+
+// ---------- attacks ----------
+function startAttack(f, kind) {
+  const p = f.c.power;
+  let a;
+  if (kind === 'punch' && f.weapon) {
+    const w = WEAPONS[f.weapon.k];
+    if (w.gun) { a = { kind: 'shoot', dur: w.dur, act: [0.05, 0.06], dmg: 0 }; }
+    else a = { kind: 'weapon', dur: w.dur, act: w.act, dmg: w.dmg * p, reach: w.reach, kb: w.kb, h: [-110, -40] };
+  } else if (kind === 'punch') {
+    const n = f.comboT > 0 ? (f.combo + 1) % 3 : 0; f.combo = n;
+    a = [{ kind: 'jab', dur: 0.22, act: [0.06, 0.12], dmg: 5.5, reach: 52, kb: 120, h: [-100, -60] }, { kind: 'cross', dur: 0.26, act: [0.08, 0.14], dmg: 6.5, reach: 56, kb: 160, h: [-100, -60] }, { kind: 'upper', dur: 0.38, act: [0.1, 0.18], dmg: 10, reach: 50, kb: 260, up: 560, h: [-120, -50] }][n];
+    a = { ...a, dmg: a.dmg * p };
+  } else if (kind === 'kick') {
+    a = f.onGround ? { kind: 'kick', dur: 0.34, act: [0.1, 0.19], dmg: 9 * p, reach: 66, kb: 330, h: [-80, -20] } : { kind: 'airkick', dur: 0.4, act: [0.06, 0.32], dmg: 8.5 * p, reach: 56, kb: 300, h: [-50, 10], dive: true };
+  } else if (kind === 'special') {
+    if (f.meter < 50) return;
+    f.meter -= 50;
+    const id = f.c.id;
+    if (id === 'ninja') a = { kind: 'dash', dur: 0.35, act: [0.05, 0.2], dmg: 15, reach: 70, kb: 400, h: [-110, -20], multi: true };
+    else if (id === 'brawler') { a = { kind: 'slam', dur: 0.9, act: [9, 9], dmg: 0 }; f.vy = -900; f.onGround = false; }
+    else if (id === 'mage') a = { kind: 'cast', dur: 0.4, act: [0.15, 0.16], dmg: 0, fire: 1 };
+    else if (id === 'gunner') a = { kind: 'cast', dur: 0.55, act: [0.1, 0.11], dmg: 0, burst: 3 };
+    else if (id === 'speed') a = { kind: 'flurry', dur: 0.7, act: [0.05, 0.65], dmg: 3.2, reach: 70, kb: 60, h: [-110, -10], multi: true, rate: 0.08 };
+    else a = { kind: 'charge', dur: 0.6, act: [0.05, 0.55], dmg: 16, reach: 50, kb: 650, h: [-110, -10] };
+    popups.push({ text: f.c.sp + '!', x: f.x, y: f.y - 140, t: 0.9, col: f.c.band });
+  }
+  if (!a) return;
+  f.atk = { ...a, t: 0, hit: new Set(), lastHit: 0, shots: 0 }; f.state = 'attack'; f.t = 0;
+  if (a.kind === 'dash') { f.inv = 0.25; }
+  if (a.kind === 'charge') f.armor = 0.6;
+}
+function hitbox(f) {
+  const a = f.atk;
+  const x0 = f.x + f.face * 10, x1 = f.x + f.face * a.reach;
+  return [Math.min(x0, x1), f.y + a.h[0], Math.max(x0, x1), f.y + a.h[1]];
+}
+function bodyBox(f) { return [f.x - 18, f.y - 118, f.x + 18, f.y]; }
+const overlap = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+function hurt(t, src, dmg, kb, up, dirX) {
+  if (t.hp <= 0 || t.inv > 0) return false;
+  const blocking = t.state === 'block' && Math.sign(dirX) === -t.face;
+  if (blocking) { dmg *= 0.15; kb *= 0.35; up = 0; t.meter = Math.min(100, t.meter + 4); spark(t.x - t.face * 4, t.y - 80, '#93c5fd', 8); }
+  else spark(t.x, t.y - 80, '#fde047', 12);
+  t.hp = Math.max(0, t.hp - dmg);
+  popups.push({ text: Math.round(dmg), x: t.x, y: t.y - 130, t: 0.6, col: blocking ? '#93c5fd' : '#fff' });
+  if (src) src.meter = Math.min(100, src.meter + dmg * 1.3);
+  t.meter = Math.min(100, t.meter + dmg * 0.6);
+  if (t.armor > 0 && !blocking) { kb *= 0.2; up = 0; }
+  else if (!blocking) { t.state = 'hurt'; t.hurtT = 0.18 + dmg * 0.012; t.atk = null; }
+  t.vx = Math.sign(dirX) * kb; if (up) { t.vy = -up; t.onGround = false; }
+  shake = Math.min(12, shake + dmg * 0.5);
+  if (t.weapon && !blocking && Math.random() < 0.15) dropWeapon(t);
+  if (t.hp <= 0) ko(t, dirX);
+  return true;
+}
+function ko(t, dirX) {
+  slow = 1.1; t.state = 'ko';
+  // turn the stick figure into a ragdoll
+  const J = joints(t);
+  const pts = Object.fromEntries(Object.entries(J).map(([k, p]) => [k, { x: p[0], y: p[1], px: p[0] - Math.sign(dirX) * (6 + Math.random() * 4), py: p[1] + 6 }]));
+  const L = [['neck', 'hip'], ['neck', 'head'], ['neck', 'eB'], ['eB', 'hB'], ['neck', 'eF'], ['eF', 'hF'], ['hip', 'kB'], ['kB', 'fB'], ['hip', 'kF'], ['kF', 'fF']];
+  t.ragdoll = { pts, links: L.map(([a, b]) => [a, b, Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y)]) };
+  if (t.weapon) dropWeapon(t);
+}
+function spark(x, y, col, n) { for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - 0.5) * 500, vy: (Math.random() - 0.8) * 400, life: 0.4, col }); }
+function dropWeapon(f) { items.push({ k: f.weapon.k, uses: f.weapon.uses, x: f.x, y: f.y - 60, vy: -300, vx: -f.face * 120 }); f.weapon = null; f.dropT = 0.6; }
+
+// ---------- update ----------
+function updFighter(f, o, dt) {
+  if (f.state === 'ko') { updRagdoll(f, dt); return; }
+  const inp = input(f), c = f.c;
+  f.t += dt; f.inv -= dt; f.armor -= dt; f.comboT -= dt; f.dropT -= dt;
+  const pressed = k => inp[k] && !f['prev_' + k];
+  if (f.state === 'hurt') { f.hurtT -= dt; if (f.hurtT <= 0) f.state = 'idle'; }
+  const busy = f.state === 'hurt' || f.state === 'attack';
+  if (!busy) {
+    if (inp.down && f.onGround) { f.state = 'block'; f.vx *= 0.8; }
+    else {
+      const dir = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+      f.vx += (dir * c.speed - f.vx) * Math.min(1, dt * (f.onGround ? 14 : 5));
+      if (dir) f.face = dir; else if (f.onGround) f.face = Math.sign(o.x - f.x) || f.face;
+      f.state = !f.onGround ? 'jump' : Math.abs(f.vx) > 30 ? 'walk' : 'idle';
+      if (pressed('up') && (f.onGround || f.jumps < 2)) { f.vy = -c.jump * (f.onGround ? 1 : 0.85); f.onGround = false; f.jumps++; spark(f.x, f.y, '#cbd5e1', 4); }
+      if (pressed('punch')) startAttack(f, 'punch');
+      else if (pressed('kick')) startAttack(f, 'kick');
+      else if (pressed('special')) startAttack(f, 'special');
+    }
+  }
+  if (f.state === 'block' && !inp.down) f.state = 'idle';
+  if (f.state === 'walk') f.walkT += dt * Math.abs(f.vx) / 40;
+  if (f.state === 'attack') runAttack(f, o, dt);
+  ['up', 'punch', 'kick', 'special'].forEach(k => f['prev_' + k] = inp[k]);
+  // physics
+  if (!(f.atk && f.atk.kind === 'dash')) f.vy += GRAV * dt;
+  const prevY = f.y;
+  f.x += f.vx * dt; f.y += f.vy * dt;
+  if (f.onGround || f.state === 'hurt') f.vx *= Math.pow(f.state === 'hurt' ? 0.05 : 0.001, dt);
+  f.x = Math.max(30, Math.min(VW - 30, f.x));
+  f.onGround = false;
+  if (f.y >= FLOOR) { f.y = FLOOR; f.vy = 0; land(f); }
+  else if (f.vy >= 0 && !(inp.down && f.state !== 'attack')) for (const [px, py, pw] of STAGES[stage].plats) {
+    if (f.x > px && f.x < px + pw && prevY <= py && f.y >= py) { f.y = py; f.vy = 0; land(f); break; }
+  }
+  // walk over a weapon to pick it up
+  if (!f.weapon && f.dropT <= 0) for (const it of items) if (!it.taken && Math.abs(it.x - f.x) < 34 && Math.abs(it.y - (f.y - 20)) < 60) { it.taken = true; f.weapon = { k: it.k, uses: it.uses }; popups.push({ text: WEAPONS[it.k].name, x: f.x, y: f.y - 140, t: 0.8, col: '#fde047' }); break; }
+}
+function land(f) {
+  if (!f.onGround && f.atk && f.atk.kind === 'slam' && f.t > 0.15) {
+    // ground pound shockwave
+    shake = 14; spark(f.x, f.y, '#fb923c', 24); parts.push({ ring: 1, x: f.x, y: f.y, r: 10, life: 0.4 });
+    for (const t of fighters) if (t !== f && t.state !== 'ko' && Math.abs(t.x - f.x) < 150 && Math.abs(t.y - f.y) < 80) hurt(t, f, 18, 420, 520, t.x - f.x || f.face);
+    f.atk = null; f.state = 'idle';
+  }
+  if (f.atk && f.atk.kind === 'airkick') { f.atk = null; f.state = 'idle'; }
+  f.onGround = true; f.jumps = 0;
+}
+function runAttack(f, o, dt) {
+  const a = f.atk; a.t += dt;
+  if (a.kind === 'dash' && a.t < 0.2) { f.vx = f.face * 1300; f.vy = 0; }
+  if (a.kind === 'charge' && a.t < 0.55) f.vx = f.face * 620;
+  if (a.kind === 'airkick') { f.vx = f.face * 420; f.vy = Math.max(f.vy, 500); }
+  if (a.kind === 'slam') { if (a.t > 0.2 && f.vy < 900) f.vy = 1400; if (a.t > 1.6) { f.atk = null; f.state = 'idle'; } return; }
+  if (a.kind === 'shoot' && a.t >= a.act[0] && !a.shots) { a.shots = 1; projs.push({ x: f.x + f.face * 40, y: f.y - 88, vx: f.face * 900, owner: f, dmg: WEAPONS.pistol.dmg * f.c.power, kind: 'bullet', life: 1.2 }); useWeapon(f); }
+  if (a.fire && a.t >= a.act[0] && !a.shots) { a.shots = 1; projs.push({ x: f.x + f.face * 40, y: f.y - 85, vx: f.face * 560, owner: f, dmg: 16, kind: 'fire', life: 2 }); }
+  if (a.burst && a.t >= a.act[0] + a.shots * 0.12 && a.shots < a.burst) { a.shots++; projs.push({ x: f.x + f.face * 40, y: f.y - 88 + (a.shots - 2) * 6, vx: f.face * 950, owner: f, dmg: 7, kind: 'bullet', life: 1.2 }); }
+  if (a.dmg && a.t >= a.act[0] && a.t <= a.act[1] && o.state !== 'ko') {
+    const can = a.multi ? (a.t - a.lastHit >= (a.rate || 0.12)) && (a.rate || !a.hit.has(o)) : !a.hit.has(o);
+    if (can && overlap(hitbox(f), bodyBox(o))) {
+      a.hit.add(o); a.lastHit = a.t;
+      if (hurt(o, f, a.dmg, a.kb, a.up || 0, f.face) && a.kind === 'weapon') useWeapon(f);
+      if (a.kind === 'charge') f.vx = 0;
+    }
+  }
+  if (a.t >= a.dur) { if (['jab', 'cross', 'upper'].includes(a.kind)) f.comboT = 0.35; f.atk = null; f.state = f.onGround ? 'idle' : 'jump'; }
+}
+function useWeapon(f) { if (!f.weapon) return; f.weapon.uses--; if (f.weapon.uses <= 0) { popups.push({ text: 'Broke!', x: f.x, y: f.y - 140, t: 0.7, col: '#f87171' }); f.weapon = null; } }
+function updRagdoll(f, dt) {
+  const R = f.ragdoll; if (!R) return;
+  for (const p of Object.values(R.pts)) {
+    const vx = (p.x - p.px) * 0.99, vy = (p.y - p.py) * 0.99;
+    p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + GRAV * dt * dt;
+    if (p.y > FLOOR) { p.y = FLOOR; p.px = p.x - vx * 0.5; p.py = p.y + vy * 0.3; }
+    p.x = Math.max(10, Math.min(VW - 10, p.x));
+  }
+  for (let k = 0; k < 4; k++) for (const [a, b, len] of R.links) {
+    const A = R.pts[a], B = R.pts[b], dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1, diff = (d - len) / d / 2;
+    A.x += dx * diff; A.y += dy * diff; B.x -= dx * diff; B.y -= dy * diff;
+  }
+}
+function think(f, o, dt) {
+  // CPU: approach, mix attacks, block some hits, use specials and weapons.
+  const ai = f.ai, D = [{ react: 0.42, block: 0.15, agg: 0.45 }, { react: 0.25, block: 0.35, agg: 0.65 }, { react: 0.12, block: 0.6, agg: 0.85 }, { react: 0.06, block: 0.8, agg: 1 }][mode === 2 ? Math.min(3, 1 + Math.floor(survival / 2)) : diff];
+  const inp = {}; f.aiIn = inp;
+  if (f.state === 'ko' || o.state === 'ko') return;
+  ai.t -= dt;
+  const dx = o.x - f.x, dist = Math.abs(dx), dy = o.y - f.y;
+  // go grab a weapon if one is close and we have none
+  const item = !f.weapon && items.find(it => !it.taken && Math.abs(it.x - f.x) < 260);
+  if (o.state === 'attack' && dist < 110 && Math.random() < D.block * dt * 12) { ai.plan = 'block'; ai.t = 0.3; }
+  if (ai.t <= 0) {
+    ai.t = D.react + Math.random() * 0.2;
+    const range = f.weapon ? (WEAPONS[f.weapon.k].gun ? 500 : WEAPONS[f.weapon.k].reach - 10) : 55;
+    const r = Math.random();
+    if (item && r < 0.6) ai.plan = 'item';
+    else if (f.meter >= 50 && r < 0.35 * D.agg && (['mage', 'gunner'].includes(f.c.id) ? dist < 600 : dist < 200)) ai.plan = 'special';
+    else if (dist < range + 10 && Math.abs(dy) < 60) ai.plan = r < D.agg ? (Math.random() < 0.55 ? 'punch' : 'kick') : (Math.random() < 0.5 ? 'back' : 'block');
+    else ai.plan = 'approach';
+  }
+  const toward = dx > 0 ? 'right' : 'left', away = dx > 0 ? 'left' : 'right';
+  switch (ai.plan) {
+    case 'item': if (item) { inp[item.x > f.x ? 'right' : 'left'] = true; if (item.y < f.y - 80 && f.onGround) inp.up = true; } break;
+    case 'approach': inp[toward] = true; if ((dy < -60 && f.onGround) || (Math.random() < dt * 0.6)) inp.up = !f.prev_up; break;
+    case 'back': inp[away] = true; break;
+    case 'block': inp.down = true; break;
+    case 'punch': if (dist > 50) inp[toward] = true; inp.punch = !f.prev_punch; break;
+    case 'kick': inp.kick = !f.prev_kick; break;
+    case 'special': f.face = Math.sign(dx) || f.face; inp.special = !f.prev_special; ai.plan = null; break;
+  }
+  if (o.y < f.y - 100 && f.onGround && Math.random() < dt * 2) inp.up = true;
+}
+function update(dt) {
+  parts.forEach(p => { p.life -= dt; if (!p.ring) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 1200 * dt; } else p.r += 600 * dt; }); parts = parts.filter(p => p.life > 0);
+  popups.forEach(p => { p.t -= dt; p.y -= 40 * dt; }); popups = popups.filter(p => p.t > 0);
+  shake = Math.max(0, shake - dt * 30);
+  if (state !== 'fight' && state !== 'ko' && state !== 'intro') return;
+  stateT -= dt;
+  if (state === 'intro') { if (stateT <= 0) state = 'fight'; fighters.forEach(f => { f.aiIn = {}; }); }
+  const [a, b] = fighters;
+  if (state === 'fight') { if (a.cpu) think(a, b, dt); if (b.cpu) think(b, a, dt); }
+  else { a.aiIn = {}; b.aiIn = {}; }
+  if (state !== 'intro') { updFighter(a, b, dt); updFighter(b, a, dt); }
+  // keep fighters from overlapping
+  if (a.state !== 'ko' && b.state !== 'ko' && Math.abs(a.x - b.x) < 30 && Math.abs(a.y - b.y) < 90) { const push = (30 - Math.abs(a.x - b.x)) / 2 * Math.sign(a.x - b.x || 1); a.x += push; b.x -= push; }
+  for (const p of projs) {
+    p.x += p.vx * dt; p.life -= dt;
+    if (p.kind === 'fire' && Math.random() < 0.5) parts.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 60, vy: -Math.random() * 80, life: 0.3, col: '#fb923c' });
+    const t = fighters.find(f => f !== p.owner);
+    if (t.state !== 'ko' && overlap([p.x - 8, p.y - 8, p.x + 8, p.y + 8], bodyBox(t))) { hurt(t, p.owner, p.dmg, p.kind === 'fire' ? 380 : 150, p.kind === 'fire' ? 260 : 0, p.vx); p.life = 0; }
+  }
+  projs = projs.filter(p => p.life > 0 && p.x > -20 && p.x < VW + 20);
+  // weapon drops
+  itemT -= dt;
+  if (itemT <= 0 && state === 'fight' && items.filter(i => !i.taken).length < 2) {
+    itemT = 9 + Math.random() * 7;
+    const keysW = Object.keys(WEAPONS), k = keysW[Math.random() * keysW.length | 0];
+    items.push({ k, uses: WEAPONS[k].uses, x: 120 + Math.random() * (VW - 240), y: -20, vy: 0, vx: 0 });
+  }
+  for (const it of items) {
+    if (it.taken) continue;
+    it.vy += GRAV * dt * 0.6; it.y += it.vy * dt; it.x += it.vx * dt; it.vx *= 0.98;
+    let ground = FLOOR - 6; for (const [px, py, pw] of STAGES[stage].plats) if (it.x > px && it.x < px + pw && it.y - it.vy * dt <= py - 6) ground = Math.min(ground, py - 6);
+    if (it.y > ground) { it.y = ground; it.vy = 0; it.vx *= 0.8; }
+  }
+  items = items.filter(i => !i.taken);
+  // round end
+  if (state === 'fight') {
+    const dead = fighters.filter(f => f.state === 'ko');
+    if (dead.length) { state = 'ko'; stateT = 2.2; const w = fighters.find(f => f.state !== 'ko'); if (w) wins[w.side]++; }
+  } else if (state === 'ko' && stateT <= 0) nextRound();
+}
+function nextRound() {
+  if (mode === 2) {
+    const me = fighters[0];
+    if (me.state === 'ko') return endMatch(`You beat ${survival} fighter${survival === 1 ? '' : 's'}`);
+    survival++;
+    const hp = me.hp;
+    const ci = Math.random() * CHARS.length | 0;
+    fighters[1] = mkFighter(ci, 1, true);
+    fighters[0].hp = Math.min(me.max, hp + 30); fighters[0].x = 260; fighters[0].y = FLOOR; fighters[0].vx = fighters[0].vy = 0; fighters[0].state = 'idle'; fighters[0].atk = null;
+    projs = []; state = 'intro'; stateT = 1.4; round = survival + 1; return;
+  }
+  if (wins[0] >= 2 || wins[1] >= 2) return endMatch();
+  round++; startRound();
+}
+function startRound() {
+  fighters = [mkFighter(sel[0], 0, false), mkFighter(sel[1], 1, mode !== 1)];
+  projs = []; items = []; itemT = 5; state = 'intro'; stateT = 1.4;
+}
+function endMatch(text) {
+  state = 'over';
+  const w = wins[0] > wins[1] ? 0 : 1;
+  $('endT').textContent = mode === 2 ? 'SURVIVAL OVER' : mode === 1 ? `PLAYER ${w + 1} WINS` : w === 0 ? 'YOU WIN!' : 'YOU LOSE';
+  $('endS').textContent = text || `${CHARS[sel[w]].name} wins ${wins[w]}–${wins[1 - w]}`;
+  window.SJG && (mode === 0 && w === 0 && SJG.unlock('win'), mode === 2 && (SJG.score(survival, 'survival'), survival >= 10 && SJG.unlock('s10'))); if (mode === 2) { let best = 0; try { best = +localStorage.getItem('sj-stick-surv') || 0; if (survival > best) localStorage.setItem('sj-stick-surv', String(survival)); } catch {} $('endS').textContent += ` · best ${Math.max(best, survival)}`; }
+  $('end').classList.add('on');
+}
+function startMatch() { wins = [0, 0]; round = 1; survival = 0; $('menu').classList.remove('on'); $('end').classList.remove('on'); startRound(); }
+
+// ---------- drawing ----------
+const lerp = (a, b, k) => a + (b - a) * k;
+function pose(f) {
+  const t = performance.now() / 1000;
+  let P = { lean: 0.06, aU: [0.25, 0.7], aL: [1.9, 2.4], lU: [-0.25, 0.3], lL: [-0.05, 0.1] };
+  const br = Math.sin(t * 3) * 0.04; P.aL = [P.aL[0] + br, P.aL[1] + br];
+  if (f.state === 'walk') { const s = Math.sin(f.walkT); P.lU = [-0.55 * s, 0.55 * s]; P.lL = [-0.55 * s - Math.max(0, s) * 0.5, 0.55 * s - Math.max(0, -s) * 0.5]; P.aU = [0.4 * s + 0.2, -0.4 * s + 0.6]; P.lean = 0.12; }
+  if (f.state === 'jump') P = { lean: 0.05, aU: [-0.6, 2.2], aL: [-0.2, 2.6], lU: [0.4, 1.1], lL: [-0.5, -0.2] };
+  if (f.state === 'block') P = { lean: -0.05, aU: [1.1, 1.3], aL: [2.7, 2.9], lU: [-0.35, 0.4], lL: [-0.2, 0.15] };
+  if (f.state === 'hurt') P = { lean: -0.4, aU: [-0.9, -0.5], aL: [-0.4, 0.2], lU: [-0.3, 0.25], lL: [-0.1, 0.1] };
+  const a = f.atk;
+  if (a) {
+    const k = a.t < a.act[0] ? a.t / a.act[0] : a.t < a.act[1] ? 1 : Math.max(0, 1 - (a.t - a.act[1]) / Math.max(0.01, a.dur - a.act[1]));
+    switch (a.kind) {
+      case 'jab': P.aU[1] = lerp(0.7, 1.57, k); P.aL[1] = lerp(2.4, 1.57, k); P.lean = 0.1 + 0.1 * k; break;
+      case 'cross': P.aU[0] = lerp(0.25, 1.6, k); P.aL[0] = lerp(1.9, 1.57, k); P.lean = 0.1 + 0.25 * k; break;
+      case 'upper': P.aU[1] = lerp(0.7, 2.6, k); P.aL[1] = lerp(2.4, 3.0, k); P.lean = lerp(0.2, -0.1, k); P.lU[1] = lerp(0.3, 0.7, k); break;
+      case 'kick': P.lU[1] = lerp(0.3, 1.55, k); P.lL[1] = lerp(0.1, 1.6, k); P.lean = -0.3 * k; P.aU = [-0.4, 0.9]; break;
+      case 'airkick': P.lU[1] = 1.0; P.lL[1] = 1.05; P.lU[0] = -0.2; P.lL[0] = -1.2; P.lean = -0.15; break;
+      case 'flurry': { const s = Math.sin(a.t * 45); P.lU[1] = 1.2 + s * 0.3; P.lL[1] = 1.3 + s * 0.3; P.lean = -0.3; break; }
+      case 'weapon': P.aU[1] = lerp(2.8, 0.9, k); P.aL[1] = lerp(3.0, 1.2, k); P.lean = 0.25 * k; break;
+      case 'shoot': case 'cast': P.aU[1] = 1.57; P.aL[1] = 1.57; P.aU[0] = 1.4; P.aL[0] = 1.5; break;
+      case 'dash': case 'charge': P.lean = 0.5; P.aU = [1.4, 1.2]; P.aL = [1.6, 1.4]; P.lU = [-0.7, 0.9]; P.lL = [-0.9, 0.3]; break;
+      case 'slam': P.lU = [0.9, 1.2]; P.lL = [-0.2, 0]; P.aU = [2.8, 3.0]; P.aL = [3.0, 3.1]; break;
+    }
+  }
+  return P;
+}
+function joints(f) {
+  const P = pose(f), s = f.face, v = (a, l) => [Math.sin(a) * s * l, Math.cos(a) * l];
+  const crouch = f.state === 'block' ? 6 : 0;
+  const hip = [f.x, f.y - 52 + crouch];
+  const tv = v(Math.PI + P.lean, 44), neck = [hip[0] + tv[0], hip[1] + tv[1]];
+  const head = [neck[0] + Math.sin(P.lean) * s * 14, neck[1] - 14];
+  const limb = (o, aU, aL, l1, l2) => { const u = v(aU, l1), e = [o[0] + u[0], o[1] + u[1]], d = v(aL, l2); return [e, [e[0] + d[0], e[1] + d[1]]]; };
+  const [eB, hB] = limb(neck, P.aU[0], P.aL[0], 24, 23), [eF, hF] = limb(neck, P.aU[1], P.aL[1], 24, 23);
+  const [kB, fB] = limb(hip, P.lU[0], P.lL[0], 27, 27), [kF, fF] = limb(hip, P.lU[1], P.lL[1], 27, 27);
+  return { hip, neck, head, eB, hB, eF, hF, kB, fB, kF, fF };
+}
+function drawFighter(f) {
+  const col = f.c.color;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (f.ragdoll) {
+    const p = f.ragdoll.pts; ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.globalAlpha = 0.85;
+    for (const [a, b] of f.ragdoll.links) { if (b === 'head') continue; ctx.beginPath(); ctx.moveTo(p[a].x, p[a].y); ctx.lineTo(p[b].x, p[b].y); ctx.stroke(); }
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p.head.x, p.head.y, 13, 0, 7); ctx.fill(); ctx.globalAlpha = 1; return;
+  }
+  const J = joints(f);
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(f.x, groundUnder(f) + 2, 26, 6, 0, 0, 7); ctx.fill();
+  const line = (pts, c, w) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(...pts[0]); for (const p of pts.slice(1)) ctx.lineTo(...p); ctx.stroke(); };
+  const dim = shade(col, -0.25);
+  if (f.inv > 0) ctx.globalAlpha = 0.5;
+  line([J.neck, J.eB, J.hB], dim, 7); line([J.hip, J.kB, J.fB], dim, 8);
+  line([J.hip, J.neck], col, 9);
+  line([J.hip, J.kF, J.fF], col, 8);
+  // weapon in front hand
+  if (f.weapon) { const w = WEAPONS[f.weapon.k], ang = Math.atan2(J.hF[1] - J.eF[1], J.hF[0] - J.eF[0]); ctx.save(); ctx.translate(...J.hF); ctx.rotate(ang); ctx.fillStyle = w.color; if (w.gun) ctx.fillRect(-2, -9, 18, 8); else { ctx.fillRect(-4, -3, w.len, 6); if (f.weapon.k === 'hammer') ctx.fillRect(w.len - 12, -11, 14, 22); if (f.weapon.k === 'spear') { ctx.beginPath(); ctx.moveTo(w.len - 2, -6); ctx.lineTo(w.len + 12, 0); ctx.lineTo(w.len - 2, 6); ctx.fill(); } } ctx.restore(); }
+  line([J.neck, J.eF, J.hF], col, 7);
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(J.head[0], J.head[1] - 4, 14, 0, 7); ctx.fill();
+  ctx.fillStyle = f.c.band; ctx.fillRect(J.head[0] - 14, J.head[1] - 10, 28, 5);
+  ctx.beginPath(); ctx.moveTo(J.head[0] - f.face * 12, J.head[1] - 9); ctx.lineTo(J.head[0] - f.face * 30, J.head[1] - 4 + Math.sin(performance.now() / 120) * 3); ctx.lineTo(J.head[0] - f.face * 12, J.head[1] - 5); ctx.fill();
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(J.head[0] + f.face * 5 - 2, J.head[1] - 6, 4, 4);
+  if (f.state === 'block') { ctx.strokeStyle = 'rgba(147,197,253,.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x + f.face * 8, f.y - 70, 52, -1.2 * f.face - (f.face < 0 ? Math.PI : 0), 1.2 * f.face - (f.face < 0 ? Math.PI : 0), f.face < 0); ctx.stroke(); }
+  if (f.armor > 0) { ctx.strokeStyle = 'rgba(96,165,250,.7)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y - 60, 60, 0, 7); ctx.stroke(); }
+  if (f.atk && f.atk.kind === 'dash') { ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(f.x - f.face * 140, f.y - 110, f.face * 140, 100); }
+  ctx.globalAlpha = 1;
+}
+function groundUnder(f) { let g = FLOOR; for (const [px, py, pw] of STAGES[stage].plats) if (f.x > px && f.x < px + pw && py >= f.y - 1 && py < g) g = py; return g; }
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16), c = [n >> 16, n >> 8 & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * (1 + k))))); return `rgb(${c})`; }
+function drawStage() {
+  const S = STAGES[stage], g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, S.sky[0]); g.addColorStop(1, S.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  if (S.night) { ctx.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 60; i++) ctx.fillRect((i * 157) % VW, (i * 89) % 300, 2, 2); ctx.fillStyle = '#fef9c3'; ctx.beginPath(); ctx.arc(800, 90, 34, 0, 7); ctx.fill(); }
+  if (stage === 1) { ctx.fillStyle = '#1e293b'; for (let i = 0; i < 12; i++) { const h = 120 + (i * 53) % 160; ctx.fillRect(i * 82, FLOOR - h, 70, h); ctx.fillStyle = '#fde68a'; for (let w = 0; w < 6; w++) if ((i + w) % 3) ctx.fillRect(i * 82 + 10 + (w % 2) * 30, FLOOR - h + 14 + (w >> 1) * 28, 12, 12); ctx.fillStyle = '#1e293b'; } }
+  if (stage === 2) { for (let i = 0; i < 9; i++) { const x = i * 115 + 20; ctx.fillStyle = '#3f2a14'; ctx.fillRect(x + 22, FLOOR - 150, 14, 150); ctx.fillStyle = '#166534'; ctx.beginPath(); ctx.arc(x + 29, FLOOR - 170, 52, 0, 7); ctx.fill(); } }
+  if (stage === 0) { ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let i = 0; i < 8; i++) ctx.fillRect(i * 130 + 30, 120, 12, FLOOR - 120); ctx.fillStyle = '#7f1d1d'; ctx.fillRect(0, 100, VW, 24); }
+  ctx.fillStyle = S.ground; ctx.fillRect(0, FLOOR, VW, VH - FLOOR);
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(0, FLOOR, VW, 4);
+  if (stage === 3) { ctx.fillStyle = '#312e81'; ctx.beginPath(); ctx.moveTo(60, FLOOR); ctx.lineTo(VW - 60, FLOOR); ctx.lineTo(VW - 160, VH); ctx.lineTo(160, VH); ctx.fill(); }
+  for (const [x, y, w] of S.plats) { ctx.fillStyle = shade(S.ground.length === 7 ? S.ground : '#334155', 0.25); ctx.fillRect(x, y, w, 12); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x, y + 12, w, 6); }
+}
+function hudBar(f, x, right) {
+  const w = 380, frac = f.hp / f.max;
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 4, 16, w + 8, 34);
+  ctx.fillStyle = '#7f1d1d'; ctx.fillRect(x, 20, w, 18);
+  ctx.fillStyle = frac > 0.3 ? '#facc15' : '#ef4444';
+  if (right) ctx.fillRect(x + w * (1 - frac), 20, w * frac, 18); else ctx.fillRect(x, 20, w * frac, 18);
+  ctx.fillStyle = '#1e3a8a'; ctx.fillRect(x, 40, w, 6);
+  ctx.fillStyle = f.meter >= 50 ? '#60a5fa' : '#3b82f6'; const m = w * f.meter / 100;
+  if (right) ctx.fillRect(x + w - m, 40, m, 6); else ctx.fillRect(x, 40, m, 6);
+  ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(x + w / 2, 40, 2, 6);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui'; ctx.textAlign = right ? 'right' : 'left';
+  const label = `${f.cpu ? 'CPU · ' : ''}${f.c.name}${f.weapon ? ' · ' + WEAPONS[f.weapon.k].name + ' (' + f.weapon.uses + ')' : ''}`;
+  ctx.fillText(label, right ? x + w : x, 66);
+}
+function draw() {
+  ctx.save();
+  if (shake) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  drawStage();
+  for (const it of items) { const w = WEAPONS[it.k]; ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(-0.5); ctx.fillStyle = w.color; ctx.fillRect(-w.len / 2, -3, w.len, 6); if (it.k === 'hammer') ctx.fillRect(w.len / 2 - 12, -10, 14, 20); ctx.restore(); ctx.fillStyle = 'rgba(253,224,71,.35)'; ctx.beginPath(); ctx.arc(it.x, it.y, 20 + Math.sin(performance.now() / 200) * 3, 0, 7); ctx.fill(); }
+  fighters.forEach(drawFighter);
+  for (const p of projs) { if (p.kind === 'fire') { ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, 7); ctx.fill(); ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fill(); } else { ctx.fillStyle = '#fde047'; ctx.fillRect(p.x - 7, p.y - 2, 14, 4); } }
+  for (const p of parts) { if (p.ring) { ctx.strokeStyle = `rgba(251,146,60,${p.life * 2.5})`; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 0.25, 0, 0, 7); ctx.stroke(); } else { ctx.globalAlpha = Math.max(0, p.life * 2.5); ctx.fillStyle = p.col; ctx.fillRect(p.x - 3, p.y - 3, 6, 6); } }
+  ctx.globalAlpha = 1;
+  for (const p of popups) { ctx.globalAlpha = Math.min(1, p.t * 2); ctx.font = 'bold 20px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillText(p.text, p.x + 2, p.y + 2); ctx.fillStyle = p.col; ctx.fillText(p.text, p.x, p.y); }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  if (fighters.length && state !== 'menu') {
+    hudBar(fighters[0], 30, false); hudBar(fighters[1], VW - 410, true);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui';
+    ctx.fillText(mode === 2 ? `KO ${survival}` : `${'●'.repeat(wins[0])}${'○'.repeat(2 - wins[0])}  R${round}  ${'○'.repeat(2 - wins[1])}${'●'.repeat(wins[1])}`, VW / 2, 36);
+    if (state === 'intro') { ctx.font = 'bold 60px system-ui'; ctx.fillStyle = '#fde047'; ctx.fillText(stateT > 0.6 ? (mode === 2 ? `FIGHTER ${survival + 1}` : `ROUND ${round}`) : 'FIGHT!', VW / 2, VH / 2 - 40); }
+    if (state === 'ko') { ctx.font = 'bold 90px system-ui'; ctx.fillStyle = '#ef4444'; ctx.fillText('K.O.', VW / 2, VH / 2 - 30); }
+  }
+}
+
+// ---------- input / menu ----------
+addEventListener('keydown', e => { keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash'].includes(e.code)) e.preventDefault(); if (e.code === 'Escape' && state !== 'menu') { state = 'menu'; showMenu(); } });
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+const tk = {};
+if (matchMedia('(pointer: coarse)').matches) $('touch').classList.add('on');
+document.querySelectorAll('#touch button').forEach(b => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture(e.pointerId); tk[k] = true; });
+  const up = () => { tk[k] = false; }; b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+});
+function chips(el, items, cur, pick) { el.innerHTML = ''; items.forEach((html, i) => { const b = document.createElement('button'); b.innerHTML = html; if (i === cur) b.classList.add('sel'); b.onclick = () => pick(i); el.appendChild(b); }); }
+function showMenu() {
+  $('menu').classList.add('on'); $('end').classList.remove('on');
+  chips($('modes'), ['🤖 vs CPU', '👥 2 Players', '🔥 Survival'], mode, i => { mode = i; showMenu(); });
+  const card = c => `<span style="font-size:22px;color:${c.band}">●</span><b>${c.name}</b><small>${c.sp}</small>`;
+  chips($('c1'), CHARS.map(card), sel[0], i => { sel[0] = i; showMenu(); });
+  $('p2l').textContent = mode === 1 ? 'Player 2' : mode === 2 ? 'Opponents are random' : 'CPU';
+  $('c2').style.display = mode === 2 ? 'none' : '';
+  chips($('c2'), CHARS.map(card), sel[1], i => { sel[1] = i; showMenu(); });
+  chips($('stages'), STAGES.map(s => s.name), stage, i => { stage = i; showMenu(); });
+  chips($('diffs'), ['Easy', 'Normal', 'Hard', 'Master'], diff, i => { diff = i; showMenu(); });
+  $('diffs').style.display = mode === 0 ? '' : 'none';
+}
+$('fight').onclick = () => { if (mode === 2) sel[1] = Math.random() * CHARS.length | 0; startMatch(); };
+$('rematch').onclick = startMatch;
+$('toMenu').onclick = () => { state = 'menu'; showMenu(); };
+function fit() { const s = Math.min(innerWidth / VW, innerHeight / VH); cv.style.width = Math.floor(VW * s) + 'px'; cv.style.height = Math.floor(VH * s) + 'px'; }
+addEventListener('resize', fit); fit();
+// online: the host sends this state ~30×/s; a guest only draws it (SJG.netRole === 'guest')
+window.__stickNet = {
+  snap() {
+    return { mode, sel, stage, state, stateT, wins, round, survival, shake, slow, endT: $('endT').textContent, endS: $('endS').textContent,
+      f: fighters.map(f => ({ ...f, c: CHARS.indexOf(f.c), atk: f.atk ? { ...f.atk, hit: 0 } : null, ai: 0, aiIn: 0, weapon: f.weapon })),
+      projs: projs.map(p => ({ ...p, owner: p.owner ? p.owner.side : 0 })), items, parts: parts.slice(-90), popups };
+  },
+  load(s) {
+    mode = s.mode; sel = s.sel; stage = s.stage; state = s.state; stateT = s.stateT; wins = s.wins; round = s.round; survival = s.survival; shake = s.shake; slow = 0;
+    fighters = s.f.map(f => ({ ...f, c: CHARS[f.c] || CHARS[0], atk: f.atk ? { ...f.atk, hit: new Set() } : null, ai: { t: 0, plan: null }, aiIn: {} }));
+    projs = s.projs.map(p => ({ ...p, owner: fighters[p.owner] })); items = s.items; parts = s.parts; popups = s.popups;
+    $('menu').classList.remove('on'); $('end').classList.remove('on');
+    netAt = performance.now();
+  },
+};
+let netAt = 0;
+function guestStep(dt) {   // between snapshots: keep things moving smoothly
+  parts.forEach(p => { p.life -= dt; if (!p.ring) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 1200 * dt; } else p.r += 600 * dt; }); parts = parts.filter(p => p.life > 0);
+  popups.forEach(p => { p.t -= dt; p.y -= 40 * dt; }); popups = popups.filter(p => p.t > 0);
+  const fresh = performance.now() - netAt < 110;   // only predict a moment past the last snapshot
+  for (const f of fighters) if (f.state !== 'ko') { if (!fresh) continue; f.x += f.vx * dt; if (!f.onGround) { f.y = Math.min(FLOOR, f.y + f.vy * dt); f.vy += GRAV * dt; } if (f.state === 'walk') f.walkT += dt * Math.abs(f.vx) / 40; if (f.atk) f.atk.t += dt; } else updRagdoll(f, dt);
+  if (fresh) for (const p of projs) p.x += p.vx * dt;
+  shake = Math.max(0, shake - dt * 30);
+}
+window.__stick = () => ({ state, wins, round, hp: fighters.map(f => Math.round(f.hp)), st: fighters.map(f => f.state) });
+let last = performance.now();
+function frame(t) {
+  requestAnimationFrame(frame);   // first, so one bad frame can never freeze the game
+  try { step(t); } catch (e) { console.error('frame', e && e.stack || e); }
+}
+function step(t) {
+  let dt = Math.min(0.04, (t - last) / 1000); last = t;
+  if (slow > 0) { slow -= dt; dt *= 0.3; }
+  if (window.SJG && SJG.netRole === 'guest') { if (state !== 'menu') guestStep(dt); } else update(dt);
+  draw();
+}
+showMenu(); stage = 0; requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sheets</title>
+<script src="../sj-officekit/kit.js"></script>
+<script src="engine.js"></script>
+<style>
+:root{--k-acc:#1f8a4c;--grid:#e2e5e9;--hdr:#f3f4f6;--cell:#fff;--ctext:#1b1b1b}
+@media (prefers-color-scheme:dark){:root{--grid:#3a3e45;--hdr:#2a2d32;--cell:#1f2125;--ctext:#e8eaed}}
+#app{display:flex;flex-direction:column;height:100%}
+#home{flex:1;overflow:auto} #home.off{display:none}
+#ed{flex:1;display:none;flex-direction:column;min-height:0} #ed.on{display:flex}
+.fbar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--k-panel);border-bottom:1px solid var(--k-line)}
+.fbar input{font:13px ui-monospace,Consolas,monospace;border:1px solid var(--k-line);border-radius:6px;background:var(--k-bg);color:var(--k-text);padding:5px 8px;height:30px}
+#nameBox{width:90px;text-align:center}
+#fx{flex:1;min-width:0}
+.fxl{color:var(--k-sub);font-style:italic;font-family:Georgia,serif}
+.gwrap{flex:1;overflow:auto;position:relative;background:var(--cell);outline:none}
+table.g{border-collapse:separate;border-spacing:0;table-layout:fixed;font:13px/1.2 system-ui,"Segoe UI",Arial,sans-serif;color:var(--ctext);user-select:none}
+.g th,.g td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);height:24px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.g td{background:var(--cell);max-width:0}
+.g thead th{position:sticky;top:0;z-index:3;background:var(--hdr);font-weight:500;color:var(--k-sub);font-size:12px;text-align:center;position:sticky}
+.g tbody th{position:sticky;left:0;z-index:2;background:var(--hdr);font-weight:500;color:var(--k-sub);font-size:12px;text-align:center;width:46px;min-width:46px}
+.g thead th.corner{left:0;z-index:4;width:46px}
+.g thead th .rz{position:absolute;right:-3px;top:0;bottom:0;width:7px;cursor:col-resize;z-index:5}
+.g th.hs{background:color-mix(in srgb,var(--k-acc) 22%,var(--hdr));color:var(--k-text)}
+.g td.sel{background:color-mix(in srgb,var(--k-acc) 13%,var(--cell))}
+.g td.act{outline:2px solid var(--k-acc);outline-offset:-2px;background:var(--cell)}
+.g td.err{color:#c62828}
+.g td.wrap{white-space:normal;word-break:break-word}
+#edit{position:absolute;z-index:6;display:none;font:13px/1.2 system-ui,"Segoe UI",Arial,sans-serif;border:2px solid var(--k-acc);padding:3px 4px;background:var(--cell);color:var(--ctext);outline:none;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.tabs{display:flex;align-items:center;gap:2px;padding:3px 6px;background:var(--k-panel);border-top:1px solid var(--k-line);overflow-x:auto}
+.tab{border:none;background:none;padding:6px 14px;border-radius:6px;cursor:pointer;white-space:nowrap;color:var(--k-sub)}
+.tab:hover{background:var(--k-hover)} .tab.on{background:var(--k-bg);color:var(--k-acc);font-weight:600;box-shadow:inset 0 -2px 0 var(--k-acc)}
+.sum{margin-left:auto;color:var(--k-sub);font-size:12px;white-space:nowrap;padding:0 6px}
+.ac{position:fixed;z-index:60;background:var(--k-panel);border:1px solid var(--k-line);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.2);max-height:200px;overflow:auto;font:13px ui-monospace,monospace;display:none}
+.ac div{padding:5px 10px;cursor:pointer} .ac div.on,.ac div:hover{background:var(--k-hover)}
+.chartc{width:min(640px,86vw);height:min(380px,50vh);display:block;background:#fff;border-radius:8px;border:1px solid var(--k-line)}
+.tpl-grid{position:absolute;inset:0;background-image:linear-gradient(#e3e6ea 1px,transparent 1px),linear-gradient(90deg,#e3e6ea 1px,transparent 1px);background-size:20% 10%}
+.tpl-grid b{position:absolute;left:6%;top:4%;font:9px sans-serif;color:#1f8a4c}
+@media print{#home,.k-bar,.k-tools,.fbar,.tabs{display:none!important}#ed,.gwrap{display:block!important;overflow:visible!important}.g td.act{outline:none}.g td.sel{background:none}}
+</style></head>
+<body><div id="app"><div id="home"></div><div id="ed">
+  <div class="k-bar">
+    <button class="k-mb" data-m="file">File</button><button class="k-mb" data-m="edit">Edit</button><button class="k-mb" data-m="insert">Insert</button><button class="k-mb" data-m="format">Format</button><button class="k-mb" data-m="data">Data</button>
+    <input class="k-title" id="title" spellcheck="false"><span class="k-status" id="status"></span>
+  </div>
+  <div class="k-tools">
+    <button class="k-tb" data-t="undo" title="Undo (Ctrl+Z)">↶</button><button class="k-tb" data-t="redo" title="Redo (Ctrl+Y)">↷</button><span class="k-vs"></span>
+    <select id="fmt" title="Number format"><option value="">General</option><option value="num">Number</option><option value="cur">Currency</option><option value="pct">Percent</option><option value="date">Date</option><option value="time">Time</option><option value="text">Text</option></select>
+    <button class="k-tb" data-t="dec-" title="Fewer decimals">.0←</button><button class="k-tb" data-t="dec+" title="More decimals">.00→</button><span class="k-vs"></span>
+    <button class="k-tb" data-s="b" title="Bold (Ctrl+B)"><b>B</b></button><button class="k-tb" data-s="i" title="Italic (Ctrl+I)"><i>I</i></button><button class="k-tb" data-s="u" title="Underline (Ctrl+U)"><u>U</u></button><button class="k-tb" data-s="st" title="Strikethrough"><s>S</s></button>
+    <span class="k-col k-tb" title="Text colour"><b>A</b><i id="fcI" style="background:#c62828"></i><input type="color" id="fc" value="#c62828"></span>
+    <span class="k-col k-tb" title="Fill colour"><span>🪣</span><i id="bgI" style="background:#fff59d"></i><input type="color" id="bg" value="#fff59d"></span>
+    <span class="k-vs"></span>
+    <button class="k-tb" data-al="left" title="Align left">⫷</button><button class="k-tb" data-al="center" title="Centre">≡</button><button class="k-tb" data-al="right" title="Align right">⫸</button><button class="k-tb" data-s="wrap" title="Wrap text">↵</button>
+    <span class="k-vs"></span>
+    <button class="k-tb" data-t="sum" title="AutoSum">Σ</button><button class="k-tb" data-t="sortA" title="Sort A→Z">A↓</button><button class="k-tb" data-t="sortZ" title="Sort Z→A">Z↓</button><button class="k-tb" data-t="chart" title="Chart">📊</button><button class="k-tb" data-t="clear" title="Clear formatting">⌫</button>
+  </div>
+  <div class="fbar"><input id="nameBox" title="Cell — type a cell like C12 to jump"><span class="fxl">fx</span><input id="fx" spellcheck="false" autocomplete="off"></div>
+  <div class="gwrap" id="gw" tabindex="0"><table class="g" id="g"></table><textarea id="edit" spellcheck="false" rows="1"></textarea></div>
+  <div class="tabs" id="tabs"></div>
+</div></div>
+<div class="ac" id="ac"></div>
+<script>
+'use strict';
+const { $, $$, h, esc, x } = Kit; const E = SheetEngine;
+const lib = new Kit.Library('sheets');
+const gw = $('#gw'), grid = $('#g'), edit = $('#edit'), fx = $('#fx'), nameBox = $('#nameBox'), status = $('#status');
+let book = null, docId = null, calc = null, si = 0, rows = 100, cols = 26;
+let sel = { c: 0, r: 0, c2: 0, r2: 0 }, editing = null; // editing: { via: 'cell'|'bar', orig }
+let undoS = [], redoS = [], saveT = 0, tds = [];
+const sh = () => book.sheets[si];
+const DEF_W = 96;
+
+// ---------- templates ----------
+const T = (name, cells, colW = {}) => ({ name, cells, colW });
+const rowsOf = (arr, start = 0) => { const o = {}; arr.forEach((row, r) => row.forEach((v, c) => { if (v !== '' && v != null) o[E.key(c, r + start)] = typeof v === 'object' ? v : { v: String(v) }; })); return o; };
+const B = (v, s = {}) => ({ v: String(v), s: { b: true, ...s } });
+const TEMPLATES = [
+  { name: 'Blank spreadsheet', sheets: [T('Sheet1', {})] },
+  { name: 'Monthly budget', sheets: [T('Budget', { ...rowsOf([[B('Monthly budget', { fc: '#1f8a4c' })], [], [B('Income'), B('Planned'), B('Actual'), B('Difference')], ['Salary', { v: '3000', s: { fmt: 'cur' } }, { v: '3000', s: { fmt: 'cur' } }, { v: '=C4-B4', s: { fmt: 'cur' } }], ['Other', { v: '200', s: { fmt: 'cur' } }, { v: '150', s: { fmt: 'cur' } }, { v: '=C5-B5', s: { fmt: 'cur' } }], [], [B('Expenses'), B('Planned'), B('Actual'), B('Difference')], ['Rent', { v: '1200', s: { fmt: 'cur' } }, { v: '1200', s: { fmt: 'cur' } }, { v: '=B8-C8', s: { fmt: 'cur' } }], ['Food', { v: '400', s: { fmt: 'cur' } }, { v: '455', s: { fmt: 'cur' } }, { v: '=B9-C9', s: { fmt: 'cur' } }], ['Transport', { v: '150', s: { fmt: 'cur' } }, { v: '120', s: { fmt: 'cur' } }, { v: '=B10-C10', s: { fmt: 'cur' } }], ['Phone & internet', { v: '80', s: { fmt: 'cur' } }, { v: '80', s: { fmt: 'cur' } }, { v: '=B11-C11', s: { fmt: 'cur' } }], ['Fun', { v: '200', s: { fmt: 'cur' } }, { v: '260', s: { fmt: 'cur' } }, { v: '=B12-C12', s: { fmt: 'cur' } }], [], [B('Total income'), B('=SUM(B4:B5)', { fmt: 'cur' }), B('=SUM(C4:C5)', { fmt: 'cur' })], [B('Total expenses'), B('=SUM(B8:B12)', { fmt: 'cur' }), B('=SUM(C8:C12)', { fmt: 'cur' })], [B('Left over', { fc: '#1f8a4c' }), B('=B14-B15', { fmt: 'cur', fc: '#1f8a4c' }), B('=C14-C15', { fmt: 'cur', fc: '#1f8a4c' })]]) }, { 0: 150, 1: 100, 2: 100, 3: 100 })] },
+  { name: 'To-do list', sheets: [T('Tasks', rowsOf([[B('Task'), B('Owner'), B('Due'), B('Done?')], ['Write the plan', 'Me', { v: String(E.toSerial(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate() + 3)), s: { fmt: 'date' } }, 'no'], ['Send invites', '', '', 'no'], ['Book the room', '', '', 'yes'], [], [B('Done'), { v: '=COUNTIF(D2:D4,"yes")&" of "&COUNTA(A2:A4)' }]]), { 0: 220, 1: 110, 2: 110, 3: 80 })] },
+  { name: 'Grade book', sheets: [T('Grades', rowsOf([[B('Student'), B('Test 1'), B('Test 2'), B('Test 3'), B('Average'), B('Grade')], ['Asha', 88, 92, 79, '=ROUND(AVERAGE(B2:D2),1)', '=IF(E2>=90,"A",IF(E2>=80,"B",IF(E2>=70,"C","D")))'], ['Ben', 72, 65, 81, '=ROUND(AVERAGE(B3:D3),1)', '=IF(E3>=90,"A",IF(E3>=80,"B",IF(E3>=70,"C","D")))'], ['Chen', 95, 98, 91, '=ROUND(AVERAGE(B4:D4),1)', '=IF(E4>=90,"A",IF(E4>=80,"B",IF(E4>=70,"C","D")))'], ['Dara', 64, 70, 58, '=ROUND(AVERAGE(B5:D5),1)', '=IF(E5>=90,"A",IF(E5>=80,"B",IF(E5>=70,"C","D")))'], [], [B('Class average'), '=AVERAGE(B2:B5)', '=AVERAGE(C2:C5)', '=AVERAGE(D2:D5)', '=ROUND(AVERAGE(E2:E5),1)']]), { 0: 130 })] },
+  { name: 'Invoice', sheets: [T('Invoice', { ...rowsOf([[B('INVOICE', { fc: '#1f8a4c' })], ['Invoice #', '0001'], ['Date', { v: String(E.toSerial(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate())), s: { fmt: 'date', al: 'left' } }], ['Bill to', 'Client name'], [], [B('Item'), B('Qty'), B('Price'), B('Total')], ['Design work', 10, { v: '45', s: { fmt: 'cur' } }, { v: '=B7*C7', s: { fmt: 'cur' } }], ['Hosting', 1, { v: '120', s: { fmt: 'cur' } }, { v: '=B8*C8', s: { fmt: 'cur' } }], ['', '', '', { v: '=B9*C9', s: { fmt: 'cur' } }], [], ['', '', B('Subtotal'), B('=SUM(D7:D9)', { fmt: 'cur' })], ['', '', 'Tax rate', { v: '0.08', s: { fmt: 'pct' } }], ['', '', 'Tax', { v: '=D11*D12', s: { fmt: 'cur' } }], ['', '', B('Total due'), B('=D11+D13', { fmt: 'cur', fc: '#1f8a4c' })]]) }, { 0: 180, 2: 110, 3: 110 })] }
+];
+TEMPLATES.forEach(t => t.preview = `<div class="tpl-grid">${t.name === 'Blank spreadsheet' ? '' : `<b>${esc(t.name)}</b>`}</div>`);
+
+// ---------- home ----------
+const showHome = () => { flush(); book = null; $('#ed').classList.remove('on'); $('#home').classList.remove('off'); refreshHome(); document.title = 'Sheets'; };
+const refreshHome = Kit.home({ el: $('#home'), title: 'Sheets', accent: '#1f8a4c', lib, templates: TEMPLATES, importLabel: 'Open a file…',
+  onNew: t => openBook(K_new(t.name === 'Blank spreadsheet' ? 'Untitled spreadsheet' : t.name, JSON.parse(JSON.stringify(t.sheets))), true),
+  onOpen: id => { const d = lib.load(id); if (d) { docId = id; openBook(d); } else Kit.toast('That file is gone'); },
+  onImport: () => importFile() });
+document.querySelector('#home').style.setProperty('--tp-ar', '1.3');
+const K_new = (name, sheets) => { docId = Kit.uid(); return { name, sheets: sheets.map(s => ({ name: s.name, cells: s.cells || {}, colW: s.colW || {} })) }; };
+const openBook = (b, isNew) => {
+  book = b; book.sheets.forEach(s => { s.cells = s.cells || {}; s.colW = s.colW || {}; });
+  calc = new E.Calc(book); si = Math.min(book.active || 0, book.sheets.length - 1); undoS = []; redoS = [];
+  $('#title').value = book.name; $('#home').classList.add('off'); $('#ed').classList.add('on'); document.title = book.name + ' — Sheets';
+  sel = { c: 0, r: 0, c2: 0, r2: 0 }; build(); renderTabs(); if (isNew) save(); status.textContent = 'Saved'; gw.focus();
+};
+const save = () => { if (!book) return; book.name = $('#title').value.trim() || 'Untitled spreadsheet'; book.active = si; lib.save(docId, book.name, book); status.textContent = 'Saved'; clearTimeout(saveT); saveT = 0; };
+const flush = () => { if (saveT) save(); };
+const changed = () => { status.textContent = 'Saving…'; clearTimeout(saveT); saveT = setTimeout(save, 600); };
+$('#title').oninput = () => { document.title = $('#title').value + ' — Sheets'; changed(); };
+$('#title').onkeydown = e => { if (e.key === 'Enter') gw.focus(); };
+addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+const snapshot = () => { undoS.push(JSON.stringify({ sheets: book.sheets, si })); if (undoS.length > 100) undoS.shift(); redoS = []; };
+const restore = (from, to) => { if (!from.length) return; to.push(JSON.stringify({ sheets: book.sheets, si })); const s = JSON.parse(from.pop()); book.sheets = s.sheets; si = Math.min(s.si, book.sheets.length - 1); calc = new E.Calc(book); build(); renderTabs(); changed(); };
+
+// ---------- grid ----------
+const used = s => { let mc = 0, mr = 0; for (const k in s.cells) { const p = E.parseRef(k); if (p) { mc = Math.max(mc, p.c); mr = Math.max(mr, p.r); } } return { mc, mr }; };
+const build = () => {
+  const u = used(sh()); rows = Math.max(100, u.mr + 30, sel.r2 + 30); cols = Math.max(26, u.mc + 6, sel.c2 + 6);
+  let html = '<colgroup><col style="width:46px">'; for (let c = 0; c < cols; c++) html += `<col style="width:${sh().colW[c] || DEF_W}px">`; html += '</colgroup><thead><tr><th class="corner"></th>';
+  for (let c = 0; c < cols; c++) html += `<th data-c="${c}">${E.colName(c)}<span class="rz" data-rz="${c}"></span></th>`;
+  html += '</tr></thead><tbody>';
+  for (let r = 0; r < rows; r++) { html += `<tr><th data-r="${r}">${r + 1}</th>`; for (let c = 0; c < cols; c++) html += '<td></td>'; html += '</tr>'; }
+  grid.innerHTML = html + '</tbody>';
+  tds = [...grid.tBodies[0].rows].map(tr => [...tr.cells].slice(1));
+  grid.style.width = (46 + [...Array(cols).keys()].reduce((a, c) => a + (sh().colW[c] || DEF_W), 0)) + 'px';
+  recalc(); paintSel();
+};
+const recalc = () => {
+  calc.reset(); calc.asts.clear && calc.asts.size > 5000 && calc.asts.clear();
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) paintCell(c, r);
+  updateSum();
+};
+const paintCell = (c, r) => {
+  const td = tds[r] && tds[r][c]; if (!td) return;
+  const cell = sh().cells[E.key(c, r)];
+  if (!cell) { if (td.textContent || td.className.replace(/\b(sel|act)\b/g, '').trim() || td.getAttribute('style')) { td.textContent = ''; td.removeAttribute('style'); td.classList.remove('err', 'wrap'); } return; }
+  const s = cell.s || {}; const v = s.fmt === 'text' && !String(cell.v).startsWith('=') ? cell.v : calc.value(si, c, r);
+  td.textContent = E.format(v, s.fmt, s.dec);
+  td.classList.toggle('err', v instanceof E.FErr); td.classList.toggle('wrap', !!s.wrap);
+  const st = td.style; st.cssText = '';
+  if (s.b) st.fontWeight = '700'; if (s.i) st.fontStyle = 'italic'; if (s.u || s.st) st.textDecoration = (s.u ? 'underline ' : '') + (s.st ? 'line-through' : '');
+  if (s.fc) st.color = s.fc; if (s.bg) st.background = s.bg;
+  st.textAlign = s.al || (typeof v === 'number' ? 'right' : typeof v === 'boolean' || v instanceof E.FErr ? 'center' : 'left');
+};
+const norm = () => ({ c1: Math.min(sel.c, sel.c2), r1: Math.min(sel.r, sel.r2), c2: Math.max(sel.c, sel.c2), r2: Math.max(sel.r, sel.r2) });
+let painted = [];
+const paintSel = () => {
+  painted.forEach(td => td.classList.remove('sel', 'act')); painted = [];
+  $$('.hs', grid).forEach(t => t.classList.remove('hs'));
+  const n = norm();
+  for (let r = n.r1; r <= Math.min(n.r2, rows - 1); r++) for (let c = n.c1; c <= Math.min(n.c2, cols - 1); c++) { const td = tds[r][c]; td.classList.add('sel'); painted.push(td); }
+  const a = tds[sel.r] && tds[sel.r][sel.c]; if (a) { a.classList.add('act'); painted.push(a); }
+  for (let c = n.c1; c <= n.c2 && c < cols; c++) grid.tHead.rows[0].cells[c + 1].classList.add('hs');
+  for (let r = n.r1; r <= n.r2 && r < rows; r++) grid.tBodies[0].rows[r].cells[0].classList.add('hs');
+  nameBox.value = n.c1 === n.c2 && n.r1 === n.r2 ? E.key(sel.c, sel.r) : E.key(n.c1, n.r1) + ':' + E.key(n.c2, n.r2);
+  if (!editing) { const cell = sh().cells[E.key(sel.c, sel.r)]; fx.value = cell ? cell.v : ''; }
+  syncTools(); updateSum();
+};
+const scrollTo = (c, r) => {
+  const td = tds[r] && tds[r][c]; if (!td) return;
+  const L = td.offsetLeft, T = td.offsetTop, W = td.offsetWidth, H = td.offsetHeight, hw = 46, hh = 25;
+  if (L - hw < gw.scrollLeft) gw.scrollLeft = L - hw; else if (L + W > gw.scrollLeft + gw.clientWidth) gw.scrollLeft = L + W - gw.clientWidth;
+  if (T - hh < gw.scrollTop) gw.scrollTop = T - hh; else if (T + H > gw.scrollTop + gw.clientHeight) gw.scrollTop = T + H - gw.clientHeight;
+};
+const select = (c, r, extend) => {
+  c = Kit.clamp(c, 0, 16383); r = Kit.clamp(r, 0, 1048575);
+  if (c >= cols - 2 || r >= rows - 2) { if (extend) { sel.c2 = c; sel.r2 = r; } else sel = { c, r, c2: c, r2: r }; build(); scrollTo(c, r); return; }
+  if (extend) { sel.c2 = c; sel.r2 = r; } else sel = { c, r, c2: c, r2: r };
+  paintSel(); scrollTo(extend ? c : sel.c, extend ? r : sel.r);
+};
+const updateSum = () => {
+  if (!book) return; const n = norm(); if (n.c1 === n.c2 && n.r1 === n.r2) { $('.sum') && ($('.sum').textContent = ''); return; }
+  let s = 0, cnt = 0, nums = 0;
+  for (let r = n.r1; r <= n.r2 && r <= rows; r++) for (let c = n.c1; c <= n.c2 && c <= cols; c++) { const v = calc.value(si, c, r); if (v != null && v !== '') cnt++; if (typeof v === 'number') { s += v; nums++; } }
+  const el = $('.sum'); if (el) el.textContent = nums ? `Sum ${E.format(s)} · Average ${E.format(+(s / nums).toPrecision(10))} · Count ${cnt}` : cnt ? `Count ${cnt}` : '';
+};
+
+// ---------- mouse ----------
+let drag = null;
+const cellAt = e => { const td = e.target.closest && e.target.closest('td'); if (!td || !grid.contains(td)) return null; return { c: td.cellIndex - 1, r: td.parentNode.sectionRowIndex }; };
+grid.addEventListener('mousedown', e => {
+  if (e.target.dataset.rz) return startResize(e, +e.target.dataset.rz);
+  const th = e.target.closest('th');
+  if (th) { e.preventDefault(); commitIfCell(); if (th.dataset.c) { const c = +th.dataset.c; if (e.shiftKey) { sel.c2 = c; sel.r = 0; sel.r2 = rows - 1; } else sel = { c, r: 0, c2: c, r2: rows - 1 }; drag = { col: true }; } else if (th.dataset.r) { const r = +th.dataset.r; if (e.shiftKey) { sel.r2 = r; sel.c = 0; sel.c2 = cols - 1; } else sel = { c: 0, r, c2: cols - 1, r2: r }; drag = { row: true }; } else { sel = { c: 0, r: 0, c2: cols - 1, r2: rows - 1 }; } paintSel(); gw.focus(); return; }
+  const p = cellAt(e); if (!p) return;
+  if (editing && isFormulaEditing()) { e.preventDefault(); insertRef(p, e.shiftKey); drag = { ref: true, start: p }; return; }
+  e.preventDefault(); commitIfCell();
+  select(p.c, p.r, e.shiftKey); drag = { cell: true }; gw.focus({ preventScroll: true });
+});
+grid.addEventListener('mousemove', e => {
+  if (!drag || !(e.buttons & 1)) return; const p = cellAt(e) || (() => { const th = e.target.closest && e.target.closest('th'); return th ? { c: th.dataset.c ? +th.dataset.c : sel.c2, r: th.dataset.r ? +th.dataset.r : sel.r2 } : null; })(); if (!p) return;
+  if (drag.ref) { insertRef(drag.start, false, p); return; }
+  if (drag.col) { sel.c2 = p.c; paintSel(); return; } if (drag.row) { sel.r2 = p.r; paintSel(); return; }
+  if (p.c !== sel.c2 || p.r !== sel.r2) { sel.c2 = p.c; sel.r2 = p.r; paintSel(); }
+});
+addEventListener('mouseup', () => { drag = null; });
+grid.addEventListener('dblclick', e => { const p = cellAt(e); if (p) { select(p.c, p.r); startEdit(null); } });
+// touch: tap selects, second tap on same cell edits
+let lastTap = null;
+grid.addEventListener('touchend', e => { const p = cellAt(e); if (!p) return; const now = Date.now(); if (lastTap && lastTap.c === p.c && lastTap.r === p.r && now - lastTap.t < 1200 && !editing) { e.preventDefault(); startEdit(null); } lastTap = { ...p, t: now }; });
+const startResize = (e, c) => {
+  e.preventDefault(); e.stopPropagation(); const x0 = e.clientX, w0 = sh().colW[c] || DEF_W, col = grid.querySelectorAll('col')[c + 1];
+  const mv = ev => { const w = Math.max(24, w0 + ev.clientX - x0); col.style.width = w + 'px'; sh().colW[c] = w; };
+  const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); build(); changed(); };
+  addEventListener('mousemove', mv); addEventListener('mouseup', up);
+};
+grid.addEventListener('dblclick', e => { if (e.target.dataset.rz) { autoFit(+e.target.dataset.rz); } });
+const autoFit = c => { const m = document.createElement('canvas').getContext('2d'); m.font = '13px system-ui'; let w = 40; for (let r = 0; r < rows; r++) { const t = tds[r][c].textContent; if (t) w = Math.max(w, m.measureText(t).width + 14); } sh().colW[c] = Math.min(400, Math.ceil(w)); build(); changed(); };
+
+// ---------- editing ----------
+const isFormulaEditing = () => { const inp = editing && (editing.via === 'bar' ? fx : edit); if (!inp || inp.value[0] !== '=') return false; const before = inp.value.slice(0, inp.selectionStart); return /[=(,;+\-*/^&<>:]\s*$/.test(before) || editing.refAt != null; };
+const insertRef = (p, ext, p2) => {
+  const inp = editing.via === 'bar' ? fx : edit; const ref = p2 && (p2.c !== p.c || p2.r !== p.r) ? E.key(Math.min(p.c, p2.c), Math.min(p.r, p2.r)) + ':' + E.key(Math.max(p.c, p2.c), Math.max(p.r, p2.r)) : E.key(p.c, p.r);
+  if (editing.refAt == null) editing.refAt = inp.selectionStart, editing.refLen = 0;
+  inp.value = inp.value.slice(0, editing.refAt) + ref + inp.value.slice(editing.refAt + editing.refLen); editing.refLen = ref.length;
+  const pos = editing.refAt + ref.length; inp.focus(); inp.setSelectionRange(pos, pos); mirror(inp);
+};
+const placeEditor = () => {
+  const td = tds[sel.r][sel.c]; const w = Math.max(td.offsetWidth + 2, 80);
+  edit.style.left = td.offsetLeft - 1 + 'px'; edit.style.top = td.offsetTop - 1 + 'px'; edit.style.minWidth = w + 'px'; edit.style.width = w + 'px'; edit.style.height = td.offsetHeight + 2 + 'px';
+  const s = (sh().cells[E.key(sel.c, sel.r)] || {}).s || {}; edit.style.fontWeight = s.b ? '700' : ''; edit.style.fontStyle = s.i ? 'italic' : '';
+};
+const growEditor = () => { const m = growEditor.m || (growEditor.m = document.createElement('canvas').getContext('2d')); m.font = '13px system-ui'; const need = m.measureText(edit.value).width + 20; edit.style.width = Math.max(parseFloat(edit.style.minWidth), Math.min(600, need)) + 'px'; };
+const startEdit = (initial, via = 'cell') => {
+  if (editing) return; const cell = sh().cells[E.key(sel.c, sel.r)]; const orig = cell ? cell.v : '';
+  editing = { via, orig, c: sel.c, r: sel.r, refAt: null };
+  if (via === 'cell') { placeEditor(); edit.style.display = 'block'; edit.value = initial != null ? initial : orig; edit.focus(); const l = edit.value.length; edit.setSelectionRange(l, l); growEditor(); fx.value = edit.value; }
+  else fx.value = orig;
+};
+const mirror = from => { if (from === edit) { fx.value = edit.value; growEditor(); } else if (edit.style.display === 'block') edit.value = fx.value; showAC(from); };
+edit.addEventListener('input', () => { editing && (editing.refAt = null); mirror(edit); });
+fx.addEventListener('focus', () => { if (!editing) startEdit(null, 'bar'); });
+fx.addEventListener('input', () => { if (!editing) startEdit(null, 'bar'); editing.refAt = null; mirror(fx); });
+const commit = (dc = 0, dr = 0) => {
+  if (!editing) return; const inp = editing.via === 'bar' ? fx : edit; const val = inp.value; const { c, r } = editing; endEdit();
+  if (val !== editing_last_orig) setCell(c, r, val);
+  select(c + dc, r + dr); gw.focus({ preventScroll: true });
+};
+let editing_last_orig = '';
+const endEdit = () => { editing_last_orig = editing ? editing.orig : ''; editing = null; edit.style.display = 'none'; hideAC(); };
+const cancelEdit = () => { endEdit(); paintSel(); gw.focus({ preventScroll: true }); };
+const commitIfCell = () => { if (editing) commit(0, 0); };
+// input conveniences: 50% → 0.5 (percent), $1,200 → 1200 (currency), 2024-05-01 → date
+const smart = (val, s) => {
+  if (val === '' || val[0] === '=' || val[0] === "'" || (s && s.fmt === 'text')) return { v: val };
+  const t = val.trim(); let m;
+  if ((m = /^(-?[\d,]*\.?\d+)\s*%$/.exec(t)) && !isNaN(m[1].replace(/,/g, ''))) return { v: String(+m[1].replace(/,/g, '') / 100), fmt: s && s.fmt ? null : 'pct' };
+  if ((m = /^(-)?\$\s?([\d,]*\.?\d+)$/.exec(t))) return { v: String((m[1] ? -1 : 1) * +m[2].replace(/,/g, '')), fmt: s && s.fmt ? null : 'cur' };
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) return { v: t.replace(/,/g, ''), fmt: s && s.fmt ? null : 'num' };
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t)) || (m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t))) { const [y, mo, d] = m[1].length === 4 ? [+m[1], +m[2], +m[3]] : [+m[3], +m[1], +m[2]]; if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return { v: String(E.toSerial(y, mo, d)), fmt: 'date' }; }
+  return { v: val };
+};
+const setCell = (c, r, val, noSnap) => {
+  if (!noSnap) snapshot(); const k = E.key(c, r), cell = sh().cells[k]; const s = cell && cell.s;
+  if (typeof val === 'string' && val[0] === '=' && val.length > 1) val = '=' + val.slice(1).replace(/^\s+/, '');
+  const sm = smart(val, s);
+  if (sm.v === '' && !(s && Object.keys(s).length)) delete sh().cells[k];
+  else { const n = sh().cells[k] = { v: sm.v }; if (s) n.s = s; if (sm.fmt) n.s = { ...(n.s || {}), fmt: sm.fmt }; }
+  if (!noSnap) { recalc(); changed(); }
+};
+edit.addEventListener('keydown', e => edKey(e, edit));
+fx.addEventListener('keydown', e => edKey(e, fx));
+const edKey = (e, inp) => {
+  if (acKey(e)) return;
+  if (e.key === 'Enter' && !e.altKey) { e.preventDefault(); commit(0, e.shiftKey ? -1 : 1); }
+  else if (e.key === 'Enter' && e.altKey) { e.preventDefault(); const p = inp.selectionStart; inp.value = inp.value.slice(0, p) + '\n' + inp.value.slice(inp.selectionEnd); inp.setSelectionRange(p + 1, p + 1); mirror(inp); }
+  else if (e.key === 'Tab') { e.preventDefault(); commit(e.shiftKey ? -1 : 1, 0); }
+  else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+  else if (inp === edit && editing && editing.initialTyped && /^Arrow/.test(e.key) && !isFormulaEditing()) { e.preventDefault(); commit(...({ ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] })[e.key]); }
+};
+// formula autocomplete
+const ac = $('#ac'); let acList = [], acI = 0, acInp = null;
+const showAC = inp => {
+  const before = inp.value.slice(0, inp.selectionStart), m = /(?:^=|[=(,;+\-*/^&<>\s])([A-Za-z][A-Za-z0-9.]*)$/.exec(before);
+  if (inp.value[0] !== '=' || !m) return hideAC();
+  acList = E.FUNCTIONS.filter(f => f.startsWith(m[1].toUpperCase())).slice(0, 8); if (!acList.length || (acList.length === 1 && acList[0] === m[1].toUpperCase())) return hideAC();
+  acI = 0; acInp = inp; ac.innerHTML = acList.map((f, i) => `<div data-i="${i}" class="${i ? '' : 'on'}">${f}(</div>`).join('');
+  const r = inp.getBoundingClientRect(); ac.style.left = r.left + 'px'; ac.style.top = r.bottom + 2 + 'px'; ac.style.display = 'block';
+};
+const hideAC = () => { ac.style.display = 'none'; acList = []; };
+const pickAC = i => { const inp = acInp, p = inp.selectionStart, before = inp.value.slice(0, p).replace(/[A-Za-z][A-Za-z0-9.]*$/, acList[i] + '('); inp.value = before + inp.value.slice(p); inp.setSelectionRange(before.length, before.length); inp.focus(); hideAC(); mirror(inp); };
+const acKey = e => { if (!acList.length) return false; if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); acI = (acI + (e.key === 'ArrowDown' ? 1 : -1) + acList.length) % acList.length; $$('div', ac).forEach((d, i) => d.classList.toggle('on', i === acI)); return true; } if (e.key === 'Tab' || (e.key === 'Enter' && acList.length)) { e.preventDefault(); pickAC(acI); return true; } if (e.key === 'Escape') { hideAC(); e.preventDefault(); return true; } return false; };
+ac.addEventListener('mousedown', e => { e.preventDefault(); const d = e.target.closest('[data-i]'); if (d) pickAC(+d.dataset.i); });
+
+// ---------- keyboard on grid ----------
+gw.addEventListener('keydown', e => {
+  if (editing || e.target !== gw) return;
+  const c = e.ctrlKey || e.metaKey, k = e.key;
+  const mv = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[k];
+  if (mv) {
+    e.preventDefault(); let [dc, dr] = mv; const from = e.shiftKey ? { c: sel.c2, r: sel.r2 } : sel;
+    if (c) { const u = used(sh()); let { c: x, r: y } = from; const filled = (a, b) => sh().cells[E.key(a, b)] && sh().cells[E.key(a, b)].v !== ''; if (dc) { x += dc; while (x > 0 && x < u.mc + 1 && filled(x, y) === filled(x + dc, y)) x += dc; } else { y += dr; while (y > 0 && y < u.mr + 1 && filled(x, y) === filled(x, y + dr)) y += dr; } return select(Math.max(0, x), Math.max(0, y), e.shiftKey); }
+    return select(from.c + dc, from.r + dr, e.shiftKey);
+  }
+  if (k === 'Enter') { e.preventDefault(); return select(sel.c, sel.r + (e.shiftKey ? -1 : 1)); }
+  if (k === 'Tab') { e.preventDefault(); return select(sel.c + (e.shiftKey ? -1 : 1), sel.r); }
+  if (k === 'Home') { e.preventDefault(); return select(0, c ? 0 : sel.r, e.shiftKey); }
+  if (k === 'PageDown' || k === 'PageUp') { e.preventDefault(); return select(sel.c, sel.r + (k === 'PageDown' ? 20 : -20), e.shiftKey); }
+  if (k === 'F2') { e.preventDefault(); return startEdit(null); }
+  if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); return clearRange(false); }
+  if (c && !e.altKey) {
+    const kl = k.toLowerCase();
+    if (kl === 'z') { e.preventDefault(); return e.shiftKey ? restore(redoS, undoS) : restore(undoS, redoS); }
+    if (kl === 'y') { e.preventDefault(); return restore(redoS, undoS); }
+    if (kl === 'b' || kl === 'i' || kl === 'u') { e.preventDefault(); return toggleStyle(kl); }
+    if (kl === 'a') { e.preventDefault(); sel = { c: 0, r: 0, c2: cols - 1, r2: rows - 1 }; return paintSel(); }
+    if (kl === 'd') { e.preventDefault(); return fill('down'); }
+    if (kl === 'r') { e.preventDefault(); return fill('right'); }
+    if (kl === 's') { e.preventDefault(); save(); return exportXlsx(); }
+    if (kl === 'f') { e.preventDefault(); return findDlg(); }
+    if (kl === 'p') { e.preventDefault(); return print(); }
+    if (k === ';') { e.preventDefault(); return setCell(sel.c, sel.r, String(E.FN.TODAY())) || setStyle({ fmt: 'date' }); }
+    return;
+  }
+  if (k.length === 1 && !e.altKey) { e.preventDefault(); startEdit(k); editing.initialTyped = true; fx.value = k; showAC(edit); }
+});
+
+// ---------- clipboard ----------
+let clip = null; // { cells: [[{v,s}]], src: {c,r}, tsv, cut }
+const rangeTSV = n => { const out = []; for (let r = n.r1; r <= n.r2; r++) { const row = []; for (let c = n.c1; c <= n.c2; c++) { const cell = sh().cells[E.key(c, r)]; row.push(cell ? E.format(calc.value(si, c, r), (cell.s || {}).fmt, (cell.s || {}).dec) : ''); } out.push(row.join('\t')); } return out.join('\n'); };
+const doCopy = (e, cut) => {
+  if (editing || !book || document.activeElement !== gw) return; e.preventDefault(); const n = norm();
+  const cells = []; for (let r = n.r1; r <= n.r2; r++) { const row = []; for (let c = n.c1; c <= n.c2; c++) { const cell = sh().cells[E.key(c, r)]; row.push(cell ? JSON.parse(JSON.stringify(cell)) : null); } cells.push(row); }
+  const tsv = rangeTSV(n); clip = { cells, src: { c: n.c1, r: n.r1 }, tsv, cut, si, n };
+  e.clipboardData.setData('text/plain', tsv);
+  e.clipboardData.setData('text/html', '<table>' + tsv.split('\n').map(r => '<tr>' + r.split('\t').map(c => `<td>${esc(c)}</td>`).join('') + '</tr>').join('') + '</table>');
+  Kit.toast(cut ? 'Cut — paste it somewhere' : 'Copied', 1000);
+};
+document.addEventListener('copy', e => doCopy(e, false)); document.addEventListener('cut', e => doCopy(e, true));
+document.addEventListener('paste', e => {
+  if (editing || !book || document.activeElement !== gw) return; e.preventDefault();
+  const text = e.clipboardData.getData('text/plain'); snapshot();
+  if (clip && text.replace(/\r/g, '') === clip.tsv) {
+    const n = norm(), h = clip.cells.length, w = clip.cells[0].length;
+    const reps = (n.r2 - n.r1 + 1) % h === 0 && (n.c2 - n.c1 + 1) % w === 0 ? [(n.r2 - n.r1 + 1) / h, (n.c2 - n.c1 + 1) / w] : [1, 1];
+    if (clip.cut) { const s = book.sheets[clip.si]; for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) delete s.cells[E.key(clip.src.c + c, clip.src.r + r)]; }
+    for (let rr = 0; rr < reps[0]; rr++) for (let cc = 0; cc < reps[1]; cc++) for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+      const src = clip.cells[r][c], tc = n.c1 + cc * w + c, tr = n.r1 + rr * h + r, k = E.key(tc, tr);
+      if (!src) { delete sh().cells[k]; continue; }
+      const v = typeof src.v === 'string' && src.v[0] === '=' && !clip.cut ? E.shift(src.v, tc - clip.src.c - c - 0 + c - c, 0) : src.v;
+      sh().cells[k] = { ...JSON.parse(JSON.stringify(src)), v: typeof src.v === 'string' && src.v[0] === '=' && !clip.cut ? E.shift(src.v, tc - (clip.src.c + c), tr - (clip.src.r + r)) : src.v };
+      void v;
+    }
+    sel.c2 = n.c1 + w * reps[1] - 1; sel.r2 = n.r1 + h * reps[0] - 1; if (clip.cut) clip = null;
+  } else {
+    let data = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(l => l.split('\t'));
+    const html = e.clipboardData.getData('text/html');
+    if (html && /<table/i.test(html)) { const d = new DOMParser().parseFromString(html, 'text/html'); const t = d.querySelector('table'); if (t) data = [...t.rows].map(r => [...r.cells].map(c => c.innerText.trim())); }
+    data.forEach((row, r) => row.forEach((v, c) => setCell(sel.c + c, sel.r + r, v, true)));
+    sel.c2 = sel.c + Math.max(...data.map(r => r.length)) - 1; sel.r2 = sel.r + data.length - 1;
+  }
+  build(); changed();
+});
+
+// ---------- range operations ----------
+const eachSel = fn => { const n = norm(); for (let r = n.r1; r <= Math.min(n.r2, rows - 1); r++) for (let c = n.c1; c <= Math.min(n.c2, cols - 1); c++) fn(c, r); };
+const clearRange = all => { snapshot(); eachSel((c, r) => { const k = E.key(c, r); if (all) delete sh().cells[k]; else if (sh().cells[k]) { if (sh().cells[k].s) sh().cells[k].v = ''; else delete sh().cells[k]; } }); recalc(); paintSel(); changed(); };
+const setStyle = patch => { snapshot(); eachSel((c, r) => { const k = E.key(c, r); const cell = sh().cells[k] || (sh().cells[k] = { v: '' }); cell.s = { ...(cell.s || {}), ...patch }; Object.keys(cell.s).forEach(p => (cell.s[p] == null || cell.s[p] === false || cell.s[p] === '') && delete cell.s[p]); if (!Object.keys(cell.s).length) delete cell.s; if (!cell.s && cell.v === '') delete sh().cells[k]; }); recalc(); paintSel(); changed(); };
+const curStyle = () => (sh().cells[E.key(sel.c, sel.r)] || {}).s || {};
+const toggleStyle = p => setStyle({ [p]: !curStyle()[p] });
+const fill = dir => {
+  const n = norm(); snapshot();
+  if (dir === 'down') { const top = n.r1 === n.r2 ? n.r1 - 1 : n.r1; if (top < 0) return; for (let c = n.c1; c <= n.c2; c++) { const src = sh().cells[E.key(c, top)]; for (let r = top + 1; r <= n.r2; r++) { const k = E.key(c, r); if (!src) delete sh().cells[k]; else sh().cells[k] = { ...JSON.parse(JSON.stringify(src)), v: String(src.v)[0] === '=' ? E.shift(src.v, 0, r - top) : src.v }; } } }
+  else { const left = n.c1 === n.c2 ? n.c1 - 1 : n.c1; if (left < 0) return; for (let r = n.r1; r <= n.r2; r++) { const src = sh().cells[E.key(left, r)]; for (let c = left + 1; c <= n.c2; c++) { const k = E.key(c, r); if (!src) delete sh().cells[k]; else sh().cells[k] = { ...JSON.parse(JSON.stringify(src)), v: String(src.v)[0] === '=' ? E.shift(src.v, c - left, 0) : src.v }; } } }
+  recalc(); changed();
+};
+const fillSeries = () => {
+  const n = norm(); if (n.r1 === n.r2) return Kit.toast('Select a column of cells — the first one or two set the pattern');
+  snapshot(); for (let c = n.c1; c <= n.c2; c++) {
+    const a = calc.value(si, c, n.r1), b = calc.value(si, c, n.r1 + 1); const two = typeof a === 'number' && typeof b === 'number' && sh().cells[E.key(c, n.r1 + 1)];
+    const step = two ? b - a : 1, start = typeof a === 'number' ? a : 0, s = (sh().cells[E.key(c, n.r1)] || {}).s;
+    for (let r = n.r1 + (two ? 2 : 1); r <= n.r2; r++) sh().cells[E.key(c, r)] = { v: E.numStr(start + step * (r - n.r1)), ...(s ? { s: { ...s } } : {}) };
+  }
+  recalc(); changed();
+};
+const autoSum = () => {
+  const n = norm(); snapshot();
+  if (n.c1 === n.c2 && n.r1 === n.r2) {
+    let r = sel.r - 1; while (r >= 0 && typeof calc.value(si, sel.c, r) === 'number') r--;
+    if (r === sel.r - 1) { let c = sel.c - 1; while (c >= 0 && typeof calc.value(si, c, sel.r) === 'number') c--; if (c < sel.c - 1) { setCell(sel.c, sel.r, `=SUM(${E.key(c + 1, sel.r)}:${E.key(sel.c - 1, sel.r)})`, true); recalc(); paintSel(); changed(); return; } return startEdit('=SUM(');
+    }
+    setCell(sel.c, sel.r, `=SUM(${E.key(sel.c, r + 1)}:${E.key(sel.c, sel.r - 1)})`, true);
+  } else for (let c = n.c1; c <= n.c2; c++) setCell(c, n.r2 + 1, `=SUM(${E.key(c, n.r1)}:${E.key(c, n.r2)})`, true);
+  recalc(); paintSel(); changed();
+};
+const sortRange = desc => {
+  let n = norm(), header = false;
+  if (n.r1 === n.r2) { const u = used(sh()); n = { c1: 0, r1: 0, c2: u.mc, r2: u.mr }; header = [...Array(u.mc + 1).keys()].every(c => { const v = calc.value(si, c, 0); return typeof v === 'string' && v; }); }
+  const r0 = n.r1 + (header ? 1 : 0); if (r0 >= n.r2) return Kit.toast('Nothing to sort');
+  snapshot(); const keyCol = sel.c, rowsData = [];
+  for (let r = r0; r <= n.r2; r++) { const row = []; for (let c = n.c1; c <= n.c2; c++) row.push(sh().cells[E.key(c, r)] || null); rowsData.push({ row, k: calc.value(si, keyCol, r) }); }
+  rowsData.sort((a, b) => { if (a.k == null) return 1; if (b.k == null) return -1; const d = E.compare('<', a.k, b.k) ? -1 : E.compare('>', a.k, b.k) ? 1 : 0; return desc ? -d : d; });
+  rowsData.forEach((d, i) => d.row.forEach((cell, j) => { const k = E.key(n.c1 + j, r0 + i); if (cell) sh().cells[k] = cell; else delete sh().cells[k]; }));
+  recalc(); changed(); Kit.toast(`Sorted by column ${E.colName(keyCol)}${header ? ' (kept the header row)' : ''}`);
+};
+// insert/delete rows/cols with formula fix-ups across all sheets
+const shiftAxis = (axis, at, delta) => {
+  snapshot(); const target = sh().name;
+  const move = {}; for (const [k, v] of Object.entries(sh().cells)) { const p = E.parseRef(k); const idx = axis === 'r' ? p.r : p.c; if (delta < 0 && idx >= at && idx < at - delta) continue; const ni = idx >= at ? idx + delta : idx; move[axis === 'r' ? E.key(p.c, ni) : E.key(ni, p.r)] = v; }
+  sh().cells = move;
+  book.sheets.forEach((s, i) => { for (const cell of Object.values(s.cells)) if (typeof cell.v === 'string' && cell.v[0] === '=') cell.v = E.mapRefs(cell.v, ref => { const on = ref.sheet == null ? i === si : ref.sheet.toLowerCase() === target.toLowerCase(); if (!on) return { c: ref.c, r: ref.r }; const idx = axis === 'r' ? ref.r : ref.c; if (delta < 0 && idx >= at && idx < at - delta) return null; const ni = idx >= at ? idx + delta : idx; return axis === 'r' ? { c: ref.c, r: ni } : { c: ni, r: ref.r }; }); });
+  if (axis === 'c') { const w = {}; Object.entries(sh().colW).forEach(([c, v]) => { c = +c; if (delta < 0 && c >= at && c < at - delta) return; w[c >= at ? c + delta : c] = v; }); sh().colW = w; }
+  build(); changed();
+};
+
+// ---------- toolbar ----------
+const syncTools = () => { const s = curStyle(); ['b', 'i', 'u', 'st', 'wrap'].forEach(p => $(`[data-s="${p}"]`).classList.toggle('on', !!s[p])); $$('[data-al]').forEach(b => b.classList.toggle('on', s.al === b.dataset.al)); $('#fmt').value = s.fmt || ''; };
+$$('.k-tools button').forEach(b => b.addEventListener('mousedown', e => e.preventDefault()));
+$$('[data-s]').forEach(b => b.onclick = () => toggleStyle(b.dataset.s));
+$$('[data-al]').forEach(b => b.onclick = () => setStyle({ al: curStyle().al === b.dataset.al ? null : b.dataset.al }));
+$('#fmt').onchange = e => { setStyle({ fmt: e.target.value || null, dec: null }); gw.focus(); };
+$('#fc').oninput = e => { $('#fcI').style.background = e.target.value; setStyle({ fc: e.target.value }); };
+$('#bg').oninput = e => { $('#bgI').style.background = e.target.value; setStyle({ bg: e.target.value }); };
+const TOOLS = { undo: () => restore(undoS, redoS), redo: () => restore(redoS, undoS), 'dec+': () => setStyle({ dec: Math.min(10, (curStyle().dec ?? (curStyle().fmt === 'pct' ? 0 : 2)) + 1), fmt: curStyle().fmt || 'num' }), 'dec-': () => setStyle({ dec: Math.max(0, (curStyle().dec ?? (curStyle().fmt === 'pct' ? 0 : 2)) - 1), fmt: curStyle().fmt || 'num' }), sum: autoSum, sortA: () => sortRange(false), sortZ: () => sortRange(true), chart: () => chartDlg(), clear: () => setStyle({ b: null, i: null, u: null, st: null, fc: null, bg: null, al: null, fmt: null, dec: null, wrap: null }) };
+$$('[data-t]').forEach(b => b.onclick = () => { TOOLS[b.dataset.t](); gw.focus({ preventScroll: true }); });
+nameBox.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const rg = E.parseRange(nameBox.value.trim()); if (!rg) return Kit.toast('Type a cell like B7 or a range like A1:C5'); sel = { c: rg.c1, r: rg.r1, c2: rg.c2, r2: rg.r2 }; build(); scrollTo(rg.c1, rg.r1); gw.focus(); } if (e.key === 'Escape') { paintSel(); gw.focus(); } };
+nameBox.onfocus = () => nameBox.select();
+
+// ---------- sheet tabs ----------
+const renderTabs = () => {
+  const t = $('#tabs'); t.innerHTML = book.sheets.map((s, i) => `<button class="tab${i === si ? ' on' : ''}" data-i="${i}">${esc(s.name)}</button>`).join('') + '<button class="tab" data-add title="Add sheet">＋</button><span class="sum"></span>';
+  $$('[data-i]', t).forEach(b => { b.onclick = () => { if (editing && isFormulaEditing()) return; commitIfCell(); si = +b.dataset.i; sel = { c: 0, r: 0, c2: 0, r2: 0 }; build(); renderTabs(); }; b.ondblclick = () => renameSheet(+b.dataset.i); b.oncontextmenu = e => { e.preventDefault(); sheetMenu(b, +b.dataset.i); }; });
+  $('[data-add]', t).onclick = () => { snapshot(); let n = book.sheets.length + 1; while (book.sheets.some(s => s.name === 'Sheet' + n)) n++; book.sheets.push({ name: 'Sheet' + n, cells: {}, colW: {} }); si = book.sheets.length - 1; sel = { c: 0, r: 0, c2: 0, r2: 0 }; build(); renderTabs(); changed(); };
+  updateSum();
+};
+const renameSheet = async i => { const v = await Kit.dialog('Rename sheet', [{ id: 'n', label: 'Name', value: book.sheets[i].name }]); if (!v) return; const nm = v.n.trim().replace(/[\\/?*[\]:]/g, '').slice(0, 31); if (!nm || book.sheets.some((s, j) => j !== i && s.name.toLowerCase() === nm.toLowerCase())) return Kit.toast('Pick a different name'); snapshot(); const old = book.sheets[i].name; book.sheets[i].name = nm; const q = n => /^[A-Za-z_][\w.]*$/.test(n) ? n : `'${n.replace(/'/g, "''")}'`; book.sheets.forEach(s => Object.values(s.cells).forEach(c => { if (typeof c.v === 'string' && c.v[0] === '=') c.v = c.v.replace(/("(?:[^"]|"")*")|((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)/g, (m, str, sh) => { if (str) return m; let n = sh.slice(0, -1); if (n[0] === "'") n = n.slice(1, -1).replace(/''/g, "'"); return n.toLowerCase() === old.toLowerCase() ? q(nm) + '!' : m; }); })); renderTabs(); recalc(); changed(); };
+const sheetMenu = (b, i) => Kit.menu(b, [
+  { label: 'Rename…', act: () => renameSheet(i) },
+  { label: 'Duplicate', act: () => { snapshot(); const c = JSON.parse(JSON.stringify(book.sheets[i])); c.name += ' copy'; book.sheets.splice(i + 1, 0, c); si = i + 1; build(); renderTabs(); changed(); } },
+  { label: 'Move left', disabled: i === 0, act: () => { snapshot(); const [s] = book.sheets.splice(i, 1); book.sheets.splice(i - 1, 0, s); si = i - 1; build(); renderTabs(); changed(); } },
+  { label: 'Move right', disabled: i === book.sheets.length - 1, act: () => { snapshot(); const [s] = book.sheets.splice(i, 1); book.sheets.splice(i + 1, 0, s); si = i + 1; build(); renderTabs(); changed(); } },
+  '-',
+  { label: 'Delete sheet', disabled: book.sheets.length < 2, act: async () => { if (!await Kit.confirm(`Delete “${book.sheets[i].name}”?`, 'You can undo this with Ctrl+Z.', 'Delete')) return; snapshot(); book.sheets.splice(i, 1); si = Math.max(0, Math.min(si, book.sheets.length - 1)); calc = new E.Calc(book); build(); renderTabs(); changed(); } }
+]);
+
+// ---------- menus ----------
+const MENUS = {
+  file: () => [
+    { label: 'New spreadsheet', act: () => { flush(); openBook(K_new('Untitled spreadsheet', [{ name: 'Sheet1' }]), true); } },
+    { label: 'Open…', act: showHome }, { label: 'Open a file from this device…', act: importFile }, '-',
+    { label: 'Save as Excel (.xlsx)', hint: 'Ctrl+S', act: exportXlsx },
+    { label: 'Save this sheet as .csv', act: exportCsv },
+    { label: 'Print / Save as PDF', hint: 'Ctrl+P', act: () => print() }, '-',
+    { label: 'Close', act: showHome }
+  ],
+  edit: () => [
+    { label: 'Undo', hint: 'Ctrl+Z', act: () => restore(undoS, redoS) }, { label: 'Redo', hint: 'Ctrl+Y', act: () => restore(redoS, undoS) }, '-',
+    { label: 'Fill down', hint: 'Ctrl+D', act: () => fill('down') }, { label: 'Fill right', hint: 'Ctrl+R', act: () => fill('right') }, { label: 'Fill series (1, 2, 3…)', act: fillSeries }, '-',
+    { label: 'Clear contents', hint: 'Del', act: () => clearRange(false) }, { label: 'Clear everything', act: () => clearRange(true) }, '-',
+    { label: 'Find…', hint: 'Ctrl+F', act: findDlg }, { label: 'Find and replace…', act: () => findDlg(true) }
+  ],
+  insert: () => [
+    { label: 'Row above', act: () => shiftAxis('r', norm().r1, norm().r2 - norm().r1 + 1) }, { label: 'Row below', act: () => shiftAxis('r', norm().r2 + 1, norm().r2 - norm().r1 + 1) },
+    { label: 'Column left', act: () => shiftAxis('c', norm().c1, norm().c2 - norm().c1 + 1) }, { label: 'Column right', act: () => shiftAxis('c', norm().c2 + 1, norm().c2 - norm().c1 + 1) }, '-',
+    { label: 'Delete selected rows', act: () => { const n = norm(); shiftAxis('r', n.r1, -(n.r2 - n.r1 + 1)); } }, { label: 'Delete selected columns', act: () => { const n = norm(); shiftAxis('c', n.c1, -(n.c2 - n.c1 + 1)); } }, '-',
+    { label: 'Chart…', act: chartDlg }, { label: 'Function…', act: funcDlg }, { label: 'Today’s date', hint: 'Ctrl+;', act: () => { setCell(sel.c, sel.r, String(E.FN.TODAY())); setStyle({ fmt: 'date' }); } }, { label: 'New sheet', act: () => $('[data-add]').click() }
+  ],
+  format: () => [
+    ...[['', 'General'], ['num', 'Number  1,234.56'], ['cur', 'Currency  $1,234.56'], ['pct', 'Percent  12%'], ['date', 'Date  2025-01-31'], ['time', 'Time  13:45'], ['text', 'Plain text']].map(([f, l]) => ({ label: l, checked: (curStyle().fmt || '') === f, act: () => setStyle({ fmt: f || null, dec: null }) })), '-',
+    { label: 'Bold', hint: 'Ctrl+B', act: () => toggleStyle('b') }, { label: 'Italic', hint: 'Ctrl+I', act: () => toggleStyle('i') }, { label: 'Wrap text', checked: !!curStyle().wrap, act: () => toggleStyle('wrap') }, '-',
+    { label: 'Column width…', act: async () => { const v = await Kit.dialog('Column width', [{ id: 'w', label: 'Width in pixels', type: 'number', value: sh().colW[sel.c] || DEF_W, min: 20, max: 800 }]); if (v) { const n = norm(); for (let c = n.c1; c <= n.c2; c++) sh().colW[c] = Kit.clamp(+v.w || DEF_W, 20, 800); build(); changed(); } } },
+    { label: 'Fit column to contents', act: () => { const n = norm(); for (let c = n.c1; c <= n.c2; c++) autoFit(c); } },
+    { label: 'Clear formatting', act: TOOLS.clear }
+  ],
+  data: () => [
+    { label: 'Sort A → Z', act: () => sortRange(false) }, { label: 'Sort Z → A', act: () => sortRange(true) }, '-',
+    { label: 'AutoSum', act: autoSum }, { label: 'Remove duplicate rows', act: dedupe }
+  ]
+};
+$$('[data-m]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { commitIfCell(); Kit.menu(b, MENUS[b.dataset.m]()); }; });
+const dedupe = () => { const n = norm(); if (n.r1 === n.r2) return Kit.toast('Select the rows to check first'); snapshot(); const seen = new Set(), keep = []; for (let r = n.r1; r <= n.r2; r++) { const row = []; for (let c = n.c1; c <= n.c2; c++) row.push(sh().cells[E.key(c, r)] || null); const k = JSON.stringify(row.map(x => x && x.v)); if (!seen.has(k)) { seen.add(k); keep.push(row); } } const removed = n.r2 - n.r1 + 1 - keep.length; for (let r = n.r1; r <= n.r2; r++) for (let c = n.c1; c <= n.c2; c++) { const cell = keep[r - n.r1] && keep[r - n.r1][c - n.c1]; const k = E.key(c, r); if (cell) sh().cells[k] = cell; else delete sh().cells[k]; } recalc(); changed(); Kit.toast(removed + ' duplicate row' + (removed === 1 ? '' : 's') + ' removed'); };
+const findDlg = async replace => {
+  const v = await Kit.dialog(replace ? 'Find and replace' : 'Find', [{ id: 'q', label: 'Find' }, ...(replace ? [{ id: 'r', label: 'Replace with' }] : [])], { ok: replace ? 'Replace all' : 'Find next' }); if (!v || !v.q) return;
+  const q = v.q.toLowerCase();
+  if (replace) { snapshot(); let n = 0; for (const cell of Object.values(sh().cells)) if (typeof cell.v === 'string' && cell.v.toLowerCase().includes(q)) { cell.v = cell.v.replace(new RegExp(v.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), () => (n++, v.r)); } recalc(); changed(); return Kit.toast(n + ' replaced'); }
+  const keys = Object.keys(sh().cells).map(k => ({ k, p: E.parseRef(k) })).sort((a, b) => a.p.r - b.p.r || a.p.c - b.p.c);
+  const after = keys.filter(x => x.p.r > sel.r || (x.p.r === sel.r && x.p.c > sel.c)).concat(keys);
+  const hit = after.find(x => String(tds[x.p.r] && tds[x.p.r][x.p.c] ? tds[x.p.r][x.p.c].textContent : sh().cells[x.k].v).toLowerCase().includes(q) || String(sh().cells[x.k].v).toLowerCase().includes(q));
+  if (!hit) return Kit.toast('Not found'); select(hit.p.c, hit.p.r); gw.focus();
+};
+const funcDlg = async () => {
+  const v = await Kit.dialog('Insert function', [{ id: 'f', label: 'Function', type: 'select', value: 'SUM', options: E.FUNCTIONS.map(f => [f, f]) }], { ok: 'Insert' }); if (!v) return;
+  startEdit('=' + v.f + '('); mirror(edit);
+};
+
+// ---------- chart ----------
+const PAL = ['#2b6cd8', '#1f8a4c', '#e8710a', '#c2185b', '#7b1fa2', '#00838f', '#9e9d24', '#5d4037'];
+function chartDlg() {
+  const n = norm(); if (n.r1 === n.r2 && n.c1 === n.c2) return Kit.toast('Select some data first — labels in the first column, numbers next to them');
+  const g = []; for (let r = n.r1; r <= n.r2; r++) { const row = []; for (let c = n.c1; c <= n.c2; c++) row.push(calc.value(si, c, r)); g.push(row); }
+  const hasHead = g[0].slice(1).some(v => typeof v === 'string') || (g[0].length === 1 && typeof g[0][0] === 'string');
+  const labelCol = g.every((row, i) => (hasHead && i === 0) || typeof row[0] !== 'number') && g[0].length > 1;
+  const body = hasHead ? g.slice(1) : g, heads = hasHead ? g[0] : g[0].map((_, i) => 'Series ' + (i + 1));
+  const labels = body.map((r, i) => labelCol ? String(r[0] ?? '') : String(i + 1));
+  const series = (labelCol ? heads.slice(1) : heads).map((name, j) => ({ name: String(name ?? ''), data: body.map(r => { const v = r[j + (labelCol ? 1 : 0)]; return typeof v === 'number' ? v : 0; }) }));
+  const d = h(`<div class="k-modal"><div class="k-dlg"><h3>Chart</h3><div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="ct" style="font:inherit;padding:6px;border-radius:8px;border:1px solid var(--k-line);background:var(--k-bg);color:var(--k-text)"><option value="bar">Column</option><option value="hbar">Bar</option><option value="line">Line</option><option value="pie">Pie</option></select><input id="ctt" placeholder="Chart title" value="${esc(sh().name)}" style="flex:1;font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--k-line);background:var(--k-bg);color:var(--k-text)"></div><canvas class="chartc"></canvas><div class="k-btns"><button class="k-btn" data-c>Close</button><button class="k-btn pri" data-dl>Download PNG</button></div></div></div>`);
+  document.body.appendChild(d); const cv = $('canvas', d);
+  const draw = () => drawChart(cv, $('#ct', d).value, $('#ctt', d).value, labels, series);
+  $('#ct', d).onchange = draw; $('#ctt', d).oninput = draw; draw();
+  $('[data-c]', d).onclick = () => d.remove(); d.onmousedown = e => { if (e.target === d) d.remove(); };
+  $('[data-dl]', d).onclick = () => cv.toBlob(b => Kit.download(b, Kit.safeName($('#ctt', d).value || 'chart') + '.png'));
+}
+function drawChart(cv, type, title, labels, series) {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#222'; g.font = '600 15px system-ui'; g.textAlign = 'center'; g.fillText(title, W / 2, 24);
+  g.font = '12px system-ui';
+  if (type === 'pie') {
+    const data = series[0] ? series[0].data.map(v => Math.max(0, v)) : [], tot = data.reduce((a, b) => a + b, 0) || 1, cx = W * 0.38, cy = H / 2 + 12, R = Math.min(W * 0.3, H / 2 - 30); let a = -Math.PI / 2;
+    data.forEach((v, i) => { const s = v / tot * Math.PI * 2; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, a, a + s); g.closePath(); g.fillStyle = PAL[i % PAL.length]; g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); if (s > 0.25) { g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(Math.round(v / tot * 100) + '%', cx + Math.cos(a + s / 2) * R * 0.65, cy + Math.sin(a + s / 2) * R * 0.65 + 4); } a += s; });
+    g.textAlign = 'left'; labels.forEach((l, i) => { const y = 50 + i * 20; if (y > H - 10) return; g.fillStyle = PAL[i % PAL.length]; g.fillRect(W * 0.72, y - 10, 12, 12); g.fillStyle = '#333'; g.fillText(l.slice(0, 22), W * 0.72 + 18, y); });
+    return;
+  }
+  const all = series.flatMap(s => s.data), max = Math.max(0, ...all), min = Math.min(0, ...all), span = (max - min) || 1;
+  const step = (() => { const raw = span / 5, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p; })();
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step || step;
+  const L = 56, T = 40, Rr = W - 16, Bt = H - 44 - (series.length > 1 ? 18 : 0), hb = type === 'hbar';
+  const vpos = v => hb ? L + (v - lo) / (hi - lo) * (Rr - L) : Bt - (v - lo) / (hi - lo) * (Bt - T);
+  g.strokeStyle = '#e5e7eb'; g.lineWidth = 1; g.fillStyle = '#666'; g.textAlign = hb ? 'center' : 'right';
+  for (let v = lo; v <= hi + step / 2; v += step) { const p = vpos(v); g.beginPath(); if (hb) { g.moveTo(p, T); g.lineTo(p, Bt); g.stroke(); g.fillText(E.numStr(+v.toPrecision(6)), p, Bt + 16); } else { g.moveTo(L, p); g.lineTo(Rr, p); g.stroke(); g.fillText(E.numStr(+v.toPrecision(6)), L - 6, p + 4); } }
+  const n = labels.length, band = (hb ? Bt - T : Rr - L) / Math.max(1, n);
+  g.textAlign = hb ? 'right' : 'center'; g.fillStyle = '#444';
+  labels.forEach((l, i) => { const c = (hb ? T : L) + band * (i + 0.5); if (n > 30 && i % Math.ceil(n / 30)) return; hb ? g.fillText(l.slice(0, 10), L - 6, c + 4) : g.fillText(l.slice(0, Math.max(3, Math.floor(band / 7))), c, Bt + 16); });
+  series.forEach((s, j) => {
+    g.fillStyle = g.strokeStyle = PAL[j % PAL.length];
+    if (type === 'line') { g.lineWidth = 2.5; g.beginPath(); s.data.forEach((v, i) => { const x0 = L + band * (i + 0.5), y0 = vpos(v); i ? g.lineTo(x0, y0) : g.moveTo(x0, y0); }); g.stroke(); s.data.forEach((v, i) => { g.beginPath(); g.arc(L + band * (i + 0.5), vpos(v), 3.5, 0, 7); g.fill(); }); }
+    else { const bw = band * 0.75 / series.length; s.data.forEach((v, i) => { const o = (hb ? T : L) + band * (i + 0.125) + bw * j, z = vpos(0), p = vpos(v); hb ? g.fillRect(Math.min(z, p), o, Math.abs(p - z), bw - 1) : g.fillRect(o, Math.min(z, p), bw - 1, Math.abs(p - z)); }); }
+  });
+  if (series.length > 1) { g.textAlign = 'left'; let x0 = L; series.forEach((s, j) => { g.fillStyle = PAL[j % PAL.length]; g.fillRect(x0, H - 20, 12, 12); g.fillStyle = '#333'; g.fillText(s.name.slice(0, 18), x0 + 16, H - 10); x0 += 30 + g.measureText(s.name.slice(0, 18)).width; }); }
+}
+
+// ---------- CSV ----------
+const csvCell = s => /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+function exportCsv() { const u = used(sh()); const out = []; for (let r = 0; r <= u.mr; r++) { const row = []; for (let c = 0; c <= u.mc; c++) { const cell = sh().cells[E.key(c, r)]; row.push(csvCell(cell ? E.format(calc.value(si, c, r), (cell.s || {}).fmt, (cell.s || {}).dec) : '')); } out.push(row.join(',')); } Kit.download(new Blob(['\ufeff' + out.join('\r\n')], { type: 'text/csv' }), Kit.safeName(book.name + (book.sheets.length > 1 ? ' - ' + sh().name : '')) + '.csv'); }
+const parseCsv = (t, delim) => { const rows = []; let row = [], f = '', q = false; for (let i = 0; i < t.length; i++) { const ch = t[i]; if (q) { if (ch === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; } else if (ch === '"') q = true; else if (ch === delim) { row.push(f); f = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && t[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; } else f += ch; } if (f || row.length) { row.push(f); rows.push(row); } return rows; };
+
+// ---------- XLSX export ----------
+async function exportXlsx() {
+  commitIfCell(); status.textContent = 'Making .xlsx…';
+  const fonts = ['<font><sz val="11"/><name val="Calibri"/></font>'], fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'], xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'], numFmts = [], key2xf = new Map([['', 0]]);
+  const fmtCode = s => { const d = s.dec ?? (s.fmt === 'pct' ? 0 : 2), z = d ? '0.' + '0'.repeat(d) : '0'; return { num: '#,##0' + (d ? '.' + '0'.repeat(d) : ''), cur: '"$"#,##0' + (d ? '.' + '0'.repeat(d) : ''), pct: z + '%', date: 'yyyy\\-mm\\-dd', time: 'hh:mm', text: '@' }[s.fmt] || (s.dec != null ? z : null); };
+  const argb = c => 'FF' + (String(c || '').replace('#', '').toUpperCase().padStart(6, '0').slice(0, 6));
+  const xfOf = s => {
+    if (!s) return 0; const k = JSON.stringify(s); if (key2xf.has(k)) return key2xf.get(k);
+    let fontId = 0, fillId = 0, numFmtId = 0;
+    if (s.b || s.i || s.u || s.st || s.fc) { fonts.push(`<font>${s.b ? '<b/>' : ''}${s.i ? '<i/>' : ''}${s.st ? '<strike/>' : ''}${s.u ? '<u/>' : ''}<sz val="11"/>${s.fc ? `<color rgb="${argb(s.fc)}"/>` : ''}<name val="Calibri"/></font>`); fontId = fonts.length - 1; }
+    if (s.bg) { fills.push(`<fill><patternFill patternType="solid"><fgColor rgb="${argb(s.bg)}"/><bgColor indexed="64"/></patternFill></fill>`); fillId = fills.length - 1; }
+    const code = fmtCode(s); if (code) { const ex = { '0': 1, '0.00': 2, '#,##0': 3, '#,##0.00': 4, '0%': 9, '0.00%': 10, '@': 49 }[code]; if (ex) numFmtId = ex; else { let f = numFmts.find(n => n.code === code); if (!f) { f = { id: 164 + numFmts.length, code }; numFmts.push(f); } numFmtId = f.id; } }
+    const al = s.al || s.wrap ? `<alignment${s.al ? ` horizontal="${s.al}"` : ''}${s.wrap ? ' wrapText="1"' : ''}/>` : '';
+    xfs.push(`<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="0" xfId="0"${numFmtId ? ' applyNumberFormat="1"' : ''}${fontId ? ' applyFont="1"' : ''}${fillId ? ' applyFill="1"' : ''}${al ? ' applyAlignment="1">' + al + '</xf>' : '/>'}`);
+    key2xf.set(k, xfs.length - 1); return xfs.length - 1;
+  };
+  const sheetsXml = book.sheets.map((s, idx) => {
+    const byRow = new Map(); for (const k of Object.keys(s.cells)) { const p = E.parseRef(k); if (!byRow.has(p.r)) byRow.set(p.r, []); byRow.get(p.r).push(p); }
+    let rowsXml = '';
+    [...byRow.keys()].sort((a, b) => a - b).forEach(r => {
+      let cx = ''; byRow.get(r).sort((a, b) => a.c - b.c).forEach(p => {
+        const ref = E.key(p.c, p.r), cell = s.cells[ref], st = xfOf(cell.s), sa = st ? ` s="${st}"` : '', raw = cell.v;
+        if (typeof raw === 'string' && raw[0] === '=' && raw.length > 1) {
+          const v = calc.value(idx, p.c, p.r), f = `<f>${x(raw.slice(1))}</f>`;
+          if (typeof v === 'number') cx += `<c r="${ref}"${sa}>${f}<v>${v}</v></c>`;
+          else if (typeof v === 'boolean') cx += `<c r="${ref}"${sa} t="b">${f}<v>${v ? 1 : 0}</v></c>`;
+          else if (v instanceof E.FErr) cx += `<c r="${ref}"${sa} t="e">${f}<v>${x(v.code === '#CIRC!' ? '#REF!' : v.code)}</v></c>`;
+          else cx += `<c r="${ref}"${sa} t="str">${f}<v>${x(v == null ? '' : v)}</v></c>`;
+        } else {
+          const v = (cell.s || {}).fmt === 'text' ? raw : calc.literal(raw);
+          if (v == null || v === '') cx += st ? `<c r="${ref}"${sa}/>` : '';
+          else if (typeof v === 'number') cx += `<c r="${ref}"${sa}><v>${v}</v></c>`;
+          else if (typeof v === 'boolean') cx += `<c r="${ref}"${sa} t="b"><v>${v ? 1 : 0}</v></c>`;
+          else cx += `<c r="${ref}"${sa} t="inlineStr"><is><t xml:space="preserve">${x(v instanceof E.FErr ? v.code : v)}</t></is></c>`;
+        }
+      });
+      if (cx) rowsXml += `<row r="${r + 1}">${cx}</row>`;
+    });
+    const colsXml = Object.keys(s.colW).length ? '<cols>' + Object.entries(s.colW).sort((a, b) => a[0] - b[0]).map(([c, w]) => `<col min="${+c + 1}" max="${+c + 1}" width="${(w / 7).toFixed(2)}" customWidth="1"/>`).join('') + '</cols>' : '';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${idx === si ? '<sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews>' : ''}<sheetFormatPr defaultRowHeight="15"/>${colsXml}<sheetData>${rowsXml}</sheetData></worksheet>`;
+  });
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${numFmts.length ? `<numFmts count="${numFmts.length}">${numFmts.map(n => `<numFmt numFmtId="${n.id}" formatCode="${x(n.code)}"/>`).join('')}</numFmts>` : ''}<fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="${fills.length}">${fills.join('')}</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const wb = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${R}"><bookViews><workbookView activeTab="${si}"/></bookViews><sheets>${book.sheets.map((s, i) => `<sheet name="${x(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`;
+  const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${book.sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="${R}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rIdS" Type="${R}/styles" Target="styles.xml"/></Relationships>`;
+  const types = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${book.sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+  const blob = await Kit.zip([['[Content_Types].xml', types], ['_rels/.rels', rels], ['xl/workbook.xml', wb], ['xl/_rels/workbook.xml.rels', wbRels], ['xl/styles.xml', stylesXml], ...sheetsXml.map((s, i) => [`xl/worksheets/sheet${i + 1}.xml`, s])], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  window.__lastXlsx = blob; status.textContent = 'Saved';
+  Kit.download(blob, Kit.safeName(book.name) + '.xlsx');
+}
+
+// ---------- XLSX import ----------
+const xlsxToBook = async (buf, name) => {
+  const files = await Kit.unzip(buf), A = Kit.attr, kid = Kit.kid, kids = Kit.kids;
+  if (!files.has('xl/workbook.xml')) throw new Error('No workbook inside — is it really an .xlsx?');
+  const wb = Kit.xml(files.get('xl/workbook.xml')), rels = Kit.rels(files, 'xl/_rels/workbook.xml.rels');
+  const ss = files.has('xl/sharedStrings.xml') ? Kit.all(Kit.xml(files.get('xl/sharedStrings.xml')), 'si').map(si => Kit.all(si, 't').filter(t => !t.closest || t.parentNode.localName !== 'rPh').map(t => t.textContent).join('')) : [];
+  // styles → our style objects
+  const xfStyle = [];
+  if (files.has('xl/styles.xml')) {
+    const sx = Kit.xml(files.get('xl/styles.xml')), custom = {};
+    Kit.all(sx, 'numFmt').forEach(n => custom[A(n, 'numFmtId')] = A(n, 'formatCode'));
+    const fonts = kids(kid(sx.documentElement, 'fonts'), 'font'), fills = kids(kid(sx.documentElement, 'fills'), 'fill');
+    const rgb = el => { const v = A(el, 'rgb'); return v && /^[0-9A-F]{8}$/i.test(v) ? '#' + v.slice(2).toLowerCase() : v && /^[0-9A-F]{6}$/i.test(v) ? '#' + v.toLowerCase() : null; };
+    kids(kid(sx.documentElement, 'cellXfs'), 'xf').forEach(xf => {
+      const s = {}, f = fonts[+A(xf, 'fontId') || 0], fl = fills[+A(xf, 'fillId') || 0], nf = +A(xf, 'numFmtId') || 0;
+      if (f) { if (kid(f, 'b') && A(kid(f, 'b'), 'val') !== '0') s.b = true; if (kid(f, 'i') && A(kid(f, 'i'), 'val') !== '0') s.i = true; if (kid(f, 'u')) s.u = true; if (kid(f, 'strike')) s.st = true; const c = rgb(kid(f, 'color')); if (c && c !== '#000000') s.fc = c; }
+      if (fl) { const p = kid(fl, 'patternFill'); if (p && A(p, 'patternType') === 'solid') { const c = rgb(kid(p, 'fgColor')); if (c && c !== '#ffffff') s.bg = c; } }
+      const code = custom[nf] || ''; const dm = /0\.(0+)/.exec(code);
+      if ([14, 15, 16, 17, 22].includes(nf) || (/[ymd]/i.test(code) && !/h/i.test(code.replace(/\[[^\]]*\]/g, '')))) s.fmt = 'date';
+      else if ([18, 19, 20, 21, 45, 46, 47].includes(nf) || /h+:mm/i.test(code)) s.fmt = 'time';
+      else if (nf === 9 || nf === 10 || code.includes('%')) { s.fmt = 'pct'; s.dec = nf === 10 ? 2 : dm ? dm[1].length : 0; }
+      else if ([5, 6, 7, 8, 42, 44].includes(nf) || /[$€£¥]/.test(code)) { s.fmt = 'cur'; s.dec = dm ? dm[1].length : (nf === 5 || nf === 6 ? 0 : 2); }
+      else if ([3, 4, 37, 38, 39, 40].includes(nf) || code.includes('#,##')) { s.fmt = 'num'; s.dec = dm ? dm[1].length : (nf === 3 || nf === 37 || nf === 38 ? 0 : 2); }
+      else if (nf === 2 || nf === 11) s.dec = 2; else if (nf === 49 || code === '@') s.fmt = 'text';
+      else if (dm && /^[0#.,]+$/.test(code)) s.dec = dm[1].length;
+      const al = kid(xf, 'alignment'); if (al) { const hz = A(al, 'horizontal'); if (['left', 'center', 'right'].includes(hz)) s.al = hz; if (A(al, 'wrapText') === '1') s.wrap = true; }
+      xfStyle.push(Object.keys(s).length ? s : null);
+    });
+  }
+  const sheets = [];
+  for (const s of Kit.all(wb, 'sheet')) {
+    const rel = rels[Kit.rid(s)]; if (!rel) continue; const path = Kit.resolve('xl/workbook.xml', rel.target); const f = files.get(path); if (!f) continue;
+    const doc = Kit.xml(f), cells = {}, colW = {}, shared = {};
+    Kit.all(doc, 'col').forEach(c => { const w = parseFloat(A(c, 'width')); if (w && A(c, 'customWidth') !== '0') for (let i = +A(c, 'min'); i <= Math.min(+A(c, 'max'), +A(c, 'min') + 200); i++) colW[i - 1] = Math.round(w * 7); });
+    let autoR = 0;
+    for (const row of Kit.all(doc, 'row')) {
+      const rn = A(row, 'r') ? +A(row, 'r') - 1 : autoR; autoR = rn + 1; let autoC = 0;
+      for (const c of kids(row, 'c')) {
+        const p = A(c, 'r') ? E.parseRef(A(c, 'r')) : { c: autoC, r: rn }; autoC = p.c + 1;
+        const t = A(c, 't'), vEl = kid(c, 'v'), fEl = kid(c, 'f'), st = xfStyle[+A(c, 's') || 0];
+        let v = '';
+        if (fEl) {
+          let ftxt = fEl.textContent; const si2 = A(fEl, 'si');
+          if (A(fEl, 't') === 'shared' && si2 != null) { if (ftxt) shared[si2] = { f: ftxt, c: p.c, r: p.r }; else if (shared[si2]) ftxt = E.shift(shared[si2].f, p.c - shared[si2].c, p.r - shared[si2].r); }
+          if (ftxt) v = '=' + ftxt.replace(/_xlfn\.|_xlws\./g, '');
+        }
+        if (!v) {
+          if (t === 's') v = ss[+(vEl && vEl.textContent)] ?? '';
+          else if (t === 'inlineStr') v = Kit.all(c, 't').map(x => x.textContent).join('');
+          else if (t === 'b') v = vEl && vEl.textContent === '1' ? 'TRUE' : 'FALSE';
+          else if (t === 'str' || t === 'e') v = vEl ? vEl.textContent : '';
+          else v = vEl ? vEl.textContent : '';
+          if (t === 's' || t === 'inlineStr' || t === 'str') { if (/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(v.trim()) || /^(true|false)$/i.test(v) || v[0] === '=' || v[0] === "'") v = "'" + v; }
+        }
+        if (v === '' && !st) continue;
+        cells[E.key(p.c, p.r)] = st ? { v, s: { ...st } } : { v };
+      }
+    }
+    sheets.push({ name: A(s, 'name') || 'Sheet' + (sheets.length + 1), cells, colW });
+  }
+  if (!sheets.length) sheets.push({ name: 'Sheet1', cells: {}, colW: {} });
+  return { name, sheets };
+};
+async function importFile() {
+  const f = await Kit.pick('.xlsx,.xlsm,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv'); if (!f) return;
+  try {
+    const name = f.name.replace(/\.[^.]+$/, ''), ext = f.name.split('.').pop().toLowerCase(); let b;
+    if (ext === 'xls') throw new Error('Old .xls files aren’t supported. Save it as .xlsx first.');
+    if (ext === 'xlsx' || ext === 'xlsm') b = await xlsxToBook(await Kit.readAs(f, 'readAsArrayBuffer'), name);
+    else { const t = (await Kit.readAs(f, 'readAsText')).replace(/^\ufeff/, ''); const delim = ext === 'tsv' || (t.split('\n')[0].split('\t').length > t.split('\n')[0].split(',').length) ? '\t' : ','; const cells = {}; parseCsv(t, delim).forEach((row, r) => row.forEach((v, c) => { if (v !== '') cells[E.key(c, r)] = { v: v[0] === '=' ? "'" + v : v }; })); b = { name, sheets: [{ name: 'Sheet1', cells, colW: {} }] }; }
+    docId = Kit.uid(); openBook(b, true); Kit.toast('Opened ' + f.name);
+  } catch (e) { console.error(e); Kit.toast('Couldn’t open that file: ' + e.message, 4000); }
+}
+window.__sheets = { E, exportXlsx, xlsxToBook, openBook, get book() { return book; }, get calc() { return calc; }, setCell, select, get sel() { return sel; }, tds: () => tds, K_new };
+</script></body></html>
