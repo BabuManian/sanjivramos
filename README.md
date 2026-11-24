@@ -32,3 +32,8 @@ Your settings live in your browser (and server data in `~/.sanjivramos` in the C
 - Codespaces stop after 30 minutes without activity; open the Codespace again and SanjivramOS starts by itself.
 - Phone-only parts (Android apps, phone shell desktop, Chromium Web Browser) don't work here; the proxy browser does.
 - Free GitHub accounts get a monthly allowance of Codespaces hours — stop the Codespace when you're done.
+
+## License
+
+SanjivramOS is free software under the **GNU General Public License v3.0 or later** — see [LICENSE](LICENSE).
+The bundled web proxy parts keep their own licenses (in `proxy/LICENSES/`).

@@ -79,7 +79,7 @@ h2{margin:0 0 8px;font:700 22px Georgia,serif;color:#fde68a}
 <div class="hud" id="prompt"></div>
 <div class="hud" id="log"></div>
 <div id="stick"></div>
-<div id="touch"><button data-btn="act">👆 Use item</button><button data-btn="use">✋ Interact</button><button data-btn="jump">⤒ Jump</button><button data-btn="sack">🎒 Sack</button><button data-btn="light">🔦 Light</button><button data-btn="craft">🛠 Craft</button><button data-btn="journal">📖 Book</button><button data-btn="eat">🍓 Eat</button><button data-btn="run">🏃 Run</button></div>
+<div id="touch"><button data-btn="act">👆 Use item</button><button data-btn="use">✋ Interact</button><button data-btn="jump">⤒ Jump</button><button data-btn="sack">🎒 Sack</button><button data-btn="light">🔦 Light</button><button data-btn="craft">🛠 Craft</button><button data-btn="journal">📖 Book</button><button data-btn="eat">🍓 Eat</button><button data-btn="run">🏃 Run</button><button data-btn="reload">🔄 Reload</button><button data-btn="aim">🎯 Aim</button></div>
 <div id="hotbar" hidden></div><div id="sackbar" hidden></div>
 
 <div class="panel" id="menu"><div class="card">
@@ -89,7 +89,7 @@ h2{margin:0 0 8px;font:700 22px Georgia,serif;color:#fde68a}
     <div class="btns"><button class="btn pri" id="bStory">▶ New story</button><button class="btn" id="bCont" hidden>⏵ Continue</button><button class="btn" id="bEndless">♾ Endless nights</button></div>
     <div class="btns"><button class="btn" id="bKeys">⌨ Controls</button><button class="btn" id="bLook">🧍 Edit my character</button><label class="btn" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="lowq"> Faster graphics</label></div>
   </div><div style="text-align:center"><canvas id="me" width="300" height="400"></canvas><div style="font-size:12px;opacity:.7;margin-top:4px">This is you — change it in Character Creator</div></div></div>
-  <div id="keys" hidden style="margin-top:12px"><div class="keys"><div><b>WASD</b> move</div><div><b>Shift</b> run</div><div><b>Mouse</b> look (click to lock)</div><div><b>Space</b> jump</div><div><b>Click / J</b> hit · chop · mine</div><div><b>E</b> use · pick up · add wood</div><div><b>Q</b> eat</div><div><b>F</b> flashlight</div><div><b>L</b> lantern</div><div><b>C</b> craft (at the workbench)</div><div><b>G</b> place a light post</div><div><b>1–7</b> hotbar</div><div><b>Click / J</b> use the held item</div><div><b>Tab</b> open the sack</div><div><b>M</b> journal &amp; map</div><div><b>Esc</b> pause</div></div><p style="opacity:.7;font-size:13px">Phone: left side of the screen = walk, right side = look, buttons on the right. A game controller works too.</p></div>
+  <div id="keys" hidden style="margin-top:12px"><div class="keys"><div><b>WASD</b> move</div><div><b>Shift</b> run</div><div><b>Mouse</b> look (click to lock)</div><div><b>Space</b> jump</div><div><b>Click / J</b> hit · chop · mine</div><div><b>E</b> use · pick up · add wood</div><div><b>Q</b> eat</div><div><b>F</b> flashlight</div><div><b>L</b> lantern</div><div><b>C</b> craft (at the workbench)</div><div><b>G</b> place a light post</div><div><b>1–0</b> hotbar</div><div><b>Right-click</b> aim</div><div><b>R</b> reload</div><div><b>Click / J</b> use the held item</div><div><b>Tab</b> open the sack</div><div><b>M</b> journal &amp; map</div><div><b>Esc</b> pause</div></div><p style="opacity:.7;font-size:13px">Phone: left side of the screen = walk, right side = look, buttons on the right. A game controller works too.</p></div>
 </div></div>
 <div class="panel" id="pause" hidden><div class="card" style="max-width:420px;text-align:center"><h2>Paused</h2><div class="btns" style="justify-content:center"><button class="btn pri" id="bResume">Resume</button><button class="btn" id="bSave">Save &amp; quit</button></div></div></div>
 <div class="panel" id="craft" hidden><div class="card"><h2>🛠 Workbench</h2><div class="recipes" id="recipes"></div><div class="btns"><button class="btn" data-close>Close (C)</button></div></div></div>
@@ -117,6 +117,12 @@ const kit = window.SJG ? SJG.init('lantern', { title: 'Lantern Woods', vs: false
   { id: 'lumber', name: 'Lumberjack', desc: 'Chop 40 trees', icon: '🪓' },
   { id: 'beacon', name: 'Keeper of the Light', desc: 'Wake the Beacon and finish the story', icon: '🏮' },
   { id: 'endless15', name: 'Endless Ember', desc: 'Survive 15 nights in Endless', icon: '🔥' },
+  { id: 'wolf', name: 'Wolfbane', desc: 'Beat a wolf', icon: '🐺' },
+  { id: 'pack', name: 'Pack Leader', desc: 'Beat 15 wolves', icon: '🌕' },
+  { id: 'alpha', name: 'Top Dog', desc: 'Beat an alpha wolf', icon: '👑' },
+  { id: 'bear', name: 'Bear Necessities', desc: 'Beat the bear', icon: '🐻' },
+  { id: 'armed', name: 'Locked and Loaded', desc: 'Find the revolver', icon: '🔫' },
+  { id: 'cook', name: 'Camp Cook', desc: 'Cook 10 pieces of meat', icon: '🍖' },
 ] }) : null;
 const G3 = window.GL3D, { M, hex, dirOf, pushBox, pushCone, pushTerrain } = G3;
 const $ = id => document.getElementById(id);
@@ -303,6 +309,10 @@ const RECIPES = [
   { id: 'lantern', name: 'Lantern', desc: 'Carry a little warm light (L). The Gloam keeps its distance.', cost: { wood: 2, scrap: 2 }, tool: true },
   { id: 'wrap', name: 'Herbal wrap', desc: 'Heals 35 health (used straight away).', cost: { berries: 3, wood: 1 } },
   { id: 'ring', name: 'Stone fire ring', desc: 'The campfire burns slower and wider.', cost: { stone: 10, wood: 6 }, once: true },
+  { id: 'bow', name: 'Bow', desc: 'Shoots arrows in an arc. Quiet, and you can pick the arrows back up.', cost: { wood: 5, stone: 1 }, tool: true },
+  { id: 'arrows', name: '8 arrows', desc: 'Ammo for the bow.', cost: { wood: 2, stone: 1 }, ammo: 'arrows', n: 8 },
+  { id: 'vest', name: 'Pelt vest', desc: 'Armor: take 25% less damage.', cost: { pelts: 3 }, armor: 0.25, once: true },
+  { id: 'coat', name: 'Bear coat', desc: 'Armor: take 45% less damage.', cost: { bearpelts: 1, pelts: 2 }, armor: 0.45, once: true },
 ];
 /* the Scrap Grinder builds from scrap (junk ground down) + wood from the camp pile */
 const GRINDER = [
@@ -312,11 +322,18 @@ const GRINDER = [
   { id: 'sack22', name: 'Giant Sack', desc: 'Carry 22 things.', cost: { scrap: 28, wood: 6 }, sack: 22 },
   { id: 'post', name: 'Light post', desc: 'A hotbar item: place it to make light for two nights.', cost: { wood: 4, scrap: 2 }, item: 'posts' },
   { id: 'battery', name: 'Battery', desc: 'Refills the flashlight. Goes into the camp pile.', cost: { scrap: 3 }, item: 'batteries' },
+  { id: 'strongaxe', name: 'Strong axe', desc: 'Fells a tree in one hit and hits hard (50).', cost: { scrap: 12, wood: 4 }, tool: true },
+  { id: 'bullets', name: '12 bullets', desc: 'Revolver ammo.', cost: { scrap: 6 }, ammo: 'bullets', n: 12 },
+  { id: 'shells', name: '6 shotgun shells', desc: 'Shotgun ammo.', cost: { scrap: 8 }, ammo: 'shells', n: 6 },
 ];
 const ITEMS = {
   log: { i: '🪵', n: 'Log', col: '#7c4a1e', pile: 'wood' }, stone: { i: '🪨', n: 'Stone', col: '#8b8f99', pile: 'stone' },
   berry: { i: '🍓', n: 'Berries', col: '#dc2626', pile: 'berries', food: 12 }, can: { i: '🥫', n: 'Can of beans', col: '#b45309', pile: 'cans', food: 40 },
   battery: { i: '🔋', n: 'Battery', col: '#facc15', pile: 'batteries' },
+  meat: { i: '🥩', n: 'Raw meat', col: '#b91c1c', food: 6, raw: true, pile: 'meat' }, cooked: { i: '🍖', n: 'Cooked meat', col: '#92400e', food: 40, pile: 'cooked' },
+  pelt: { i: '🐺', n: 'Wolf pelt', col: '#9ca3af', pile: 'pelts' }, bearpelt: { i: '🐻', n: 'Bear pelt', col: '#78350f', pile: 'bearpelts' },
+  revolver: { i: '🔫', n: 'Revolver', col: '#1f2937', tool: 'revolver' }, shotgun: { i: '💥', n: 'Shotgun', col: '#3f2a1a', tool: 'shotgun' },
+  bullets: { i: '📦', n: 'Box of bullets', col: '#a16207', ammo: 'bullets', amt: 12 }, shells: { i: '🧨', n: 'Shotgun shells', col: '#b91c1c', ammo: 'shells', amt: 6 }, arrow: { i: '➶', n: 'Arrow', col: '#d6a756', ammo: 'arrows', amt: 1 },
   bolts: { i: '🔩', n: 'Bolts', col: '#94a3b8', scrap: 1 }, pipe: { i: '🔧', n: 'Old pipe', col: '#64748b', scrap: 2 }, tire: { i: '🛞', n: 'Tire', col: '#27272a', scrap: 3 }, radio: { i: '📻', n: 'Broken radio', col: '#57534e', scrap: 4 },
 };
 const SACKS = { 5: 'Old Sack', 10: 'Good Sack', 15: 'Big Sack', 22: 'Giant Sack' };
@@ -330,7 +347,7 @@ let S = null, P = null, mode = 'story', running = false, paused = false, enemies
 function fresh(m) {
   mode = m;
   S = { mode: m, night: 0, t: 25, isNight: false, fire: 70, hp: 100, food: 80, stam: 100, inv: { wood: 2, stone: 0, scrap: 0, berries: 3, cans: 1, batteries: 1, posts: 0 }, cap: 20, tools: { axe: false, spear: false, lantern: false, ring: false },
-    held: 'hands', sack: [], sackCap: 5, drops: [], dropN: 0, beds: 0, junkTaken: [], flash: 100, flashOn: false, lanternOn: false, pages: [], stones: [], placed: 0, chopped: [], rocksUsed: {}, berriesT: {}, scrapsTaken: [], posts: [], kills: 0, chops: 0, deaths: 0, beaconLit: false, finalNight: false, wardenGone: 0 };
+    held: 'hands', ammo: { arrows: 0, bullets: 0, shells: 0 }, mag: { revolver: 0, shotgun: 0 }, chests: [], armor: 0, wolves: 0, cooked: 0, sack: [], sackCap: 5, drops: [], dropN: 0, beds: 0, junkTaken: [], flash: 100, flashOn: false, lanternOn: false, pages: [], stones: [], placed: 0, chopped: [], rocksUsed: {}, berriesT: {}, scrapsTaken: [], posts: [], kills: 0, chops: 0, deaths: 0, beaconLit: false, finalNight: false, wardenGone: 0 };
   { const jr = G3.rng(SEED + 77); for (let i = 0; i < 60; i++) { const x = (jr() * 2 - 1) * 90, z = (jr() * 2 - 1) * 90; if (Math.hypot(x, z) < 15 || inCaveRock(x, z) || Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2]) continue; const id = jr() < 0.12 ? 'battery' : jr() < 0.12 ? 'can' : JUNK[(jr() * JUNK.length) | 0]; S.drops.push({ u: ++S.dropN, id, x, z, y: groundH(x, z) }); } }
   P = Object.assign(G3.Body(1.5, 0, 6), { yaw: Math.PI, face: Math.PI, walk: 0, swing: 0, swingT: 0, hurtT: 0, inv: 0 });
   camYaw = Math.PI * 0.85; camPitch = -0.25;
@@ -366,6 +383,13 @@ const groundAt = (x, z) => (Math.abs(x - LM.cave.x) < 2 && z > LM.cave.z - 1 && 
 /** into the sack, or onto the ground if it's full; returns true if it went in */
 function give(id, x, z) { if (sackRoom() > 0) { S.sack.push(id); return true; } dropItem(id, x == null ? P.x : x, z == null ? P.z : z, 0.6); sackFull(); return false; }
 function pickUp(d) {
+  const it = ITEMS[d.id];
+  if (it.tool || it.ammo) {
+    S.drops.splice(S.drops.indexOf(d), 1);
+    if (it.tool) { S.tools[it.tool] = true; S.held = it.tool; S.mag[it.tool] = WEAP[it.tool].mag; log(`${it.i} You found the ${it.n.toLowerCase()}! Click to shoot · R reloads · right-click aims`); if (it.tool === 'revolver') kit && kit.unlock('armed'); sfx('power'); }
+    else { S.ammo[it.ammo] += it.amt; log(`${it.i} +${it.amt} ${it.ammo}`); G3.tone(880, 0.05, 'square', 0.04); }
+    fx.push({ k: 'fly', x: d.x, y: d.y + 0.3, z: d.z, t: 0.3, col: it.col }); return true;
+  }
   if (sackRoom() <= 0) { sackFull(); return false; }
   S.drops.splice(S.drops.indexOf(d), 1); S.sack.push(d.id);
   fx.push({ k: 'fly', x: d.x, y: d.y + 0.3, z: d.z, t: 0.3, col: ITEMS[d.id].col });
@@ -375,12 +399,17 @@ function collectAround(r = 3.8) { const near = S.drops.filter(d => Math.hypot(d.
 function unloadSack() { let n = 0; for (let i = S.sack.length - 1; i >= 0; i--) { const it = ITEMS[S.sack[i]]; if (it.pile) { S.inv[it.pile] = (S.inv[it.pile] || 0) + 1; S.sack.splice(i, 1); n++; } } log(n ? `🏕 Unloaded ${n} thing${n === 1 ? '' : 's'} into the camp pile` : 'Nothing to unload (junk goes in the Scrap Grinder).'); if (n) G3.noise(0.25, 0.05, 600); return n; }
 function grind() { let pts = 0, n = 0; for (let i = S.sack.length - 1; i >= 0; i--) { const it = ITEMS[S.sack[i]]; if (it.scrap) { pts += it.scrap; n++; S.sack.splice(i, 1); } } if (n) { S.inv.scrap += pts; S.grindT = 1.2; log(`⚙️ Ground ${n} junk into ${pts} scrap`); G3.noise(1.1, 0.08, 400); G3.tone(90, 1, 'sawtooth', 0.04, 140); } return pts; }
 /* ---------- the hotbar ---------- */
-const HB = { hands: ['✊', 'Hands'], axe: ['🪓', 'Axe'], spear: ['🔱', 'Spear'], flash: ['🔦', 'Flashlight'], lantern: ['🏮', 'Lantern'], sack: ['🎒', 'Sack'], food: ['🍓', 'Food'], post: ['🕯', 'Light post'] };
-const hotbar = () => [S.tools.axe ? 'axe' : 'hands', S.tools.spear && 'spear', 'flash', S.tools.lantern && 'lantern', 'sack', 'food', S.inv.posts > 0 && 'post'].filter(Boolean);
-const foodCount = () => sackCount('berry') + sackCount('can');
+const WEAP = {
+  hands: { dmg: 12, reach: 2.3, cd: 0.42, chop: 18 }, axe: { dmg: 30, reach: 2.3, cd: 0.42, chop: 50 }, strongaxe: { dmg: 50, reach: 2.5, cd: 0.42, chop: 100 }, spear: { dmg: 45, reach: 3.2, cd: 0.5, chop: 25 },
+  bow: { gun: 'arrow', dmg: 42, cd: 0.75, ammo: 'arrows' }, revolver: { gun: 'hit', dmg: 45, cd: 0.32, ammo: 'bullets', mag: 6, reload: 1.4, range: 55, spread: 0.008 }, shotgun: { gun: 'hit', dmg: 16, pellets: 7, cd: 0.9, ammo: 'shells', mag: 2, reload: 1.8, range: 22, spread: 0.09 },
+};
+const HB = { strongaxe: ['🪓', 'Strong axe'], bow: ['🏹', 'Bow'], revolver: ['🔫', 'Revolver'], shotgun: ['💥', 'Shotgun'], hands: ['✊', 'Hands'], axe: ['🪓', 'Axe'], spear: ['🔱', 'Spear'], flash: ['🔦', 'Flashlight'], lantern: ['🏮', 'Lantern'], sack: ['🎒', 'Sack'], food: ['🍓', 'Food'], post: ['🕯', 'Light post'] };
+const hotbar = () => [S.tools.strongaxe ? 'strongaxe' : S.tools.axe ? 'axe' : 'hands', S.tools.spear && 'spear', S.tools.bow && 'bow', S.tools.revolver && 'revolver', S.tools.shotgun && 'shotgun', 'flash', S.tools.lantern && 'lantern', 'sack', 'food', S.inv.posts > 0 && 'post'].filter(Boolean);
+const foodCount = () => sackCount('berry') + sackCount('can') + sackCount('cooked') + sackCount('meat');
 function useHeld() {
   const h = S.held;
-  if (h === 'hands' || h === 'axe' || h === 'spear') attack();
+  if (WEAP[h] && WEAP[h].gun) fire();
+  else if (WEAP[h]) attack();
   else if (h === 'flash') toggleFlash();
   else if (h === 'lantern') { S.lanternOn = !S.lanternOn; G3.tone(700, 0.04, 'square', 0.04); }
   else if (h === 'sack') collectAround();
@@ -398,17 +427,18 @@ function facing(x, z, maxD, cone = 0.35) {
 }
 function attack() {
   if (P.swingT > 0) return;
-  const tool = S.held === 'spear' ? 2 : S.held === 'axe' ? 1 : 0, dmg = tool === 2 ? 45 : tool === 1 ? 30 : 12, reach = tool === 2 ? 3.2 : 2.3;
-  P.swingT = tool === 2 ? 0.5 : 0.42; P.swing = 0.001;
+  const Wp = WEAP[S.held] && !WEAP[S.held].gun ? WEAP[S.held] : WEAP.hands, tool = S.held === 'spear' ? 2 : S.held === 'axe' || S.held === 'strongaxe' ? 1 : 0, dmg = Wp.dmg, reach = Wp.reach;
+  P.swingT = Wp.cd; P.swing = 0.001;
   setTimeout(() => {
     let hit = false;
     for (const e of enemies) if (e.hp > 0 && facing(e.x, e.z, reach + 0.4, 0.2)) { e.hp -= dmg; e.stun = 0.35; e.vx = e.x - P.x; e.vz = e.z - P.z; hit = true; G3.tone(160, 0.12, 'square', 0.07, 80); if (e.hp <= 0) killEnemy(e); }
+    for (const a of animals) if (a.hp > 0 && facing(a.x, a.z, reach + AN[a.kind].r, 0.2)) { hurtAnimal(a, dmg); hit = true; }
     if (warden && warden.hp > 0 && facing(warden.x, warden.z, reach + 0.6, 0.2)) { warden.hp -= dmg * 0.5; warden.fear += 0.6; hit = true; G3.tone(120, 0.18, 'sawtooth', 0.06, 60); }
     if (hit) return;
     // chop
     let best = null, bd = 9;
     for (const t of treesNear(P.x, P.z, 3)) if (t.alive && facing(t.x, t.z, 2.3, 0.3)) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd) { bd = d; best = t; } }
-    if (best) { best.hp += tool === 1 ? 50 : tool === 2 ? 25 : 18; G3.noise(0.08, 0.06, 1200); fx.push({ k: 'chip', x: best.x, y: P.y + 1.2, z: best.z, t: 0.5 });
+    if (best) { best.hp += Wp.chop; G3.noise(0.08, 0.06, 1200); fx.push({ k: 'chip', x: best.x, y: P.y + 1.2, z: best.z, t: 0.5 });
       if (best.hp >= 100) { best.alive = false; S.chopped.push(best.id); dirtyAt(best.x, best.z); const n = tool === 1 ? 4 : 3; for (let k = 0; k < n; k++) dropItem('log', best.x, best.z, 1.6); log(`🪵 The tree drops ${n} logs — pick them up (E, or hold the sack 🎒)`); S.chops++; if (S.chops >= 40) kit && kit.unlock('lumber'); G3.tone(90, 0.3, 'triangle', 0.08, 50); }
       return; }
     for (const r of rocks) if (r.left > 0 && Math.abs(r.x - P.x) < 3 && Math.abs(r.z - P.z) < 3 && facing(r.x, r.z, 2.6, 0.3)) { r.left--; S.rocksUsed[r.id] = r.left; dirtyAt(r.x, r.z); const n = 1 + (tool === 1 ? 1 : 0); for (let k = 0; k < n; k++) dropItem('stone', P.x + (r.x - P.x) * 0.5, P.z + (r.z - P.z) * 0.5, 0.7); log(`🪨 ${n} stone${n > 1 ? 's' : ''} broke off`); G3.tone(400, 0.06, 'square', 0.05, 200); return; }
@@ -426,6 +456,8 @@ function usable() {
     out.push(logs ? { label: `Burn ${logs} log${logs > 1 ? 's' : ''} from your sack (fire ${Math.round(S.fire)}%)`, run: () => { if (S.fire >= 100) return log('The fire is roaring already.'); let n = 0; while (sackCount('log') && S.fire < 100) { S.sack.splice(S.sack.indexOf('log'), 1); S.fire = Math.min(100, S.fire + 12); n++; } log(`🔥 Fed the fire (${n} log${n > 1 ? 's' : ''})`); G3.noise(0.4, 0.05, 300); } }
       : S.inv.wood ? { label: `Add wood from the camp pile (${S.inv.wood}) — fire ${Math.round(S.fire)}%`, run: () => { const n = Math.min(S.inv.wood, Math.ceil((100 - S.fire) / 12)) || 1; if (S.fire >= 100) return log('The fire is roaring already.'); S.inv.wood -= n; S.fire = Math.min(100, S.fire + n * 12); log(`🔥 Fed the fire (${n} wood)`); G3.noise(0.4, 0.05, 300); } }
       : { label: `Fire: ${Math.round(S.fire)}% — bring logs`, run: () => log('Chop trees and carry the logs back in your sack.') }); }
+  for (const c of CHESTS) { if (S.chests.includes(c.id)) continue; const p = c.at(); if (Math.hypot(P.x - p[0], P.z - p[2]) < 2 && Math.abs(P.y - p[1]) < 2.5) { out.push({ top: true, label: 'Open the chest', run: () => openChest(c) }); break; } }
+  if (Math.hypot(P.x, P.z) < 3.2 && sackCount('meat') && S.fire > 0) out.unshift({ label: `Cook ${sackCount('meat')} raw meat over the fire`, run: () => { let n = 0; S.sack = S.sack.map(x => x === 'meat' ? (n++, 'cooked') : x); S.cooked += n; log(`🍖 Cooked ${n} meat`); G3.noise(0.8, 0.05, 2500); if (S.cooked >= 10) kit && kit.unlock('cook'); } });
   if (near(SPOTS.pile, 2.4)) out.push({ label: `Unload your sack into the camp pile (🪵${S.inv.wood} 🪨${S.inv.stone} 🍓${S.inv.berries})`, run: unloadSack });
   if (near(SPOTS.grinder, 2.4)) out.push({ label: S.sack.some(x => ITEMS[x].scrap) ? 'Grind your junk into scrap' : 'Use the Scrap Grinder', run: () => { grind(); openPanel('grinder'); } });
   if (S.isNight && fireR() > 6) for (let b = 0; b < S.beds; b++) { const p = BEDSPOTS[b]; if (Math.hypot(P.x - p[0], P.z - p[1]) < 1.8) { out.push({ label: S.resting ? 'Get up' : 'Sleep in the bed (the night passes faster)', run: () => { S.resting = !S.resting; log(S.resting ? '😴 Sleeping…' : 'You get up.'); } }); break; } }
@@ -460,7 +492,7 @@ function placeStones() {
   }
   save();
 }
-const builtOut = r => (r.tool && S.tools[r.id]) || (r.once && S.tools[r.id]) || (r.sack && S.sackCap >= r.sack) || (r.bed && S.beds >= 5);
+const builtOut = r => (r.armor && S.tools[r.id]) || (r.tool && S.tools[r.id]) || (r.once && S.tools[r.id]) || (r.sack && S.sackCap >= r.sack) || (r.bed && S.beds >= 5);
 function craft(r) {
   if (builtOut(r)) return;
   for (const [k, v] of Object.entries(r.cost)) if ((S.inv[k] || 0) < v) return;
@@ -469,6 +501,9 @@ function craft(r) {
   if (r.item) S.inv[r.item]++;
   if (r.id === 'wrap') S.hp = Math.min(100, S.hp + 35);
   if (r.id === 'ring') S.tools.ring = true;
+  if (r.ammo) { S.ammo[r.ammo] += r.n; log(`🏹 +${r.n} ${r.ammo}`); }
+  if (r.armor) { S.tools[r.id] = true; S.armor = Math.max(S.armor, r.armor); }
+  if (r.tool && ['bow', 'strongaxe'].includes(r.id)) S.held = r.id;
   if (r.bed) { S.beds++; log(`🛏 Bed built (${S.beds}) — nights are now ${Math.round(nightLen())}s`); }
   if (r.sack) { S.sackCap = Math.max(S.sackCap, r.sack); S.held = 'sack'; }
   if (S.tools.axe && S.tools.spear && S.tools.lantern) kit && kit.unlock('crafter');
@@ -478,12 +513,192 @@ function placePost() { if (S.inv.posts <= 0) return log('Build a light post at t
 function eat() {
   const atCamp = Math.hypot(P.x, P.z) < 12;
   const take = (id, pile) => { if (sackCount(id)) { S.sack.splice(S.sack.indexOf(id), 1); return true; } if (atCamp && S.inv[pile] > 0) { S.inv[pile]--; return true; } return false; };
-  if (S.food < 70 && take('can', 'cans')) { S.food = Math.min(100, S.food + 40); log('🥫 Ate beans (+40)'); }
+  if (S.food < 65 && take('cooked', 'cooked')) { S.food = Math.min(100, S.food + 40); S.hp = Math.min(100, S.hp + 6); log('🍖 Ate cooked meat (+40, +6 health)'); }
+  else if (S.food < 70 && take('can', 'cans')) { S.food = Math.min(100, S.food + 40); log('🥫 Ate beans (+40)'); }
   else if (take('berry', 'berries')) { S.food = Math.min(100, S.food + 12); S.hp = Math.min(100, S.hp + 2); log('🍓 Ate berries (+12)'); }
   else if (take('can', 'cans')) { S.food = Math.min(100, S.food + 40); log('🥫 Ate beans (+40)'); }
+  else if (take('cooked', 'cooked')) { S.food = Math.min(100, S.food + 40); log('🍖 Ate cooked meat (+40)'); }
+  else if (take('meat', 'meat')) { S.food = Math.min(100, S.food + 6); if (Math.random() < 0.4) { S.hp -= 6; log('🤢 Raw meat… your stomach hurts. Cook it at the fire next time.'); } else log('🥩 Ate raw meat (+6). Cooking it is much better.'); }
   else return log(atCamp ? 'Nothing to eat — pick berries.' : 'No food in your sack.');
   G3.tone(500, 0.08, 'sine', 0.05, 700);
 }
+
+/* =================== GUNS & BOWS =================== */
+let shotCd = 0, aimEye = null, arrows = [];
+const aimDir = () => dirOf(camYaw, camPitch + 0.06);
+function fire() {
+  const w = WEAP[S.held]; if (!w || shotCd > 0 || S.reloadT > 0) return;
+  if (w.mag && S.mag[S.held] <= 0) { reload(); return; }
+  if (!w.mag && S.ammo[w.ammo] <= 0) { log('🏹 No arrows — craft some at the workbench.'); G3.tone(200, 0.05, 'square', 0.03); shotCd = 0.4; return; }
+  shotCd = w.cd;
+  const f = aimDir(), eye = aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist];
+  if (w.gun === 'arrow') {
+    S.ammo.arrows--; const o = [P.x + f[0] * 0.6, P.y + 1.5, P.z + f[2] * 0.6];
+    arrows.push({ x: o[0], y: o[1], z: o[2], vx: f[0] * 34, vy: f[1] * 34 + 1.5, vz: f[2] * 34, t: 0 });
+    G3.tone(320, 0.12, 'triangle', 0.06, 160); P.swingT = 0.3;
+  } else {
+    S.mag[S.held]--;
+    for (let k = 0; k < (w.pellets || 1); k++) {
+      const d = [f[0] + (Math.random() - 0.5) * w.spread * 2, f[1] + (Math.random() - 0.5) * w.spread * 2, f[2] + (Math.random() - 0.5) * w.spread * 2], l = Math.hypot(...d); d[0] /= l; d[1] /= l; d[2] /= l;
+      const hit = rayTarget(eye, d, w.range + camDist);
+      const end = hit ? hit.p : [eye[0] + d[0] * w.range, eye[1] + d[1] * w.range, eye[2] + d[2] * w.range];
+      fx.push({ k: 'tracer', a: [P.x + f[0] * 0.7, P.y + 1.45, P.z + f[2] * 0.7], b: end, t: 0.06 });
+      if (hit && hit.t) damageTarget(hit.t, w.dmg, d);
+    }
+    fx.push({ k: 'muzzle', x: P.x + f[0] * 0.8, y: P.y + 1.45, z: P.z + f[2] * 0.8, t: 0.07 });
+    G3.noise(S.held === 'shotgun' ? 0.35 : 0.22, S.held === 'shotgun' ? 0.16 : 0.12, 300); G3.tone(S.held === 'shotgun' ? 70 : 120, 0.15, 'sawtooth', 0.06, 40);
+    camPitch += S.held === 'shotgun' ? 0.06 : 0.03;   // recoil
+    hearShot(S.held === 'shotgun' ? 45 : 35);
+    if (S.mag[S.held] <= 0 && S.ammo[w.ammo] > 0) setTimeout(reload, 250);
+  }
+  P.face = camYaw;
+}
+function reload() {
+  const w = WEAP[S.held]; if (!w || !w.mag || S.reloadT > 0 || S.mag[S.held] >= w.mag) return;
+  if (S.ammo[w.ammo] <= 0) { log(`No ${w.ammo} — make more at the Scrap Grinder or look in chests.`); G3.tone(200, 0.05, 'square', 0.03); return; }
+  S.reloadT = w.reload; S.reloading = S.held; G3.tone(600, 0.05, 'square', 0.03); setTimeout(() => G3.tone(800, 0.05, 'square', 0.03), w.reload * 900);
+}
+function finishReload() { const k = S.reloading, w = WEAP[k]; if (!w) return; const n = Math.min(w.mag - S.mag[k], S.ammo[w.ammo]); S.mag[k] += n; S.ammo[w.ammo] -= n; S.reloading = null; }
+/** what does a ray from the camera hit first? {t: target, p: point} */
+function targets() {
+  const out = [];
+  for (const e of enemies) if (e.hp > 0) out.push({ o: e, c: [e.x, e.y + 1.1, e.z], r: 0.55, kind: 'gloam' });
+  for (const a of animals) if (a.hp > 0) out.push({ o: a, c: [a.x, a.y + AN[a.kind].h, a.z], r: AN[a.kind].r, kind: 'animal' });
+  if (warden) out.push({ o: warden, c: [warden.x, warden.y + 2, warden.z], r: 0.8, kind: 'warden' });
+  return out;
+}
+function raySphere(o, d, c, r) { const ox = o[0] - c[0], oy = o[1] - c[1], oz = o[2] - c[2], b = ox * d[0] + oy * d[1] + oz * d[2], cc = ox * ox + oy * oy + oz * oz - r * r, h = b * b - cc; if (h < 0) return null; const t = -b - Math.sqrt(h); return t > 0 ? t : null; }
+function rayTarget(o, d, max) {
+  let best = null, bt = max;
+  // walls only count from your character onwards (the camera sits behind you and may be behind a wall or in a tree)
+  const s0 = Math.max(0, (P.x - o[0]) * d[0] + (P.y + 1.5 - o[1]) * d[1] + (P.z - o[2]) * d[2]), o2 = [o[0] + d[0] * s0, o[1] + d[1] * s0, o[2] + d[2] * s0];
+  const wall = s0 + G3.rayBoxes(o2, d, boxesNear(P.x, P.z).filter(b => !(o2[0] > b[0] && o2[0] < b[3] && o2[1] > b[1] && o2[1] < b[4] && o2[2] > b[2] && o2[2] < b[5])), max - s0); if (wall < bt) bt = wall;
+  for (const tg of targets()) { const t = raySphere(o, d, tg.c, tg.r); if (t != null && t < bt && t > camDist * 0.6) { bt = t; best = tg; } }
+  return { t: best, p: [o[0] + d[0] * bt, o[1] + d[1] * bt, o[2] + d[2] * bt] };
+}
+function damageTarget(tg, dmg, d) {
+  const o = tg.o;
+  for (let k = 0; k < 4; k++) fx.push({ k: tg.kind === 'animal' ? 'blood' : 'puff', x: tg.c[0], y: tg.c[1], z: tg.c[2], t: 0.4, vx: (Math.random() - 0.5) * 3, vy: Math.random() * 2, vz: (Math.random() - 0.5) * 3 });
+  if (tg.kind === 'gloam') { o.hp -= dmg; o.stun = 0.4; o.vx = d[0] * 3; o.vz = d[2] * 3; if (o.hp <= 0) killEnemy(o); }
+  else if (tg.kind === 'animal') hurtAnimal(o, dmg, d);
+  else if (tg.kind === 'warden') { o.fear += 0.35; o.hp -= dmg * 0.3; }
+  G3.tone(240, 0.05, 'square', 0.04, 160);
+}
+function updArrows(dt) {
+  for (const a of arrows) {
+    a.t += dt; a.vy -= 9.8 * dt; const nx = a.x + a.vx * dt, ny = a.y + a.vy * dt, nz = a.z + a.vz * dt;
+    const d = [nx - a.x, ny - a.y, nz - a.z], len = Math.hypot(...d) || 1;
+    for (const tg of targets()) { const t = raySphere([a.x, a.y, a.z], d.map(v => v / len), tg.c, tg.r); if (t != null && t <= len) { damageTarget(tg, WEAP.bow.dmg, d.map(v => v / len)); a.dead = true; if (Math.random() < 0.5) dropItem('arrow', tg.c[0], tg.c[2], 0.8); break; } }
+    if (a.dead) continue;
+    const g = groundAt(nx, nz), wall = G3.rayBoxes([a.x, a.y, a.z], d.map(v => v / len), boxesNear(a.x, a.z), len);
+    if (ny <= g || wall < len || a.t > 4) { a.dead = true; if (Math.random() < 0.7 && a.t < 4) { const k = Math.min(1, wall / len); dropItem('arrow', a.x + d[0] * k, a.z + d[2] * k, 0.1); } continue; }
+    a.x = nx; a.y = ny; a.z = nz;
+  }
+  arrows = arrows.filter(a => !a.dead);
+}
+
+/* =================== WILDLIFE: wolf packs, alphas, the bear =================== */
+const AN = {
+  wolf: { hp: 60, spd: 6.0, dmg: 9, aggro: 15, r: 0.7, h: 0.6, size: 1, meat: 1, pelt: 1 },
+  alpha: { hp: 130, spd: 6.4, dmg: 15, aggro: 19, r: 0.85, h: 0.75, size: 1.3, meat: 2, pelt: 2 },
+  bear: { hp: 400, spd: 5.4, dmg: 26, aggro: 12, r: 1.3, h: 1.1, size: 1.9, meat: 4, pelt: 0 },
+};
+const DENS = [{ x: -32, z: 30 }, { x: 30, z: 28 }, { x: -38, z: -22 }, { x: 58, z: -15 }];
+const BEAR_DEN = { x: -80, z: -78 };
+let animals = [], animalN = 0;
+function spawnWildlife() {
+  DENS.forEach((dn, di) => {
+    const size = Math.min(5, 3 + Math.floor(S.night / 4)), have = animals.filter(a => a.den === di);
+    for (let k = have.length; k < size; k++) { const kind = !have.some(a => a.kind === 'alpha') && k === 0 && (S.night >= 1 || di % 2 === 0) ? 'alpha' : 'wolf'; const a0 = Math.random() * 6.283; const x = dn.x + Math.cos(a0) * 5, z = dn.z + Math.sin(a0) * 5; const a = { id: ++animalN, kind, den: di, x, z, y: groundAt(x, z), hp: AN[kind].hp, st: 'roam', cd: 1, stun: 0, face: 0, walk: 0, slot: k, tx: x, tz: z, wait: 0, flee: 0 }; animals.push(a); have.push(a); }
+  });
+  if (!animals.some(a => a.kind === 'bear') && (S.night - (S.bearDay || -9)) >= 3) { const x = BEAR_DEN.x, z = BEAR_DEN.z; animals.push({ id: ++animalN, kind: 'bear', den: -1, x, z, y: groundAt(x, z), hp: AN.bear.hp, st: 'roam', cd: 1, stun: 0, face: 0, walk: 0, slot: 0, tx: x, tz: z, wait: 0, flee: 0 }); }
+}
+const denOf = a => a.den >= 0 ? DENS[a.den] : BEAR_DEN;
+function hearShot(r) { for (const a of animals) if (Math.hypot(a.x - P.x, a.z - P.z) < r && a.st === 'roam') { a.st = a.kind === 'bear' || Math.random() < 0.6 ? 'hunt' : 'flee'; a.flee = 4; } }
+function hurtAnimal(a, dmg, d) {
+  a.hp -= dmg; a.stun = 0.18; const dx = d ? d[0] : a.x - P.x, dz = d ? d[2] : a.z - P.z, l = Math.hypot(dx, dz) || 1; a.kx = dx / l * 5; a.kz = dz / l * 5;
+  G3.tone(a.kind === 'bear' ? 90 : 330, 0.15, 'sawtooth', 0.05, a.kind === 'bear' ? 60 : 200);
+  for (const b of animals) if (b.den === a.den && b.st === 'roam') b.st = 'hunt';
+  if (a.st !== 'flee') a.st = 'hunt';
+  if (a.hp <= 0) {
+    a.dead = true; const A = AN[a.kind];
+    for (let k = 0; k < A.meat; k++) dropItem('meat', a.x, a.z, 1);
+    for (let k = 0; k < A.pelt; k++) if (Math.random() < 0.7 || a.kind === 'alpha') dropItem('pelt', a.x, a.z, 1);
+    if (a.kind === 'bear') { dropItem('bearpelt', a.x, a.z, 1); dropItem('shells', a.x, a.z, 1); S.bearDay = S.night; kit && kit.unlock('bear'); log('🐻 The bear goes down. Meat, a bear pelt… and some shells it was sitting on.'); }
+    else { S.wolves++; kit && kit.unlock('wolf'); if (a.kind === 'alpha') { kit && kit.unlock('alpha'); log('👑 The alpha falls — the pack scatters.'); for (const b of animals) if (b.den === a.den) { b.st = 'flee'; b.flee = 8; } } if (S.wolves >= 15) kit && kit.unlock('pack'); }
+    for (let k = 0; k < 8; k++) fx.push({ k: 'blood', x: a.x, y: a.y + 0.6, z: a.z, t: 0.6, vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3, vz: (Math.random() - 0.5) * 4 });
+  }
+}
+function updWildlife(dt) {
+  const pSafe = lightAt(P.x, P.z) >= 1, night = S.isNight;
+  for (const a of animals) {
+    if (a.dead) continue;
+    const A = AN[a.kind], dx = P.x - a.x, dz = P.z - a.z, d = Math.hypot(dx, dz) || 1, dn = denOf(a), fromDen = Math.hypot(a.x - dn.x, a.z - dn.z);
+    a.cd -= dt;
+    if (d > 130) continue;
+    if (a.kx) { a.x += a.kx * dt; a.z += a.kz * dt; a.kx *= 0.85; a.kz *= 0.85; if (Math.abs(a.kx) + Math.abs(a.kz) < 0.1) a.kx = a.kz = 0; }
+    if (a.stun > 0) { a.stun -= dt; continue; }
+    // states
+    if (a.kind !== 'bear' && a.hp < A.hp * 0.3 && a.st !== 'flee') { a.st = 'flee'; a.flee = 6; }
+    if (a.st === 'roam' && d < A.aggro * (night ? 1.4 : 1) && !pSafe && P.dead !== true) { a.st = 'hunt'; G3.tone(a.kind === 'bear' ? 70 : 180, 0.5, 'sawtooth', 0.04, a.kind === 'bear' ? 50 : 420); for (const b of animals) if (b.den === a.den && b.den >= 0 && Math.hypot(b.x - a.x, b.z - a.z) < 25) b.st = 'hunt'; }
+    if (a.st === 'hunt' && (fromDen > 48 || pSafe || d > 45)) a.st = 'return';
+    if (a.st === 'return' && fromDen < 8) a.st = 'roam';
+    if (a.st === 'flee') { a.flee -= dt; if (a.flee <= 0) a.st = 'return'; }
+    let tx = a.x, tz = a.z, sp = 0;
+    if (a.st === 'roam') { a.wait -= dt; if (a.wait <= 0 || Math.hypot(a.tx - a.x, a.tz - a.z) < 0.6) { a.wait = 2 + Math.random() * 4; const r = Math.random() * 10; const an = Math.random() * 6.283; a.tx = dn.x + Math.cos(an) * r; a.tz = dn.z + Math.sin(an) * r; } tx = a.tx; tz = a.tz; sp = Math.hypot(a.tx - a.x, a.tz - a.z) > 0.6 ? 1.6 : 0; }
+    else if (a.st === 'return') { tx = dn.x; tz = dn.z; sp = A.spd * 0.6; }
+    else if (a.st === 'flee') { tx = a.x - dx; tz = a.z - dz; sp = A.spd * 0.9; }
+    else if (a.st === 'hunt') {
+      // pack wolves spread out to surround you, then dart in one at a time
+      const pack = animals.filter(b => !b.dead && b.den === a.den && b.st === 'hunt'), idx = pack.indexOf(a), ang = Math.atan2(-dx, -dz) + (idx - (pack.length - 1) / 2) * 0.9;
+      const attacker = a.kind === 'bear' || (pack.length && pack.reduce((m, b) => (b.cd < m.cd ? b : m)) === a);
+      if (attacker && a.cd <= 0.6) { tx = P.x; tz = P.z; sp = A.spd * (d < 4 ? 1.25 : 1); }
+      else { const ring = 3.6; tx = P.x + Math.sin(ang) * ring; tz = P.z + Math.cos(ang) * ring; sp = Math.hypot(tx - a.x, tz - a.z) > 0.5 ? A.spd * 0.85 : 0; }
+      if (d < 1.2 + A.r && a.cd <= 0 && Math.abs(P.y - a.y) < 2) { a.cd = a.kind === 'bear' ? 1.5 : 1.3 + Math.random() * 0.8; a.bite = 0.25; hurt(A.dmg); G3.tone(a.kind === 'bear' ? 80 : 240, 0.12, 'square', 0.06, 120); }
+    }
+    // the campfire scares them off
+    const mx = tx - a.x, mz = tz - a.z, ml = Math.hypot(mx, mz);
+    if (ml > 0.05 && sp > 0) {
+      let vx = mx / ml * sp, vz = mz / ml * sp;
+      if (lightAt(a.x + vx * 0.5, a.z + vz * 0.5) >= 0.95) { const al = Math.hypot(a.x, a.z) || 1; vx = a.x / al * sp; vz = a.z / al * sp;   /* back away from the fire */ if (a.st === 'hunt') a.st = 'return'; }
+      a.x += vx * dt; a.z += vz * dt; a.face = Math.atan2(-vx, -vz); a.walk += dt * sp * 2.2;
+      a.x = clamp(a.x, -HALF + 2, HALF - 2); a.z = clamp(a.z, -HALF + 2, HALF - 2);
+    } else if (a.st === 'hunt') a.face = Math.atan2(-dx, -dz);
+    a.y = groundAt(a.x, a.z); a.bite = Math.max(0, (a.bite || 0) - dt);
+  }
+  animals = animals.filter(a => !a.dead);
+}
+function drawAnimal(a, now) {
+  const A = AN[a.kind], s = A.size, b = M.chain(M.T(a.x, a.y, a.z), M.RY(a.face || 0), M.S(s, s, s));
+  const fur = a.kind === 'bear' ? '#5b3a1e' : a.kind === 'alpha' ? '#2d3340' : '#7c818c', belly = a.kind === 'bear' ? '#4a2f18' : a.kind === 'alpha' ? '#e5e7eb' : '#a8adb7';
+  const sw = Math.sin(a.walk * 3) * 0.5, bob = Math.abs(Math.sin(a.walk * 3)) * 0.04, lunge = a.bite > 0 ? 0.25 : 0;
+  R.shadow(a.x, a.y, a.z, 0.7 * s, 0.32);
+  const body = a.kind === 'bear' ? [0.75, 0.6, 1.15] : [0.42, 0.42, 1.1];
+  R.cube(M.chain(b, M.T(0, 0.62 + bob, 0), M.S(...body)), fur);
+  R.cube(M.chain(b, M.T(0, 0.48 + bob, -0.05), M.S(body[0] * 0.8, 0.12, body[2] * 0.7)), belly);
+  const hz = -body[2] / 2 - 0.12 - lunge;
+  R.cube(M.chain(b, M.T(0, 0.78 + bob, hz), M.S(a.kind === 'bear' ? 0.5 : 0.32, a.kind === 'bear' ? 0.45 : 0.3, 0.32)), fur);
+  R.cube(M.chain(b, M.T(0, 0.72 + bob, hz - 0.24), M.S(a.kind === 'bear' ? 0.28 : 0.16, 0.16, 0.24)), a.kind === 'bear' ? '#3f2a14' : belly);
+  R.cube(M.chain(b, M.T(0, 0.74 + bob, hz - 0.37), M.S(0.08, 0.07, 0.04)), '#111');
+  for (const sx of [-1, 1]) {
+    R.cube(M.chain(b, M.T(sx * (a.kind === 'bear' ? 0.17 : 0.1), 0.99 + bob, hz + 0.05), M.S(0.09, a.kind === 'bear' ? 0.09 : 0.16, 0.06)), fur);
+    R.cube(M.chain(b, M.T(sx * 0.09, 0.82 + bob, hz - 0.165), M.S(0.05, 0.04, 0.01)), S.isNight ? [1, 0.85, 0.3] : '#111', 1, S.isNight ? 1 : 0);
+  }
+  for (const [lx, lz, ph] of [[-1, -1, 0], [1, -1, Math.PI], [-1, 1, Math.PI], [1, 1, 0]]) R.cube(M.chain(b, M.T(lx * body[0] * 0.38, 0.42, lz * body[2] * 0.36), M.RX(Math.sin(a.walk * 3 + ph) * 0.55), M.T(0, -0.21, 0), M.S(0.12, 0.42, 0.13)), fur);
+  if (a.kind !== 'bear') R.cube(M.chain(b, M.T(0, 0.72 + bob, body[2] / 2 + 0.15), M.RX(0.7 + sw * 0.3), M.T(0, 0, 0.18), M.S(0.1, 0.1, 0.42)), fur);
+  if (S.isNight) { const f = dirOf(a.face || 0); R.glow([a.x + f[0] * 0.75 * s, a.y + 0.82 * s, a.z + f[2] * 0.75 * s], 0.35 * s, [1, 0.8, 0.3], 0.6); }
+  if (a.hp < AN[a.kind].hp) { const w = 0.9 * s, k = a.hp / AN[a.kind].hp; R.box(a.x - w / 2, a.y + 1.35 * s, a.z, a.x - w / 2 + w * k, a.y + 1.42 * s, a.z + 0.02, k > 0.3 ? '#ef4444' : '#f97316', 1, 1); }
+}
+
+/* =================== CHESTS =================== */
+const CHESTS = [
+  { id: 'cabin', at: () => [LM.cabin.x - 2.6, groundH(LM.cabin.x - 2.6, LM.cabin.z + 1.6), LM.cabin.z + 1.6], loot: ['revolver', 'bullets'], name: 'the ranger’s gun locker' },
+  { id: 'mill', at: () => [LM.mill.x + 1.6, 0.3, LM.mill.z + 1.8], loot: ['shotgun', 'shells'], name: 'an old feed chest' },
+  { id: 'tower', at: () => [LM.tower.x - 1.4, 6.3, LM.tower.z + 1.2], loot: ['bullets', 'arrow', 'arrow', 'arrow', 'battery'], name: 'the lookout’s box' },
+  { id: 'oldcamp', at: () => [LM.oldcamp.x - 1.5, 0.3, LM.oldcamp.z - 2.5], loot: ['shells', 'bullets', 'can', 'can'], name: 'a campers’ cooler' },
+  { id: 'stones', at: () => [LM.stones.x + 2.5, 0.3, LM.stones.z - 2.2], loot: ['bullets', 'battery', 'radio'], name: 'a mossy chest' },
+];
+function openChest(c) { S.chests.push(c.id); const p = c.at(); for (const id of c.loot) dropItem(id, p[0], p[2], 1.2); log(`📦 You open ${c.name}: ` + c.loot.map(id => ITEMS[id].i).join(' ')); sfx('coin'); G3.tone(300, 0.3, 'triangle', 0.05, 600); }
 
 /* =================== ENEMIES =================== */
 function spawnEnemy(cave) {
@@ -524,7 +739,7 @@ function updEnemies(dt) {
   enemies = enemies.filter(e => !e.dead);
 }
 function hurt(n) {
-  if (P.inv > 0) return; S.hp -= n; P.inv = 0.4; $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 180); G3.tone(110, 0.2, 'sawtooth', 0.08, 60);
+  if (P.inv > 0) return; n *= 1 - (S.armor || 0); S.hp -= n; P.inv = 0.4; $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 180); G3.tone(110, 0.2, 'sawtooth', 0.08, 60);
   if (S.hp <= 0) die();
 }
 function die() {
@@ -558,7 +773,7 @@ let camYaw = 0, camPitch = -0.25, camDist = 5;
 function update(dt) {
   const inp = IN.frame();
   camYaw -= inp.lookX * 0.0042; camPitch = clamp(camPitch - inp.lookY * 0.0036, -1.1, 0.6);
-  if (inp.wheel) camDist = clamp(camDist + inp.wheel * 0.6, 2.2, 9);
+  if (inp.wheel) S.camWant = clamp((S.camWant || 5) + inp.wheel * 0.6, 2.2, 9);
   // time
   S.t += dt * (S.resting ? 6 : 1);
   if (!S.isNight && S.t >= DAY) { S.isNight = true; S.t = 0; S.night++; log(`🌙 Night ${S.night} falls. Stay near the light.`); G3.tone(180, 0.8, 'sine', 0.05, 90); }
@@ -567,6 +782,7 @@ function update(dt) {
     log(`☀ You survived night ${S.night}!`); sfx('win');
     if (S.night >= 1) kit && kit.unlock('night1'); if (S.night >= 5) kit && kit.unlock('night5'); if (S.night >= 10) kit && kit.unlock('night10'); if (mode === 'endless' && S.night >= 15) kit && kit.unlock('endless15');
     for (const p of S.posts) p.fuel--; S.posts = S.posts.filter(p => p.fuel > 0);
+    spawnWildlife();
     for (const b of bushes) if (b.berries < 3 && Math.random() < 0.5) { b.berries++; S.berriesT[b.id] = b.berries; dirtyAt(b.x, b.z); }
     if (S.finalNight) return winGame();
     if (mode === 'endless') kit && kit.score(S.night, 'endless');
@@ -592,6 +808,12 @@ function update(dt) {
   if (IN.hit('KeyG')) placePost();
   { const hb = hotbar(); for (let k = 0; k < hb.length; k++) if (IN.hit('Digit' + (k + 1))) selectSlot(hb[k]); if (!hb.includes(S.held)) S.held = hb[0]; }
   if (IN.hit('Mouse0') || IN.hit('KeyJ') || IN.hit('Btnact') || IN.hit('Tap')) useHeld();
+  else if ((IN.down('Mouse0') || IN.down('Btnact')) && WEAP[S.held] && WEAP[S.held].gun && S.held !== 'shotgun') useHeld();   // hold to keep firing
+  if (IN.hit('KeyR') || IN.hit('Btnreload')) reload();
+  shotCd = Math.max(0, shotCd - dt);
+  if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) finishReload(); }
+  S.aiming = (IN.down('Mouse2') || IN.down('aim')) && WEAP[S.held] && WEAP[S.held].gun;
+  camDist = lerp(camDist, S.aiming ? 2.4 : (S.camWant || 5), Math.min(1, dt * 10));
   if (S.grindT > 0) S.grindT -= dt;
   const u = usable();
   $('prompt').textContent = u ? (IN.touch ? '✋ ' : 'E: ') + u.label : '';
@@ -615,9 +837,9 @@ function update(dt) {
   if (P.swingT > 0) { P.swingT -= dt; P.swing = 1 - P.swingT / 0.45; P.face = camYaw; } else P.swing = 0;
   P.yaw += Math.atan2(Math.sin(P.face - P.yaw), Math.cos(P.face - P.yaw)) * Math.min(1, dt * 12);
   P.inv = Math.max(0, P.inv - dt);
-  updEnemies(dt); updWarden(dt);
+  updEnemies(dt); updWarden(dt); updWildlife(dt); updArrows(dt);
   if (Math.hypot(P.x - LM.cave.x, P.z - LM.cave.z - 9) < 12 && S.stones.includes('caveEnd') && !enemies.some(e => e.cave)) S.caveCleared = true;
-  for (const e of fx) { e.t -= dt; if (e.k === 'fly') { const k = Math.min(1, dt * 14); e.x += (P.x - e.x) * k; e.y += (P.y + 1.1 - e.y) * k; e.z += (P.z - e.z) * k; } } fx = fx.filter(e => e.t > 0);
+  for (const e of fx) { e.t -= dt; if (e.k === 'blood' || (e.k === 'puff' && e.vx != null)) { e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.vy -= 9 * dt; } if (e.k === 'fly') { const k = Math.min(1, dt * 14); e.x += (P.x - e.x) * k; e.y += (P.y + 1.1 - e.y) * k; e.z += (P.z - e.z) * k; } } fx = fx.filter(e => e.t > 0);
   IN.endFrame();
 }
 function selectSlot(id) { if (S.held !== id) { S.held = id; G3.tone(520, 0.03, 'square', 0.03); } }
@@ -647,6 +869,7 @@ function render(now) {
     sun: night ? [-0.3, 1, 0.5] : [0.4 + (S.t / DAY - 0.5), 1, 0.3], sunCol: night ? [0.06, 0.08, 0.15] : [0.62 * dayK + 0.05, 0.58 * dayK + 0.05, 0.5 * dayK + 0.08],
     amb: inCave ? [0.03, 0.03, 0.04] : night ? [0.045, 0.05, 0.09] : [0.38 * dayK + 0.05, 0.4 * dayK + 0.05, 0.46 * dayK + 0.09], lights,
     flash: S.flashOn && S.flash > 0 ? { p: [P.x + f[0] * 0.3, P.y + 1.5, P.z + f[2] * 0.3], d: f, c: [1.3, 1.25, 1.1], range: 26 } : null };
+  aimEye = eye;
   R.begin({ eye, yaw: camYaw, pitch: Math.atan2(tgt[1] - eye[1], Math.hypot(tgt[0] - eye[0], tgt[2] - eye[2])), fov: 1.15, far: 220 }, env);
   R.draw(terrainMesh); R.draw(staticMesh);
   const viewR = night ? 60 : 130;
@@ -689,7 +912,11 @@ function render(now) {
   if (warden) R.glow([warden.x, warden.y + 1, warden.z], 2.2, [0.3, 0.5, 1], 0.7);
   if (S.tools.lantern && S.lanternOn) R.glow([P.x, P.y + 1.2, P.z], 1.4, [1, 0.75, 0.35], 0.45);
   // you
-  const hold = { axe: '#9ca3af', spear: '#a16207', flash: '#e5e7eb', lantern: '#fbbf24', post: '#5b3a22', food: '#dc2626' }[S.held] || (S.tools.lantern && S.lanternOn ? '#fbbf24' : null);
+  for (const a of animals) if (Math.hypot(a.x - P.x, a.z - P.z) < (night ? 45 : 110)) drawAnimal(a, now);
+  for (const c of CHESTS) { const p = c.at(), open = S.chests.includes(c.id); R.box(p[0] - 0.55, p[1], p[2] - 0.35, p[0] + 0.55, p[1] + 0.55, p[2] + 0.35, '#7c4a1e'); R.box(p[0] - 0.57, p[1] + 0.25, p[2] - 0.37, p[0] + 0.57, p[1] + 0.32, p[2] + 0.37, '#ca8a04'); R.cube(M.chain(M.T(p[0], p[1] + 0.55, p[2] + 0.35), M.RX(open ? -1.9 : 0), M.T(0, 0.08, -0.35), M.S(1.12, 0.16, 0.72)), '#8b5a2b'); if (!open) R.glow([p[0], p[1] + 0.7, p[2]], 1.1, [1, 0.85, 0.4], 0.3); }
+  for (const a of arrows) R.cube(M.chain(M.T(a.x, a.y, a.z), M.RY(Math.atan2(-a.vx, -a.vz)), M.RX(Math.atan2(a.vy, Math.hypot(a.vx, a.vz))), M.S(0.04, 0.04, 0.7)), '#d6a756');
+  for (const e of fx) { if (e.k === 'tracer') { const m = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2, (e.a[2] + e.b[2]) / 2], dx = e.b[0] - e.a[0], dy = e.b[1] - e.a[1], dz = e.b[2] - e.a[2], L = Math.hypot(dx, dy, dz); R.cube(M.chain(M.T(...m), M.RY(Math.atan2(-dx, -dz)), M.RX(Math.atan2(dy, Math.hypot(dx, dz))), M.S(0.025, 0.025, L)), [1, 0.9, 0.6], 0.8, 1); } if (e.k === 'muzzle') R.glow([e.x, e.y, e.z], 0.9, [1, 0.75, 0.3], 1); if (e.k === 'blood') R.cube(M.chain(M.T(e.x, e.y, e.z), M.S(0.1)), '#991b1b'); }
+  const hold = { strongaxe: '#cbd5e1', bow: '#a16207', revolver: '#1f2937', shotgun: '#3f2a1a', axe: '#9ca3af', spear: '#a16207', flash: '#e5e7eb', lantern: '#fbbf24', post: '#5b3a22', food: '#dc2626' }[S.held] || (S.tools.lantern && S.lanternOn ? '#fbbf24' : null);
   // dropped things lying around (only the ones near you)
   for (const d of S.drops) { const dx = d.x - P.x, dz = d.z - P.z; if (dx * dx + dz * dz > 2500) continue; const it = ITEMS[d.id], bob = Math.sin(now * 0.003 + d.u) * 0.04;
     if (d.id === 'log') R.cube(M.chain(M.T(d.x, d.y + 0.2, d.z), M.RY(d.u * 1.7), M.RZ(Math.PI / 2), M.S(0.32, 1.1, 0.32)), it.col);
@@ -706,7 +933,7 @@ function render(now) {
   if (S.sack.length) { const k = 0.25 + 0.35 * S.sack.length / S.sackCap; R.cube(M.chain(M.T(P.x, P.y, P.z), M.RY(P.yaw), M.T(0, 1.15, 0.28 + k * 0.3), M.S(k * 1.3, k * 1.6, k)), '#a16207'); }
   for (const e of fx) if (e.k === 'fly') R.cube(M.chain(M.T(e.x, e.y, e.z), M.S(0.2)), e.col, 1, 0.4);
   R.person(look(), P.x, P.y, P.z, P.yaw, { groundY: groundH(P.x, P.z), walk: P.walk, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 4), swing: P.swing, hold, holdGlow: hold === '#fbbf24' ? 1 : 0 });
-  for (const e of fx) { if (e.k === 'fly') continue; const k = e.t; R.cube(M.chain(M.T(e.x, e.y + (0.7 - k), e.z), M.S(0.15 * k * 2)), e.k === 'chip' ? '#a16207' : [0.1, 0.1, 0.15], k, 0); }
+  for (const e of fx) { if (e.k === 'fly' || e.k === 'tracer' || e.k === 'muzzle' || e.k === 'blood') continue; const k = e.t; R.cube(M.chain(M.T(e.x, e.y + (0.7 - k), e.z), M.S(0.15 * k * 2)), e.k === 'chip' ? '#a16207' : [0.1, 0.1, 0.15], k, 0); }
   R.end();
 }
 function mixHex(a, b, t) { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round((v + (B[i] - v) * clamp(t, 0, 1)) * 255).toString(16).padStart(2, '0')).join(''); }
@@ -719,7 +946,7 @@ function hud(dt) {
   $('bars').innerHTML = bar('❤ Health', S.hp, '#ef4444') + bar('🍖 Food', S.food, '#f59e0b') + bar('⚡ Stamina', S.stam, '#38bdf8') + bar('🔥 Campfire', S.fire, '#fb923c') + (S.flashOn || S.flash < 100 ? bar('🔦 Battery', S.flash, '#facc15') : '');
   const left = Math.ceil((S.isNight ? nightLen() : DAY) - S.t);
   $('clock').innerHTML = `<b>${S.isNight ? '🌙 Night ' + S.night : '☀ Day ' + (S.night + 1)}</b><small>${S.isNight ? 'Dawn in ' : 'Dark in '}${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}${S.finalNight ? ' · The Long Night' : ''}</small>`;
-  const iv = S.inv; $('inv').innerHTML = `<span style="grid-column:span 2;opacity:.75;font-size:11px">🏕 CAMP PILE</span><span>🪵 ${iv.wood}</span><span>🪨 ${iv.stone}</span><span>⚙️ ${iv.scrap}</span><span>🍓 ${iv.berries}</span><span>🥫 ${iv.cans}</span><span>🔋 ${iv.batteries}</span><span>🛏 ${S.beds}</span><span>🔆 ${S.stones.length - S.placed}</span>`;
+  const iv = S.inv; $('inv').innerHTML = `<span style="grid-column:span 2;opacity:.75;font-size:11px">🏕 CAMP PILE</span><span>🪵 ${iv.wood}</span><span>🪨 ${iv.stone}</span><span>⚙️ ${iv.scrap}</span><span>🍓 ${iv.berries}</span><span>🥫 ${iv.cans}</span><span>🔋 ${iv.batteries}</span><span>🛏 ${S.beds}</span><span>🐺 ${S.inv.pelts || 0}</span><span>🍖 ${(S.inv.cooked || 0) + (S.inv.meat || 0)}</span><span>🔆 ${S.stones.length - S.placed}</span>`;
   renderHotbar();
   const dc = Math.hypot(P.x, P.z); $('camp').textContent = dc > 14 ? `🏕 Camp ${Math.round(dc)} m ${arrow(Math.atan2(-P.x, -P.z))}` : '';
   $('vig').style.boxShadow = `inset 0 0 ${160 + (100 - S.hp) * 2}px rgba(${S.hp < 35 ? '120,0,0' : '0,0,0'},.8)`;
@@ -730,10 +957,10 @@ function arrow(a) { const rel = Math.atan2(Math.sin(a - camYaw), Math.cos(a - ca
 let hbKey = '';
 function renderHotbar() {
   const hb = hotbar(), fc = foodCount();
-  const key = hb.join() + '|' + S.held + '|' + fc + '|' + S.inv.posts + '|' + S.flashOn + '|' + S.lanternOn + '|' + S.sack.length + '|' + S.sackCap;
-  $('sackbar').textContent = `🎒 ${SACKS[S.sackCap] || 'Sack'} ${S.sack.length}/${S.sackCap}`;
+  const key = hb.join() + '|' + S.held + '|' + JSON.stringify(S.ammo) + JSON.stringify(S.mag) + '|' + fc + '|' + S.inv.posts + '|' + S.flashOn + '|' + S.lanternOn + '|' + S.sack.length + '|' + S.sackCap;
+  $('sackbar').textContent = (S.reloadT > 0 ? '🔄 Reloading… · ' : '') + (S.armor ? `🛡 ${Math.round(S.armor * 100)}% · ` : '') + `🎒 ${SACKS[S.sackCap] || 'Sack'} ${S.sack.length}/${S.sackCap}`;
   if (key === hbKey) return; hbKey = key;
-  $('hotbar').innerHTML = hb.map((id, k) => { const [ic, nm] = HB[id]; const n = id === 'food' ? fc : id === 'post' ? S.inv.posts : id === 'sack' ? `${S.sack.length}/${S.sackCap}` : (id === 'flash' && S.flashOn) || (id === 'lantern' && S.lanternOn) ? 'on' : ''; return `<button class="${S.held === id ? 'on' : ''}" data-hb="${id}" title="${nm} (${k + 1})"><i>${k + 1}</i>${ic}${n !== '' ? `<b>${n}</b>` : ''}<small>${nm}</small></button>`; }).join('');
+  $('hotbar').innerHTML = hb.map((id, k) => { const [ic, nm] = HB[id]; const n = id === 'food' ? fc : id === 'post' ? S.inv.posts : id === 'sack' ? `${S.sack.length}/${S.sackCap}` : id === 'bow' ? S.ammo.arrows : WEAP[id] && WEAP[id].mag ? `${S.mag[id]}/${S.ammo[WEAP[id].ammo]}` : (id === 'flash' && S.flashOn) || (id === 'lantern' && S.lanternOn) ? 'on' : ''; return `<button class="${S.held === id ? 'on' : ''}" data-hb="${id}" title="${nm} (${k + 1})"><i>${k + 1}</i>${ic}${n !== '' ? `<b>${n}</b>` : ''}<small>${nm}</small></button>`; }).join('');
 }
 $('hotbar').addEventListener('pointerdown', e => { const b = e.target.closest('[data-hb]'); if (!b) return; e.preventDefault(); e.stopPropagation(); if (S.held === b.dataset.hb && IN.touch) useHeld(); else selectSlot(b.dataset.hb); hbKey = ''; renderHotbar(); });
 let sackSel = -1;
@@ -814,7 +1041,7 @@ function startGame(m, cont) {
   if (!R && !TEST) return;
   for (const t of trees) { t.alive = true; t.hp = 0; } for (const r of rocks) r.left = 3; for (const b of bushes) b.berries = 3; for (const s of scraps) s.taken = false; chunks.forEach(c => c.dirty = true);
   if (cont) { if (!loadSave()) fresh('story'); } else fresh(m);
-  enemies = []; warden = null; fx = [];
+  enemies = []; warden = null; fx = []; animals = []; arrows = []; spawnWildlife();
   $('menu').hidden = true; running = true; paused = false; $('touch').classList.toggle('on', IN.touch); $('stick').classList.toggle('on', IN.touch); $('hotbar').hidden = false; $('sackbar').hidden = false; hbKey = '';
   if (!cont) story(m === 'story' ? 'Hollowpine' : 'Endless nights', m === 'story' ? 'The clearing is quiet. The campfire is low, Grandpa’s chair is empty, and the old Beacon on its stone pillar is cold.<br><br><b>Before dark:</b> chop trees, pick up the logs in your sack 🎒 and burn them in the fire. Junk you find goes in the Scrap Grinder — build beds to make the nights shorter. There’s a page of Grandpa’s journal by the workbench.' : 'No story, no end. How many nights can you keep the fire alive? It gets harder every night.', [['Begin', () => closePanels()]]);
   try { cv.focus(); } catch {}
@@ -837,7 +1064,7 @@ requestAnimationFrame(frame);
 // test hooks
 window.__lantern = () => ({ S, P: { x: P && P.x, y: P && P.y, z: P && P.z }, enemies: enemies.length, warden: !!warden, running, usable: running && usable() && usable().label });
 window.__lanternStep = (n, dt = 1 / 30, inputs) => { for (let i = 0; i < n; i++) { if (inputs) inputs(i); if (!paused) update(dt); } return window.__lantern(); };
-window.__lanternApi = { hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
+window.__lanternApi = { rayTarget, aim: () => { const f = aimDir(); return { eye: aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist], f }; }, collectAround, get animals() { return animals; }, spawnWildlife, fire, reload, WEAP, CHESTS, openChest, hurtAnimal, AN, DENS, get arrows() { return arrows; }, hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
 })();
 </script>
 </body></html>
