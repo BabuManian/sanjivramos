@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Rooftop Run</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#0f172a;color:#f8fafc;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+#tags{position:fixed;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;z-index:3;pointer-events:none;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+#top{left:50%;top:10px;transform:translateX(-50%);text-align:center}
+#top b{display:block;font:900 26px system-ui;font-variant-numeric:tabular-nums}#top small{opacity:.85;font-weight:700}
+#stats{left:12px;top:12px;font-weight:700;background:rgba(0,0,0,.35);padding:8px 12px;border-radius:12px;display:flex;flex-direction:column;gap:3px}
+#room{right:12px;top:60px;background:rgba(0,0,0,.4);padding:8px 12px;border-radius:12px;font-size:13px}#room:empty{display:none}
+#tip{left:50%;bottom:20%;transform:translateX(-50%);padding:8px 16px;border-radius:12px;background:rgba(14,165,233,.8);font-weight:700;opacity:0;transition:opacity .3s;text-align:center}
+#move{left:50%;top:38%;transform:translateX(-50%);font:900 22px system-ui;color:#fde047;opacity:0;transition:opacity .25s}
+.panel{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.55);backdrop-filter:blur(8px)}
+.panel[hidden]{display:none}
+.card{width:min(720px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:linear-gradient(180deg,rgba(30,41,59,.96),rgba(15,23,42,.96));border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:20px 22px}
+h1{margin:0;font:900 48px/1 system-ui;font-style:italic;letter-spacing:1px;background:linear-gradient(90deg,#38bdf8,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:0 0 8px;font:900 24px system-ui}
+.sub{opacity:.82;line-height:1.5;margin:8px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.c{padding:12px;border-radius:14px;text-align:left;color:#fff;min-height:78px}.c b{display:block;font-size:16px}.c small{opacity:.85}
+.c.lock{filter:grayscale(1);opacity:.45}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{padding:10px 18px;border-radius:12px;background:rgba(255,255,255,.1);font-weight:800}.btn.pri{background:linear-gradient(135deg,#0ea5e9,#db2777)}
+.keys{font-size:13px;opacity:.75;line-height:1.7}
+#touch{position:fixed;right:14px;bottom:18px;z-index:4;display:none;gap:10px;align-items:flex-end}
+#touch.on{display:flex}
+#touch button{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.2);font-weight:900;font-size:12px;touch-action:none}
+#touch button.on{background:rgba(14,165,233,.65)}#touch .sm{width:56px;height:56px}
+</style></head>
+<body>
+<canvas id="gl"></canvas><div id="tags"></div>
+<div class="hud" id="top"></div><div class="hud" id="stats"></div><div class="hud" id="room"></div><div class="hud" id="tip"></div><div class="hud" id="move"></div>
+<div id="touch"><button class="sm" data-btn="menu">☰</button><button class="sm" data-btn="slide">SLIDE</button><button data-btn="jump">JUMP</button></div>
+<div class="panel" id="menu"><div class="card">
+  <h1>ROOFTOP RUN</h1>
+  <p class="sub">Free-run across the city: leap the gaps, <b>wall-run</b> along billboards, <b>slide</b> under pipes, <b>vault</b> over vents and <b>climb</b> ledges. Beat the clock for gold.</p>
+  <div class="grid" id="courses"></div>
+  <div class="btns"><button class="btn" id="bOnline">🌐 Race friends</button><button class="btn" id="bKeys">⌨ Moves</button><button class="btn" id="bLook">🧍 My character</button></div>
+  <div id="keys" hidden class="keys" style="margin-top:10px">WASD move (you run fast already, Shift = even faster) · <b>Space</b> jump · <b>C / Ctrl</b> slide while running · run at a wall in the air to <b>wall-run</b>, Space to jump off it · run into a ledge mid-jump to <b>climb</b> it · low things you <b>vault</b> automatically · R back to the last flag · V first-person · phone: left = run, right = look</div>
+</div></div>
+<div class="panel" id="done" hidden><div class="card" style="text-align:center"><div id="doneText"></div><div class="btns" style="justify-content:center"><button class="btn pri" id="again">Run again</button><button class="btn" id="next">Next city</button><button class="btn" id="toMenu">Menu</button></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script src="../sj-gamekit/obby3d.js"></script>
+<script src="../sj-gamekit/friends3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('rooftop', { title: 'Rooftop Run', vs: false, trophies: [
+  { id: 'c0', name: 'Docks Runner', desc: 'Finish Morning Docks', icon: '🌅' },
+  { id: 'c1', name: 'Sunset Sprinter', desc: 'Finish Sunset Heights', icon: '🌇' },
+  { id: 'c2', name: 'Neon Ghost', desc: 'Finish Neon Night', icon: '🌃' },
+  { id: 'gold', name: 'Gold Rush', desc: 'Get a gold time', icon: '🥇' },
+  { id: 'wall', name: 'Wall Walker', desc: 'Wall-run 20 times', icon: '🧱' },
+  { id: 'flow', name: 'Flow State', desc: 'Finish a city without falling', icon: '🌊' },
+  { id: 'endless', name: 'Skyline', desc: 'Run 600 m in Endless', icon: '🏙️' },
+] }) : null;
+const $ = id => document.getElementById(id), G3 = GL3D, { M } = G3;
+const TEST = /[?&]nogl\b/.test(location.search);
+let R = null; if (!TEST) try { R = G3.create($('gl'), { maxDpr: 1.5 }); } catch (e) { console.warn(e); }
+if (!R && !TEST) $('menu').querySelector('.sub').textContent = 'This browser can’t run WebGL, so Rooftop Run can’t be drawn here.';
+const IN = G3.Input($('gl')); IN.bindButtons($('touch'));
+const store = { get() { try { return Object.assign({ best: {}, open: 1, walls: 0 }, JSON.parse(localStorage.getItem('sj-rooftop')) || {}); } catch { return { best: {}, open: 1, walls: 0 }; } }, set(v) { try { localStorage.setItem('sj-rooftop', JSON.stringify(v)); } catch {} } };
+let SV = store.get();
+const CITIES = [
+  { name: 'Morning Docks', seed: 101, n: 22, sky: { skyTop: '#2563eb', skyHorizon: '#fde68a', clouds: 0.6, sun: [0.6, 0.5, -0.4], sunCol: [0.75, 0.68, 0.55], amb: [0.45, 0.46, 0.52], sunGlow: [1, 0.85, 0.55], fog: [90, 260] }, cols: ['#a8a29e', '#d6d3d1', '#94a3b8', '#b45309'], grad: 'linear-gradient(135deg,#38bdf8,#fde68a)', tips: true },
+  { name: 'Sunset Heights', seed: 202, n: 28, sky: { skyTop: '#7c2d12', skyHorizon: '#fb923c', clouds: 0.5, cloudCol: [1, 0.7, 0.55], sun: [-0.7, 0.25, -0.6], sunCol: [0.85, 0.55, 0.4], amb: [0.42, 0.34, 0.36], sunGlow: [1, 0.55, 0.25], fog: [80, 240] }, cols: ['#78716c', '#a16207', '#9a3412', '#57534e'], grad: 'linear-gradient(135deg,#f97316,#7c2d12)' },
+  { name: 'Neon Night', seed: 303, n: 34, sky: { skyTop: '#020617', skyHorizon: '#4c1d95', stars: 1, sun: [0.3, 0.7, 0.5], sunCol: [0.3, 0.32, 0.55], amb: [0.3, 0.3, 0.45], sunGlow: [0.6, 0.4, 1], fog: [70, 220] }, cols: ['#1e293b', '#312e81', '#0f172a', '#164e63'], grad: 'linear-gradient(135deg,#0f172a,#db2777)', neon: true },
+  { name: 'Endless', seed: 0, n: 0, sky: { skyTop: '#0c4a6e', skyHorizon: '#bae6fd', clouds: 0.7, sun: [0.5, 0.7, 0.3], sunCol: [0.7, 0.68, 0.6], amb: [0.45, 0.46, 0.52], fog: [90, 260] }, cols: ['#94a3b8', '#a8a29e', '#64748b', '#cbd5e1'], grad: 'linear-gradient(135deg,#0ea5e9,#22c55e)', endless: true },
+];
+const TIPS = { climb: '🧗 Jump at the ledge and keep running — you’ll pull yourself up', wallrun: '🧱 Jump toward the billboard and keep running along it — Space to jump off', slide: '🛝 Run, then press C (or SLIDE) to slide under the pipe', vault: '🤸 Just run into low vents — you vault them', beam: '🎯 Careful on the crane beam', drop: '⬇ Big drop — land and keep going' };
+
+/* =================== COURSE =================== */
+let cpDue = false, W = null, city = 0, segs = [], cur = null, rnd = null, built = 0, finishZ = 0, run = null, F = null;
+function newCourse(ci) {
+  city = ci; const C = CITIES[ci];
+  if (W) W.clear();
+  W = Obby3D.create({ R, input: IN, look: () => window.SJLook ? SJLook.cached : null, onDie, onCheckpoint, onCoin: () => { run.coins++; }, onPower: ob => { if (ob.finish) finish(); } });
+  W.parkour = true; W.speedMul = 1.18; W.doubleJump = false;
+  rnd = G3.rng(C.endless ? (Math.random() * 1e9) | 0 : C.seed);
+  cur = { x: 0, y: 30, z: 0 }; segs = []; built = 0; cpDue = false;
+  addBuilding(10, 14, '#64748b');   // start roof
+  W.add({ k: 'cp', b: [cur.x - 2, cur.y - 0.6, cur.z + 4, cur.x + 2, cur.y, cur.z + 8], chunk: 0, stage: 0 });
+  W.place(cur.x, cur.y + 0.05, cur.z + 6);
+  const n = C.endless ? 12 : C.n;
+  for (let i = 0; i < n; i++) addSegment(i);
+  if (!C.endless) { addBuilding(12, 12, '#facc15'); W.add({ k: 'power', b: [cur.x - 0.6, cur.y + 0.6, cur.z + 5, cur.x + 0.6, cur.y + 1.8, cur.z + 6.2], chunk: built, col: '#facc15', finish: true }); finishZ = cur.z; }
+  W.build(); W.killY = -10;
+  W.cam.yaw = 0; W.cam.pitch = -0.22; W.cam.dist = 7;
+}
+function addBuilding(w, d, col, gap = 0, dy = 0, dx = 0) {
+  cur.z -= gap; cur.y += dy; cur.x += dx;
+  const C = CITIES[city], c = col || C.cols[(rnd() * C.cols.length) | 0], chunk = built;
+  W.add({ k: 'solid', b: [cur.x - w / 2, -40, cur.z - d, cur.x + w / 2, cur.y, cur.z], col: c, chunk, trim: C.neon ? '#22d3ee' : '#e5e7eb' });
+  // windows on the side facing you (decoration)
+  if (R) for (let k = 0; k < 3; k++) W.add({ k: 'solid', b: [cur.x - w / 2 + 0.6, cur.y - 4 - k * 4, cur.z - 0.02, cur.x + w / 2 - 0.6, cur.y - 2.6 - k * 4, cur.z + 0.02], col: C.neon ? (k % 2 ? '#f472b6' : '#22d3ee') : '#1e293b', chunk, trim: false });
+  const seg = { z0: cur.z, z1: cur.z - d, x: cur.x, y: cur.y, w };
+  cur.z -= d; segs.push(seg); built++;
+  return seg;
+}
+function addSegment(i) {
+  const C = CITIES[city], diff = C.endless ? Math.min(1, 0.3 + built / 60) : [0.35, 0.65, 1][city];
+  const kinds = ['gap', 'gap', 'climb', 'drop', 'wallrun', 'slide', 'vault', 'beam'], k = C.tips && i < 6 ? ['gap', 'vault', 'climb', 'slide', 'wallrun', 'drop'][i] : kinds[(rnd() * kinds.length) | 0];
+  const chunk = built, w = 6 + rnd() * 4, d = 10 + rnd() * 8, dx = (rnd() - 0.5) * 2;
+  switch (k) {
+    case 'gap': addBuilding(w, d, null, 2.6 + rnd() * 2.2 * diff, (rnd() - 0.65) * 2, dx); break;
+    case 'climb': addBuilding(w, d, null, 1.4, 1.9 + rnd() * 0.4, 0); break;
+    case 'drop': addBuilding(w, d, null, 2.5, -3.5 - rnd() * 2.5, dx); break;
+    case 'wallrun': { const side = rnd() < 0.5 ? 1 : -1, gap = 7.5 + diff * 1.2, z0 = cur.z, y = cur.y; W.add({ k: 'solid', b: [cur.x + side * 1.4 - 0.25, y - 4, z0 - gap, cur.x + side * 1.4 + 0.25, y + 3.8, z0], col: C.neon ? '#db2777' : '#0ea5e9', chunk, trim: '#f8fafc' }); addBuilding(w, d, null, gap, 0, 0); break; }
+    case 'slide': { const s = addBuilding(w, d, null, 2.4, 0, dx); const zm = (s.z0 + s.z1) / 2; W.add({ k: 'solid', b: [s.x - s.w / 2, s.y + 1.05, zm - 0.45, s.x + s.w / 2, s.y + 3.4, zm + 0.45], col: '#f97316', chunk, trim: '#fde047' }); break; }
+    case 'vault': { const s = addBuilding(w, d, null, 2.4, 0, dx); for (let v = 0; v < 2; v++) { const zz = s.z0 - 2.6 - v * 3.4;   /* vents stay well back from the roof's edge */ W.add({ k: 'solid', b: [s.x - s.w / 2 + 0.3, s.y, zz - 1, s.x + s.w / 2 - 0.3, s.y + 0.9, zz], col: '#9ca3af', chunk }); } break; }
+    case 'beam': { const gap = 6 + diff * 1.5; W.add({ k: 'solid', b: [cur.x - 0.4, cur.y - 0.5, cur.z - gap, cur.x + 0.4, cur.y, cur.z], col: '#facc15', chunk }); addBuilding(w, d, null, gap, 0, 0); break; }
+  }
+  segs[segs.length - 1].kind = k;
+  const s = segs[segs.length - 1];
+  if (rnd() < 0.7) W.add({ k: 'coin', b: [s.x - 0.3, s.y + 0.9, s.z0 - 3.3, s.x + 0.3, s.y + 1.5, s.z0 - 2.7], chunk });
+  // a checkpoint about every 4 roofs — never on a roof with vents or pipes (you'd respawn inside them)
+  if ((i + 1) % 4 === 0 || cpDue) { if (s.kind === 'vault' || s.kind === 'slide') cpDue = true; else { cpDue = false; W.add({ k: 'cp', b: [s.x - 1.6, s.y - 0.5, s.z1 + 1, s.x + 1.6, s.y + 0.02, s.z1 + 4], chunk, stage: i + 1 }); } }
+}
+
+/* =================== RUN =================== */
+let running = false, camC = null, tipT = 0, moveT = 0, seenTip = {};
+function start(ci) {
+  if (!R && !TEST) return;
+  newCourse(ci); seenTip = {};
+  run = { t: 0, falls: 0, coins: 0, walls: 0, done: false };
+  $('menu').hidden = true; $('done').hidden = true; running = true; $('touch').classList.toggle('on', IN.touch);
+}
+function onDie() { run.falls++; }
+function onCheckpoint() { G3.tone(660, 0.1, 'square', 0.04); }
+function finish() {
+  if (run.done) return; run.done = true; W.frozen = true;
+  const C = CITIES[city], t = run.t, par = C.n * 2.6, medal = t < par ? '🥇' : t < par * 1.35 ? '🥈' : t < par * 1.8 ? '🥉' : '';
+  const k = 'c' + city, prev = SV.best[k]; if (!prev || t < prev) SV.best[k] = Math.round(t * 100) / 100; SV.open = Math.max(SV.open, Math.min(3, city + 2)); store.set(SV);
+  kit && kit.unlock(k); if (medal === '🥇') kit && kit.unlock('gold'); if (!run.falls) kit && kit.unlock('flow'); kit && kit.score(Math.round(t * 100) / 100, k);
+  G3.tone(523, 0.12, 'square', 0.05); setTimeout(() => G3.tone(784, 0.2, 'square', 0.05), 120);
+  if (F) F.send(Object.assign(myState(), { fin: Math.round(t * 100) / 100 }), true);
+  setTimeout(() => { $('doneText').innerHTML = `<div style="font-size:54px">${medal || '🏁'}</div><h2>${C.name} — ${fmt(t)}</h2><p class="sub">${run.falls} fall${run.falls === 1 ? '' : 's'} · ${run.coins} coins · ${run.walls} wall-runs<br>Best: ${fmt(SV.best[k])} · Gold under ${fmt(par)}</p>`; $('next').hidden = city >= 2; $('done').hidden = false; if (document.pointerLockElement) document.exitPointerLock(); }, 700);
+}
+const fmt = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
+const progress = () => CITIES[city].endless ? Math.max(0, -W.P.z) : Math.min(100, Math.max(0, -W.P.z / -finishZ * 100));
+const myState = () => ({ x: W.P.x, y: W.P.y, z: W.P.z, yaw: W.P.yaw, spd: Math.min(1, Math.hypot(W.P.vx, W.P.vz) / 6), label: CITIES[city].endless ? Math.round(-W.P.z) + ' m' : Math.round(progress()) + '%', p: progress() });
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) return;
+  const raw = IN.frame();
+  if (IN.hit('Escape') || IN.hit('Btnmenu')) { toMenu(); IN.endFrame(); return; }
+  if (IN.hit('KeyR') && !run.done) W.die();
+  step(dt, { mx: raw.mx, mz: raw.mz, run: raw.run || IN.down('run'), jump: IN.hit('Space') || IN.hit('Btnjump') || IN.hit('Tap'), jumpHeld: IN.down('Space') || IN.down('jump'), slide: IN.hit('KeyC') || IN.hit('ControlLeft') || IN.hit('Btnslide'), lookX: raw.lookX, lookY: raw.lookY, wheel: raw.wheel });
+  render(now);
+  IN.endFrame();
+}
+function step(dt, inp) {
+  const ev = W.update(dt, inp); camC = W.camera(inp, dt);
+  if (!run.done) run.t += dt;
+  for (const e of ev) if (['wallrun', 'walljump', 'mantle', 'vault', 'slide'].includes(e)) { $('move').textContent = { wallrun: 'WALL-RUN!', walljump: 'WALL-JUMP!', mantle: 'CLIMB!', vault: 'VAULT!', slide: 'SLIDE!' }[e]; $('move').style.opacity = 1; moveT = 0.7; if (e === 'wallrun') { run.walls++; SV.walls++; if (SV.walls >= 20) kit && kit.unlock('wall'); } }
+  moveT -= dt; if (moveT <= 0) $('move').style.opacity = 0;
+  // tips the first time you reach each kind of obstacle (first city)
+  if (CITIES[city].tips) { const sg = segs.find(s => W.P.z < s.z0 + 9 && W.P.z > s.z0 - 1 && s.kind && !seenTip[s.kind]); if (sg && TIPS[sg.kind]) { seenTip[sg.kind] = 1; $('tip').textContent = TIPS[sg.kind]; $('tip').style.opacity = 1; tipT = 4.5; } }
+  tipT -= dt; if (tipT <= 0) $('tip').style.opacity = 0;
+  // endless: build ahead, forget behind
+  if (CITIES[city].endless) { while (segs.length && segs[segs.length - 1].z1 > W.P.z - 140) addSegment(built); for (const id of [...W.chunks.keys()]) { const sg = segs[id]; if (sg && sg.z1 > W.P.z + 80 && id > 0) W.dropChunk(id); } if (-W.P.z >= 600) kit && kit.unlock('endless'); if (run.falls >= 3 && !run.done) { run.done = true; W.frozen = true; kit && kit.score(Math.round(-W.P.z), 'endless'); setTimeout(() => { $('doneText').innerHTML = `<h2>Endless — ${Math.round(Math.max(0, -W.P.z))} m</h2><p class="sub">Three falls and you’re out. ${run.walls} wall-runs, ${run.coins} coins.</p>`; $('next').hidden = true; $('done').hidden = false; }, 600); } }
+  if (F) { F.send(myState()); F.update(dt); }
+  hud();
+}
+function render(now) {
+  if (!R || !camC) return;
+  const C = CITIES[city];
+  W.render(camC, Object.assign({ view: 170 }, C.sky), r => {
+    if (F) F.draw(r);
+    // far skyline
+    for (let k = 0; k < 16; k++) { const zz = W.P.z - 60 - k * 22, side = k % 2 ? 1 : -1; r.box(W.P.x + side * (40 + (k * 7) % 25) - 6, -40, zz - 6, W.P.x + side * (40 + (k * 7) % 25) + 6, 10 + (k * 13) % 40, zz + 6, C.neon ? '#1e1b4b' : '#475569'); if (C.neon) r.glow([W.P.x + side * (40 + (k * 7) % 25), 12 + (k * 13) % 40, zz], 3, k % 2 ? [1, 0.3, 0.7] : [0.2, 0.9, 1], 0.5); }
+  });
+  if (F) F.tags(R, $('tags'));
+}
+let hudT = 0;
+function hud() {
+  if ((hudT -= 1) > 0) return; hudT = 5;
+  const C = CITIES[city];
+  $('top').innerHTML = `<b>${fmt(run.t)}</b><small>${C.name} · ${C.endless ? Math.round(Math.max(0, -W.P.z)) + ' m' : Math.round(progress()) + '%'}</small>`;
+  $('stats').innerHTML = `<span>💀 ${run.falls}${C.endless ? ' / 3' : ''}</span><span>🪙 ${run.coins}</span><span>🧱 ${run.walls}</span>`;
+  if (F) { const list = [{ name: 'You', p: progress() }].concat(F.list().map(o => ({ name: o.name, p: o.t.p || 0, fin: o.t.fin }))).sort((a, b) => b.p - a.p); $('room').innerHTML = `<b>🌐 ${F.net.room ? F.net.room.code : ''}</b>` + list.map((p, i) => `<div>${i + 1}. ${SJFriends.esc(p.name)} — ${p.fin ? '🏁 ' + fmt(p.fin) : Math.round(p.p) + (C.endless ? ' m' : '%')}</div>`).join(''); }
+}
+function toMenu() { running = false; $('menu').hidden = false; $('done').hidden = true; $('touch').classList.remove('on'); $('tags').innerHTML = ''; renderMenu(); if (document.pointerLockElement) document.exitPointerLock(); }
+function renderMenu() {
+  $('courses').innerHTML = CITIES.map((c, i) => { const open = c.endless || i < SV.open, b = SV.best['c' + i]; return `<button class="c${open ? '' : ' lock'}" data-c="${i}" style="background:${c.grad}" ${open ? '' : 'disabled'}><b>${c.name}</b><small>${c.endless ? 'How far can you go?' : `${c.n} rooftops${b ? ' · best ' + fmt(b) : ''}`}${open ? '' : ' · 🔒'}</small></button>`; }).join('');
+  $('courses').querySelectorAll('[data-c]').forEach(b => b.onclick = () => start(+b.dataset.c));
+}
+$('again').onclick = () => start(city); $('next').onclick = () => start(Math.min(2, city + 1)); $('toMenu').onclick = toMenu;
+$('bKeys').onclick = () => { $('keys').hidden = !$('keys').hidden; };
+$('bLook').onclick = () => { location.href = '../sj-avatar/'; };
+$('bOnline').onclick = async () => {
+  if (!(await SJFriends.available())) { alert('Online races need SanjivramOS (open this game from the SanjivramOS desktop).'); return; }
+  try { F = await SJFriends.join({ game: 'rooftop', gameName: 'Rooftop Run', modes: CITIES.slice(0, 3).map(c => c.name) }); } catch { return; }
+  const ci = Math.max(0, CITIES.findIndex(c => c.name === (F.net.room && F.net.room.mode)));
+  F.on('start', () => start(ci)); start(ci);
+};
+if (new URLSearchParams(location.search).get('join')) setTimeout(() => $('bOnline').click(), 600);
+if (window.SJLook) SJLook.get();
+renderMenu(); requestAnimationFrame(frame);
+window.GL3D && (GL3D.fullscreenButton(), GL3D.viewButton());
+window.__rooftop = { start, newCourse, get W() { return W; }, get segs() { return segs; }, get run() { return run; }, step: (n, dt = 1 / 60, inp = {}) => { for (let i = 0; i < n; i++) step(dt, Object.assign({ mx: 0, mz: 0, jump: false, jumpHeld: false, slide: false, lookX: 0, lookY: 0 }, typeof inp === 'function' ? inp(i) : inp)); return { x: W.P.x, y: W.P.y, z: W.P.z, ground: W.P.ground, dead: W.P.dead, h: W.P.h }; } };
+})();
+</script>
+</body></html>

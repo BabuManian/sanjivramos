@@ -79,6 +79,8 @@
       if (W.frozen) return [];
       const ev = [];
       if (P.dead > 0) { P.dead -= dt; if (P.dead <= 0) respawn(); return ev; }
+      // parkour: climbing over a ledge takes a moment
+      if (P.climb) { const c = P.climb; c.t += dt; const k = Math.min(1, c.t / c.d), e = k * k * (3 - 2 * k); P.y = c.from[1] + (c.to[1] - c.from[1]) * Math.min(1, e * 1.5); P.x = c.from[0] + (c.to[0] - c.from[0]) * e; P.z = c.from[2] + (c.to[2] - c.from[2]) * e; P.vy = 0; if (k >= 1) { P.climb = null; P.y = c.to[1]; P.ground = true; } return ev; }
       // ride moving platforms
       if (P.on && P.on.k === 'move') { P.x += P.on.dx || 0; P.y += P.on.dy || 0; P.z += P.on.dz || 0; }
       if (P.on && P.on.k === 'conv') { P.x += P.on.dir[0] * P.on.speed * dt; P.z += P.on.dir[1] * P.on.speed * dt; }
@@ -93,7 +95,8 @@
       P.buffer = inp.jump ? 0.14 : Math.max(0, P.buffer - dt);
       if (P.ground) { P.jumps = 0; P.bounced = false; }
       if (P.buffer > 0 && (P.coyote > 0 || (W.doubleJump && P.jumps < 2 && !P.ground))) { P.vy = 9.6 * W.jumpMul; P.buffer = 0; P.coyote = 0; P.jumps = P.ground || P.jumps === 0 ? 1 : 2; ev.push('jump'); GL3D.tone(P.jumps === 2 ? 520 : 300, 0.09, 'triangle', 0.04, P.jumps === 2 ? 900 : 560); }
-      if (!inp.jumpHeld && P.vy > 3 && !P.bounced) P.vy -= 30 * dt;   // short hop when you let go (not on trampolines)
+      if (!inp.jumpHeld && P.vy > 3 && !P.bounced && !P.wallT) P.vy -= 30 * dt;   // short hop when you let go (not on trampolines)
+      if (W.parkour) parkour(dt, inp, mx, mz, ml, ev);
       const wasGround = P.ground, vyBefore = P.vy;
       GL3D.moveBody(P, dt, solidsNear(P.x, P.y, P.z), NOFLOOR, 26);
       // what are we standing on?
@@ -115,8 +118,37 @@
       for (const t of W.trailPts) t[3] -= dt * 1.6; W.trailPts = W.trailPts.filter(t => t[3] > 0);
       return ev;
     };
+    /* ---------- parkour moves (W.parkour = true): slide, vault/mantle, wall-run + wall-jump ---------- */
+    function parkour(dt, inp, mx, mz, ml, ev) {
+      const boxes = solidsNear(P.x, P.y, P.z);
+      const inBox = (x, y, z) => boxes.find(b => x > b[0] && x < b[3] && z > b[2] && z < b[5] && y > b[1] && y < b[4]);
+      const hs = Math.hypot(P.vx, P.vz);
+      if (inp.slide && P.ground && !(P.slideT > 0)) {   // works from a standstill too (in the direction you're pushing / facing)
+        const d = hs > 1 ? [P.vx / hs, P.vz / hs] : ml > 0.1 ? [mx / ml, mz / ml] : [-Math.sin(P.face), -Math.cos(P.face)], v = Math.max(hs, 9.5);
+        P.slideT = 0.8; P.slideV = [d[0] * v, d[1] * v]; P.h = 0.9; ev.push('slide'); GL3D.noise(0.4, 0.04, 1200);
+      }
+      if (P.slideT > 0) { P.slideT -= dt; const k = Math.max(0.55, P.slideT / 0.8); P.vx = P.slideV[0] * k; P.vz = P.slideV[1] * k; if (P.slideT <= 0) { if (inBox(P.x, P.y + 1.3, P.z)) P.slideT = 0.05; else P.h = 1.8; } return; }
+      if (ml > 0.3) {   // a ledge in front: vault it from the ground, mantle it from the air
+        const px = P.x + mx / ml * (P.r + 0.35), pz = P.z + mz / ml * (P.r + 0.35);
+        for (const b of boxes) {
+          if (!(px > b[0] && px < b[3] && pz > b[2] && pz < b[5])) continue;
+          const up = b[4] - P.y, lim = P.ground ? 1.15 : 2.6;
+          if (up > 0.45 && up < lim && !inBox(px, b[4] + 1, pz) && (P.ground || P.vy < 7)) { P.climb = { t: 0, d: P.ground ? 0.22 : 0.4, from: [P.x, P.y, P.z], to: [px + mx / ml * 0.3, b[4], pz + mz / ml * 0.3] }; P.wallT = 0; ev.push(P.ground ? 'vault' : 'mantle'); GL3D.tone(P.ground ? 380 : 260, 0.12, 'triangle', 0.04, 520); return; }
+        }
+      }
+      if (!P.ground && hs > 4.5 && ml > 0.3) {   // wall-run
+        const rxs = -P.vz / hs, rzs = P.vx / hs; let side = 0;
+        for (const sd of [1, -1]) { const b = inBox(P.x + rxs * sd * (P.r + 0.32), P.y + 0.9, P.z + rzs * sd * (P.r + 0.32)); if (b && b[4] > P.y + 1.4) { side = sd; break; } }
+        if (side) {
+          if (!P.wallT) { P.wallT = 0.001; P.vy = Math.max(P.vy, 2.5); ev.push('wallrun'); GL3D.noise(0.3, 0.03, 2500); }
+          P.wallT += dt; P.wallSide = side; const nx = -rxs * side, nz = -rzs * side;
+          if (P.wallT < 1.5) P.vy = Math.max(P.vy, -0.8 - P.wallT * 1.2);
+          if (inp.jump) { P.vy = 9.4; P.vx += nx * 6.5; P.vz += nz * 6.5; P.wallT = 0; P.jumps = 1; P.buffer = 0; ev.push('walljump'); GL3D.tone(420, 0.1, 'triangle', 0.05, 760); }
+        } else P.wallT = 0;
+      } else if (P.ground) P.wallT = 0;
+    }
     function die() { if (P.dead > 0) return; P.dead = 0.6; P.vx = P.vy = P.vz = 0; W.deathAt = [P.x, P.y, P.z]; GL3D.tone(200, 0.3, 'sawtooth', 0.06, 70); o.onDie && o.onDie(); }
-    function respawn() { P.x = W.spawn[0]; P.y = W.spawn[1] + 0.05; P.z = W.spawn[2]; P.vx = P.vy = P.vz = 0; P.on = null; W.trailPts = []; for (const ob of objs) if (ob.k === 'vanish') { ob.touched = false; ob.vis = 1; ob.t = 0; } }
+    function respawn() { P.climb = null; P.slideT = 0; P.h = 1.8; P.wallT = 0; P.x = W.spawn[0]; P.y = W.spawn[1] + 0.05; P.z = W.spawn[2]; P.vx = P.vy = P.vz = 0; P.on = null; W.trailPts = []; for (const ob of objs) if (ob.k === 'vanish') { ob.touched = false; ob.vis = 1; ob.t = 0; } }
     W.die = die; W.respawn = respawn;
     W.place = (x, y, z) => { P.x = x; P.y = y; P.z = z; P.vx = P.vy = P.vz = 0; W.spawn = [x, y, z]; };
 
