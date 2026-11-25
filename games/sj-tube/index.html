@@ -60,7 +60,10 @@ main{overflow:auto;position:relative;border-top-left-radius:22px;background:var(
 .chips{display:flex;gap:8px;overflow-x:auto;margin-bottom:18px;scrollbar-width:none;padding:2px}
 .chips::-webkit-scrollbar{display:none}
 .chips button{flex:none;height:34px;padding:0 14px;border-radius:17px;background:var(--surface-2);border:1px solid var(--border);font-weight:600;font-size:13px;transition:all .15s}
-.chips button:hover{background:var(--surface-3)}.chips button.on{background:var(--text);color:var(--bg);border-color:transparent}
+.chips button:hover{background:var(--surface-3)}
+.why{display:block;color:#faa41a;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simrow{display:flex;gap:8px;overflow-x:auto;padding:2px 0 14px;scrollbar-width:none}.simrow h4{margin:0 6px 0 0;align-self:center;white-space:nowrap;font-size:13px;color:var(--text-2)}
+.simrow a{flex:none;display:flex;align-items:center;gap:7px;height:34px;padding:0 13px 0 4px;border-radius:17px;background:var(--surface-2);border:1px solid var(--border);font-weight:600;font-size:13px;color:inherit;text-decoration:none}.simrow a .av{width:26px;height:26px;font-size:12px}.chips button.on{background:var(--text);color:var(--bg);border-color:transparent}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:26px 18px}
 .card{cursor:pointer;min-width:0;border-radius:var(--r);transition:transform .2s var(--ease)}
 .card:hover{transform:translateY(-3px)}
@@ -263,25 +266,58 @@ function card(v) {
   if (v.type === 'channel') return `<div class="chcard" data-ch="${esc(v.id)}">${v.thumb ? `<img src="${esc(pic(v.thumb))}" alt="" loading="lazy">` : avatar(v.name)}<div><b style="font-size:17px">${esc(v.name)}</b><div style="color:var(--text-2);font-size:13px">${v.subs ? num(v.subs) + ' subscribers' : ''}</div><div style="color:var(--text-3);font-size:13px;margin-top:4px">${esc((v.desc || '').slice(0, 140))}</div></div></div>`;
   const p = D.progress[v.id], pct = p && v.len ? Math.min(100, p / v.len * 100) : 0;
   return `<div class="card" data-v="${esc(v.id)}" data-short="${v.short ? 1 : 0}"><div class="th"><img loading="lazy" decoding="async" src="${esc(pic(v.thumb))}" alt="">${v.length ? `<span class="len${v.length === 'LIVE' ? ' live' : ''}">${v.short ? '⚡ ' : ''}${esc(v.length)}</span>` : ''}${pct ? `<span class="prog" style="width:${pct}%"></span>` : ''}</div>
-    <div class="meta">${avatar(v.author)}<div style="min-width:0"><b>${esc(v.title)}</b><small>${v.authorId ? `<a href="#" data-ch="${esc(v.authorId)}">${esc(v.author || '')}</a>` : esc(v.author || '')}</small><small>${[v.views != null && v.views >= 0 ? num(v.views) + ' views' : '', ago(v)].filter(Boolean).join(' · ')}</small></div></div></div>`;
+    <div class="meta">${avatar(v.author)}<div style="min-width:0"><b>${esc(v.title)}</b><small>${v.authorId ? `<a href="#" data-ch="${esc(v.authorId)}">${esc(v.author || '')}</a>` : esc(v.author || '')}</small><small>${[v.views != null && v.views >= 0 ? num(v.views) + ' views' : '', ago(v)].filter(Boolean).join(' · ')}</small>${whyText(v)}</div></div></div>`;
+}
+/** why a For you video is there: subscriptions, "because you watched", similar channels, trending */
+function whyText(v) {
+  const w = v.why; if (!w) return '';
+  let t = '';
+  if (w.kind === 'sub') t = '✓ From your subscriptions';
+  else if (w.kind === 'because') { const seed = w.name || ((D.history.find(x => x.id === w.seed) || D.liked.find(x => x.id === w.seed) || {}).title) || ''; t = seed ? `Because you watched “${seed.length > 40 ? seed.slice(0, 40) + '…' : seed}”` : 'Recommended for you'; }
+  else if (w.kind === 'similar') t = w.name ? `Similar to ${w.name}` : 'Similar to channels you like';
+  else if (w.kind === 'trending') t = '🔥 Trending';
+  return t ? `<span class="why">${esc(t)}</span>` : '';
+}
+/** what Kushtube knows about your taste: subs, the channels you watch most, recent watches/likes (all from this device's data) */
+function tasteQuery() {
+  const hist = D.history.filter(x => !x.short), score = new Map();
+  hist.slice(0, 150).forEach((x, i) => { if (x.authorId) score.set(x.authorId, (score.get(x.authorId) || 0) + 1 + (i < 20 ? 1 : 0)); });
+  D.liked.slice(0, 60).forEach(x => { if (x.authorId) score.set(x.authorId, (score.get(x.authorId) || 0) + 3); });
+  const aff = [...score.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).slice(0, 30);
+  const seeds = [...new Set([...hist.slice(0, 6), ...D.liked.filter(x => !x.short).slice(0, 3)].map(x => x.id))].slice(0, 8);
+  const seen = D.history.slice(0, 120).map(x => x.id);
+  return `subs=${D.subs.slice(0, 80).map(x => x.id).join(',')}&aff=${aff.join(',')}&seeds=${seeds.join(',')}&seen=${seen.join(',')}&region=${D.set.region}`;
 }
 function errBox(e, retry) { return `<div class="err"><span>⚠ ${esc(e.message)}</span>${retry ? '<button class="pill" id="retry">Try again</button>' : ''}</div>`; }
 const CATS = ['Trending', 'Music', 'Gaming', 'Minecraft', 'Roblox', 'Football', 'Basketball', 'Science', 'Coding', 'Funny', 'Animals', 'Cooking', 'Movies', 'News'];
 async function home() {
   const snap = local.get('home');   // last home page, shown instantly while the fresh one loads
-  main.innerHTML = `<div class="wrap"><div id="hero"></div><div class="shelf"><h3>${ic('shorts')} Shorts</h3><div class="srow" id="srow">${'<div class="stile skel"></div>'.repeat(8)}</div></div>
-    <div class="chips" id="cats">${CATS.map((c, i) => `<button class="${i ? '' : 'on'}" data-cat="${c}">${c}</button>`).join('')}</div><div id="list">${skel(12)}</div></div>`;
+  const personal = !!(D.subs.length || D.history.length || D.liked.length), cats = personal ? ['For you', ...CATS] : CATS;
+  const fySnap = personal ? local.get('foryou') : null;
+  main.innerHTML = `<div class="wrap"><div id="hero"></div><div id="sim"></div><div class="shelf"><h3>${ic('shorts')} Shorts</h3><div class="srow" id="srow">${'<div class="stile skel"></div>'.repeat(8)}</div></div>
+    <div class="chips" id="cats">${cats.map((c, i) => `<button class="${i ? '' : 'on'}" data-cat="${c}">${c}</button>`).join('')}</div><div id="list">${skel(12)}</div></div>`;
   const myView = view;
   const paint = items => {
     if (view !== myView) return;
-    const trend = $('#cats .on').dataset.cat === 'Trending', top = trend ? items[0] : null;
+    const cat = $('#cats .on').dataset.cat, trend = cat === 'Trending' || cat === 'For you', top = trend ? items[0] : null;
     if (top) $('#hero').innerHTML = `<div class="hero" data-v="${esc(top.id)}"><div class="bgimg" style="background-image:url('${esc(pic(top.thumb))}')"></div>
       <div class="th"><img src="${pic(`https://i.ytimg.com/vi/${top.id}/hqdefault.jpg`)}" alt="" style="object-fit:cover"></div>
-      <div><span class="tag">${ic('trend')} #1 trending</span><h1>${esc(top.title)}</h1><p>${esc(top.author || '')}${top.views ? ' · ' + num(top.views) + ' views' : ''}</p><button class="pill acc">${ic('play')} Watch now</button></div></div>`;
+      <div><span class="tag">${ic('trend')} ${cat === 'For you' ? 'Picked for you' : '#1 trending'}</span><h1>${esc(top.title)}</h1><p>${esc(top.author || '')}${top.views ? ' · ' + num(top.views) + ' views' : ''}</p><button class="pill acc">${ic('play')} Watch now</button></div></div>`;
     $('#list').innerHTML = items.length ? `<div class="grid">${items.slice(top ? 1 : 0).map(card).join('')}</div>` : '<div class="empty">Nothing here right now.</div>';
   };
+  const paintSim = list => { const el = $('#sim'); if (!el) return; el.innerHTML = list && list.length ? `<div class="simrow"><h4>Channels like yours</h4>${list.map(c => `<a href="#" data-ch="${esc(c.id)}">${avatar(c.name)}${esc(c.name || '')}</a>`).join('')}</div>` : ''; };
   const load = async (cat, fresh) => {
-    if (cat !== 'Trending') $('#hero').innerHTML = '';
+    if (cat !== 'Trending' && cat !== 'For you') $('#hero').innerHTML = '';
+    if (cat !== 'For you') paintSim(null);
+    if (cat === 'For you') {
+      try {
+        const j = await api('foryou?' + tasteQuery(), { fresh });
+        if (!j.items.length) throw new Error('Watch or subscribe to a few things first — For you learns from them.');
+        local.set('foryou', { t: Date.now(), items: j.items.slice(0, 40), similar: j.similar });
+        if (view === myView && $('#cats .on') && $('#cats .on').dataset.cat === cat) { paint(j.items); paintSim(j.similar); prefetch(j.items.slice(0, 2).map(v => v.id)); }
+      } catch (e) { if (view !== myView || fySnap) return; $('#list').innerHTML = errBox(e, true); $('#retry').onclick = () => load(cat, true); }
+      return;
+    }
     try {
       const j = cat === 'Trending' ? await api('home?region=' + D.set.region, { fresh }) : await api('search?q=' + encodeURIComponent(cat));
       if (cat === 'Trending') local.set('home', { t: Date.now(), items: j.items.slice(0, 40) });
@@ -289,8 +325,8 @@ async function home() {
     } catch (e) { if (view !== myView) return; if (cat === 'Trending' && snap) return; $('#list').innerHTML = errBox(e, true); $('#retry').onclick = () => load(cat, true); }
   };
   $('#cats').onclick = e => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cats button').forEach(x => x.classList.toggle('on', x === b)); $('#list').innerHTML = skel(12); load(b.dataset.cat); };
-  if (snap && snap.items && snap.items.length) paint(snap.items);
-  load('Trending');
+  if (personal) { if (fySnap && fySnap.items && fySnap.items.length) { paint(fySnap.items); paintSim(fySnap.similar); } load('For you'); }
+  else { if (snap && snap.items && snap.items.length) paint(snap.items); load('Trending'); }
   api('shorts?page=1').then(j => {
     if (view !== myView) return; shelfItems = j.items;
     $('#srow').innerHTML = j.items.slice(0, 20).map(v => `<div class="stile" data-v="${esc(v.id)}" data-short="1"><img loading="lazy" src="${pic(`https://i.ytimg.com/vi/${v.id}/oar2.jpg`)}" onerror="this.onerror=null;this.src='${esc(pic(v.thumb))}'" alt=""><b>${esc(v.title)}</b></div>`).join('');

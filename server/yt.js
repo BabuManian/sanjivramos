@@ -5,7 +5,7 @@
 // one-time tokens for links the server resolved itself (never an open proxy).
 // Routes (signed-in, "Use the YouTube app" permission):
 //   GET /yt/api/status · home?region= · search?q=&page=&type= · shorts?page=&q= · video/:id · related/:id?title=
-//       channel/:id?tab=videos|shorts · feed?ids=UC..,UC.. · sponsor/:id · prefetch?ids=a,b,c
+//       channel/:id?tab=videos|shorts · feed?ids=UC..,UC.. · foryou?subs=&aff=&seeds=&seen= · sponsor/:id · prefetch?ids=a,b,c
 //   GET /yt/stream?t=TOKEN · /yt/img?u=<YouTube image URL> (thumbnails/avatars fetched by this server, cached on disk)
 // Env: SJ_YT_INSTANCES (Invidious bases), SJ_YT_PIPED (extra Piped API bases), SJ_YT_NO_YTDLP=1, SJ_YT_NO_WARM=1
 import { spawn, execFileSync } from 'node:child_process';
@@ -292,6 +292,76 @@ function sponsor(id) {
   });
 }
 
+/* ---------------- For you: subscriptions + "because you watched" + similar channels, mixed and de-duplicated ----------------
+   subs = subscribed channel ids, aff = channels you watch most (most first), seeds = videos you watched/liked recently,
+   seen = videos to leave out. Every input is cached elsewhere (channel 30 min, related 3 h), so a repeat is cheap. */
+async function limitAll(list, n, fn) { const out = new Array(list.length); let i = 0; await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => { while (i < list.length) { const k = i++; try { out[k] = await fn(list[k]); } catch { out[k] = null; } } })); return out; }
+async function forYou({ subs, aff, seeds, seen, region }) {
+  const now = Date.now(), seenSet = new Set(seen), subSet = new Set(subs);
+  const affRank = new Map(aff.map((id, i) => [id, i]));
+  const affinity = id => affRank.has(id) ? 1.5 - affRank.get(id) / Math.max(10, aff.length) : 0;   // 0..1.5
+  const fresh = ms => ms > 0 ? Math.pow(0.5, (now - ms) / (4 * 86400e3)) : 0.25;                    // half-life 4 days
+  // the subscriptions you actually watch go first; at most 14 channels per refresh
+  const subPick = subs.slice().sort((a, b) => (affRank.get(a) ?? 99) - (affRank.get(b) ?? 99)).slice(0, 14);
+  const chans = await limitAll(subPick, 4, id => channel(id, 'videos'));
+  const cand = new Map();   // id → { v, score, why }
+  const add = (v, score, why) => {
+    if (!v || !v.id || v.short || v.length === 'LIVE' || seenSet.has(v.id)) return;
+    const c = cand.get(v.id); if (c) { c.score += score * 0.5; return; }
+    cand.set(v.id, { v, score, why });
+  };
+  const subLatest = [];
+  chans.forEach((c, i) => {
+    if (!c) return; const id = subPick[i];
+    c.videos.filter(v => !v.short).slice(0, 6).forEach((v, k) => {
+      v = { ...v, author: v.author || c.name, authorId: v.authorId || id };
+      if (k === 0) subLatest.push(v);
+      add(v, 3 + 2.5 * fresh(v.published) + affinity(id) - k * 0.3, { kind: 'sub', name: c.name });
+    });
+  });
+  // "because you watched": related videos of recent watches + newest uploads of the subs you watch most
+  const seedList = [...seeds.slice(0, 8).map(id => ({ id })), ...subLatest.slice(0, 5)].filter((x, i, a) => a.findIndex(y => y.id === x.id) === i).slice(0, 12);
+  const rel = await limitAll(seedList, 4, s => related(s.id, s.title || ''));
+  const chanHits = new Map();   // channel → { n, name, from }
+  rel.forEach((r, i) => {
+    if (!r || !r.related) return;
+    const seed = seedList[i], watched = !seed.author, weight = watched ? 1.2 : 0.8;
+    r.related.slice(0, 15).forEach((v, k) => {
+      if (v.authorId && !subSet.has(v.authorId)) { const h = chanHits.get(v.authorId) || { n: 0, name: v.author, from: seed.author || '' }; h.n++; chanHits.set(v.authorId, h); }
+      add(v, weight * (1.6 - k * 0.07) + 0.6 * fresh(v.published) + Math.min(0.6, Math.log10((v.views || 0) + 1) / 10) + affinity(v.authorId),
+        watched ? { kind: 'because', seed: seed.id } : { kind: 'similar', name: seed.author });
+    });
+  });
+  // channels that keep coming up next to what you like are "similar channels"
+  const similar = [...chanHits.entries()].filter(([, h]) => h.n >= 2).sort((a, b) => b[1].n - a[1].n).slice(0, 12);
+  for (const [id, h] of similar) for (const c of cand.values()) if (c.v.authorId === id) { c.score += 0.35 * Math.min(4, h.n); if (c.why.kind !== 'sub') c.why = { kind: 'similar', name: h.from || h.name }; }
+  // a little trending so the feed never gets stale
+  try { (await home(region)).slice(0, 12).forEach((v, k) => add(v, 1.1 - k * 0.05, { kind: 'trending' })); } catch {}
+  // three ranked lanes, blended in a fixed rhythm: subscriptions · discovery (because you watched / similar) · trending
+  const lanes = { S: [], D: [], T: [] };
+  for (const c of cand.values()) lanes[c.why.kind === 'sub' ? 'S' : c.why.kind === 'trending' ? 'T' : 'D'].push(c);
+  const out = [], perChan = new Map(), used = new Set();
+  const take = lane => {   // best in the lane, but channels already shown (and very recent ones) are pushed down
+    const L = lanes[lane]; let bi = -1, bs = -1e9;
+    for (let i = 0; i < L.length; i++) {
+      const c = L[i]; if (used.has(c.v.id)) continue;
+      const sc = c.score * Math.pow(0.55, perChan.get(c.v.authorId) || 0) - (out.slice(-3).some(o => o.v.authorId === c.v.authorId) ? 1.5 : 0);
+      if (sc > bs) { bs = sc; bi = i; }
+    }
+    if (bi < 0) return false;
+    const [c] = L.splice(bi, 1); used.add(c.v.id); perChan.set(c.v.authorId, (perChan.get(c.v.authorId) || 0) + 1); out.push(c); return true;
+  };
+  const RHYTHM = 'SDDSDTSDDSDD';
+  for (let i = 0; out.length < 60 && (lanes.S.length + lanes.D.length + lanes.T.length); i++) {
+    const want = RHYTHM[i % RHYTHM.length];
+    if (!take(want)) take(want === 'S' ? 'D' : 'S') || take('D') || take('T');
+  }
+  return {
+    items: out.map(c => ({ ...c.v, why: c.why })),
+    similar: similar.map(([id, h]) => ({ id, name: (h.name || '').replace(/ and \d+ more$/, ''), hits: h.n })),
+  };
+}
+
 /* ---------------- warm-up: trending and the first Shorts are ready before anyone opens Kushtube ---------------- */
 function warm(force) {
   if (process.env.SJ_YT_NO_WARM) return;
@@ -387,6 +457,12 @@ export async function ytApi(req, res, url) {
     if ((m = /^\/yt\/api\/related\/([\w-]{11})$/.exec(p))) return send(200, await related(m[1], q('title').slice(0, 200)), 1800), true;
     if ((m = /^\/yt\/api\/sponsor\/([\w-]{11})$/.exec(p))) return send(200, { segments: await sponsor(m[1]) }, 3600), true;
     if ((m = /^\/yt\/api\/channel\/(UC[\w-]{22})$/.exec(p))) return send(200, await channel(m[1], q('tab') === 'shorts' ? 'shorts' : 'videos')), true;
+    if (p === '/yt/api/foryou') {
+      const ids = (k, re, n) => q(k).split(',').filter(x => re.test(x)).slice(0, n);
+      const args = { subs: ids('subs', CHAN, 80), aff: ids('aff', CHAN, 30), seeds: ids('seeds', VID, 10), seen: ids('seen', VID, 120), region };
+      const key = 'fy:' + crypto.createHash('sha1').update(JSON.stringify(args)).digest('hex');
+      return send(200, await cached(key, 10 * 60e3, () => forYou(args), 6 * 3600e3)), true;
+    }
     if (p === '/yt/api/feed') { const ids = q('ids').split(',').filter(x => CHAN.test(x)).slice(0, 60); return send(200, { items: await feed(ids) }), true; }
     send(404, { error: 'Unknown Kushtube request' }); return true;
   } catch (e) {
