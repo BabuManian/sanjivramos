@@ -215,6 +215,9 @@ body.wm-busy iframe { pointer-events: none !important; }
 :root[data-icons="liquidtint"] .app-tile:not(.ci-pic), .ic-prev[data-icons="liquidtint"].ic-prev.ic-prev .app-tile:not(.ci-pic) { background: rgba(14,15,22,.5); }
 :root[data-icons="liquidtint"] .app-tile:not(.ci-pic)::before, .ic-prev[data-icons="liquidtint"].ic-prev.ic-prev .app-tile:not(.ci-pic)::before { background: var(--accent); opacity: .2; }
 :root[data-icons="liquidtint"] .app-tile .g, .ic-prev[data-icons="liquidtint"].ic-prev.ic-prev .app-tile .g { stroke: color-mix(in srgb, var(--accent) 75%, #fff); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 50%, transparent)); }
+/* Liquid Clear: the dock is see-through too — no fill, no blur, just a thin white glass edge */
+:root[data-icons="liquidclear"] #dock #dock-inner, :root[data-icons="liquidclear"] #phone-home .ph-dock { background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 1px solid rgba(255,255,255,.3) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.25) !important; }
+:root[data-icons="liquidclear"] #dock #dock-inner::before, :root[data-icons="liquidclear"] #dock #dock-inner::after { background: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 /* Keep the glass layers out of other styles' previews while Liquid Glass is the active style */
 :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]) .app-tile::before, :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]) .app-tile::after { content: none; }
 :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]):not([data-icons="frost"]) .app-tile { -webkit-backdrop-filter: none; backdrop-filter: none; isolation: auto; }
