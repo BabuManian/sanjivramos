@@ -99,7 +99,7 @@ function cleanLook(l) {
   if (!l || typeof l !== 'object') return null;
   const o = {};
   for (const k of LOOK_COLORS) if (typeof l[k] === 'string' && /^#[0-9a-f]{6}$/i.test(l[k])) o[k] = l[k].toLowerCase();
-  for (const k of LOOK_PARTS) if (Number.isInteger(l[k]) && l[k] >= 0 && l[k] < 32) o[k] = l[k];
+  for (const k of LOOK_PARTS) if (Number.isInteger(l[k]) && l[k] >= 0 && l[k] < 64) o[k] = l[k];
   if (typeof l.title === 'string') o.title = l.title.replace(/[\u0000-\u001f<>]/g, '').slice(0, 24);
   // items people drew themselves (Item Workshop): 16×16 pixels, 16-colour palette, one per slot
   if (l.custom && typeof l.custom === 'object') {
