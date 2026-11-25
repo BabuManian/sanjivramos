@@ -112,6 +112,17 @@ function cleanLook(l) {
     }
     if (Object.keys(c).length) o.custom = c;
   }
+  // shirts / pants made from people's own pictures: up to 32×32 pixels, 6 hex chars each ('......' = see-through)
+  if (l.cloth && typeof l.cloth === 'object') {
+    const c = {};
+    for (const k of ['shirt', 'pants']) {
+      const x = l.cloth[k];
+      if (!x || !Number.isInteger(x.w) || !Number.isInteger(x.h) || x.w < 4 || x.h < 4 || x.w > 32 || x.h > 32) continue;
+      if (typeof x.px !== 'string' || x.px.length !== x.w * x.h * 6 || !/^(?:[0-9a-f]{6}|\.{6})+$/.test(x.px)) continue;
+      c[k] = { n: String(x.n || '').replace(/[\u0000-\u001f<>]/g, '').slice(0, 24), w: x.w, h: x.h, px: x.px };
+    }
+    if (Object.keys(c).length) o.cloth = c;
+  }
   return Object.keys(o).length ? o : null;
 }
 const publicUser = u => { if (!u) return u; const p = prefsOf(u); return { id: u.id, username: u.username, display: u.display, avatar: u.avatar || null, bio: u.bio || '', look: p.look || null, online: p.showOnline === false ? false : sockets.has(u.id), lastSeen: p.showOnline === false ? null : (u.last_seen || null), activity: p.showActivity === false ? null : (activity.get(u.id) || null) }; };

@@ -50,11 +50,20 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
 .card small{opacity:.6}
 .card .row{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
 .imp{display:flex;gap:6px;margin-top:14px}
+/* clothing */
+.drop{border:2px dashed rgba(255,255,255,.2);border-radius:14px;padding:18px;text-align:center;cursor:pointer;display:block}
+.drop.over{border-color:#60a5fa;background:rgba(96,165,250,.1)}
+.drop input{display:none}
+#clGrid{width:100%;max-width:240px;aspect-ratio:1;image-rendering:pixelated;border-radius:10px;display:block;margin:10px 0;background:repeating-conic-gradient(#334155 0 25%,#1e293b 0 50%) 0 0/16px 16px}
+.chk{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.designs{display:flex;flex-wrap:wrap;gap:6px}
+.designs button{display:flex;flex-direction:column;align-items:center;gap:2px;width:74px;padding:5px 2px;border-radius:10px;background:rgba(255,255,255,.06);font-size:11px}
+.designs img{width:44px;height:44px;image-rendering:pixelated;border-radius:6px}
 </style></head>
 <body><main>
 <h1>🧍 Character Creator</h1>
 <p class="sub">Design the character that represents you in online games — and draw your own hats, badges, wings, pets and more.</p>
-<div class="tabs" id="tabs"><button data-t="char" class="on">🧍 Character</button><button data-t="ws">🎨 Item Workshop</button><button data-t="mine">🎒 My Items</button></div>
+<div class="tabs" id="tabs"><button data-t="char" class="on">🧍 Character</button><button data-t="ws">🎨 Item Workshop</button><button data-t="cl">👕 Clothing</button><button data-t="mine">🎒 My Items</button></div>
 
 <section id="t-char">
   <div id="ed"></div>
@@ -69,7 +78,7 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
       <div class="tools" id="tools">
         <button data-tool="pen" class="on" title="Pencil">✏️</button><button data-tool="erase" title="Eraser">🧽</button><button data-tool="fill" title="Fill">🪣</button><button data-tool="pick" title="Pick a colour from the picture">💧</button>
         <button data-act="mirror" title="Mirror drawing (left/right)">🪞</button><button data-act="undo" title="Undo">↩️</button><button data-act="redo" title="Redo">↪️</button>
-        <button data-act="flip" title="Flip left/right">⇆</button><button data-act="up" title="Move up">⬆</button><button data-act="down" title="Move down">⬇</button><button data-act="left" title="Move left">⬅</button><button data-act="right" title="Move right">➡</button><button data-act="clear" title="Clear">🗑️</button>
+        <button data-act="flip" title="Flip left/right">⇆</button><button data-act="up" title="Move up">⬆</button><button data-act="down" title="Move down">⬇</button><button data-act="left" title="Move left">⬅</button><button data-act="right" title="Move right">➡</button><button data-act="clear" title="Clear">🗑️</button><label class="btn sm" style="display:inline-flex;align-items:center;height:36px;box-sizing:border-box" title="Turn a picture into pixel art with these colours">📷 From picture<input type="file" id="wsPic" accept="image/*" hidden></label>
       </div>
       <div class="pal" id="pal"></div>
       <div class="palrow"><input type="color" id="palEdit" title="Change this colour"><span>Tap a colour to paint with it · use this box to change it to any colour</span></div>
@@ -85,6 +94,30 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
       <div class="msg" id="wsMsg" style="margin-top:6px"></div>
       <h3>Start from a design</h3>
       <div class="tpl" id="tpl"></div>
+    </div>
+  </div>
+</section>
+
+<section id="t-cl" hidden>
+  <div class="ws">
+    <div>
+      <div class="slots" id="clKind"><button data-k="shirt" class="on">👕 Shirt</button><button data-k="pants">👖 Pants</button></div>
+      <label class="drop" id="clDrop" style="margin-top:10px">📷 <b>Upload a picture</b><br><span class="hint">or drop one here — any photo, drawing or logo</span><input type="file" id="clFile" accept="image/*"></label>
+      <h3>How it fits</h3>
+      <div class="slots" id="clMode"><button data-m="fill" class="on">Fill</button><button data-m="fit">Fit</button><button data-m="stretch">Stretch</button></div>
+      <label class="chk"><input type="checkbox" id="clBg"> Remove plain background</label>
+      <label class="chk"><input type="checkbox" id="clMatch" checked> Match sleeves / colour to the picture</label>
+      <canvas id="clGrid" width="24" height="24"></canvas>
+      <div class="hint" id="clHint">Shirts cover your chest. For pants, the left half of the picture goes on the left leg and the right half on the right leg.</div>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Name</h3>
+      <input class="txt" id="clName" maxlength="24" placeholder="My shirt">
+      <canvas id="clPrev" width="300" height="400" style="width:100%;max-width:240px;aspect-ratio:3/4;border-radius:14px;background:radial-gradient(circle at 50% 30%,#334155,#0f172a);display:block;margin:8px 0"></canvas>
+      <div class="bar" style="margin-top:4px"><button class="btn pri" id="clWear">👕 Wear it</button><button class="btn" id="clSave">💾 Save to closet</button><button class="btn" id="clOff">Take off</button></div>
+      <div class="msg" id="clMsg" style="margin-top:6px"></div>
+      <h3>Try a design</h3><div class="designs" id="clDesigns"></div>
+      <h3>My closet</h3><div class="designs" id="clCloset"></div>
     </div>
   </div>
 </section>
@@ -106,6 +139,7 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
     { id: 'designer', name: 'Designer', desc: 'Make your own item in the Item Workshop', icon: '🎨' },
     { id: 'collector', name: 'Collector', desc: 'Have 10 items you made', icon: '🎒' },
     { id: 'fullfit', name: 'All Mine', desc: 'Wear your own items in 3 slots at once', icon: '👑' },
+    { id: 'tailor', name: 'Tailor', desc: 'Wear a shirt or pants you made', icon: '👕' },
   ] });
   const $ = id => document.getElementById(id);
   const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -114,7 +148,7 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
 
   /* ---------- tabs ---------- */
   let tab = 'char';
-  const show = t => { tab = t; for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.t === t); for (const s of ['char', 'ws', 'mine']) $('t-' + s).hidden = s !== t; if (t === 'mine') paintItems(); if (t === 'char') ed.refresh(); };
+  const show = t => { tab = t; for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.t === t); for (const s of ['char', 'ws', 'cl', 'mine']) $('t-' + s).hidden = s !== t; if (t === 'mine') paintItems(); if (t === 'cl') paintCloset(); if (t === 'char') ed.refresh(); };
   $('tabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) show(b.dataset.t); };
 
   /* ---------- character ---------- */
@@ -209,11 +243,97 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
   // live preview: you, wearing what you're drawing
   const pc = $('prev'), px = pc.getContext('2d'); let pt = 0;
   (function loop() {
-    requestAnimationFrame(loop); if (tab !== 'ws') return; pt += 1 / 60;
+    if (!pc.isConnected) return; requestAnimationFrame(loop); if (tab !== 'ws') return; pt += 1 / 60;
     const L = ed.get(), item = { n: 'x', s: it.s, p: it.p, d: it.d.join('') };
     px.clearRect(0, 0, pc.width, pc.height);
     SJLook.draw(px, { ...L, custom: { ...(L.custom || {}), [it.s]: item } }, it.s === 'pet' ? 190 : 150, 370, 270, { t: pt, pose: it.s === 'held' ? 'idle' : 'walk', face: 1 });
   })();
+
+  /* ---------- pictures → pixels ---------- */
+  const loadImg = file => new Promise((res, rej) => { if (!file || !/^image\//.test(file.type)) return rej(new Error('That isn’t a picture.')); const u = URL.createObjectURL(file), im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Couldn’t open that picture.')); im.src = u; });
+  /** scale a picture down to w×h (in halving steps so it stays smooth) → RGBA data */
+  function shrink(img, W, H, mode) {
+    let src = img, sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
+    while (sw > W * 4 || sh > H * 4) { const c = document.createElement('canvas'); c.width = Math.max(1, sw >> 1); c.height = Math.max(1, sh >> 1); const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); src = c; sw = c.width; sh = c.height; }
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    if (mode === 'stretch') x.drawImage(src, 0, 0, W, H);
+    else { const k = mode === 'fill' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh), dw = sw * k, dh = sh * k; x.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh); }
+    return x.getImageData(0, 0, W, H).data;
+  }
+  const hex2 = v => v.toString(16).padStart(2, '0');
+  const near = (d, i, bg) => bg && Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) < 60;
+  function toCloth(img, mode, removeBg) {
+    const W = 24, H = 24, d = shrink(img, W, H, mode); let px = '', R = 0, G = 0, B = 0, n = 0;
+    const bg = removeBg ? [d[0], d[1], d[2]] : null;
+    for (let i = 0; i < W * H; i++) { const k = i * 4; if (d[k + 3] < 128 || near(d, k, bg)) { px += '......'; continue; } px += hex2(d[k]) + hex2(d[k + 1]) + hex2(d[k + 2]); R += d[k]; G += d[k + 1]; B += d[k + 2]; n++; }
+    return { w: W, h: H, px, avg: n ? '#' + [R, G, B].map(v => hex2(Math.round(v / n))).join('') : null };
+  }
+  $('wsPic').onchange = async e => {
+    try {
+      const img = await loadImg(e.target.files[0]); e.target.value = ''; push();
+      const d = shrink(img, 16, 16, 'fit'), bg = d[3] > 128 ? [d[0], d[1], d[2]] : null, rgb = it.p.map(h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; });
+      it.d = Array.from({ length: 256 }, (_, i) => { const k = i * 4; if (d[k + 3] < 128 || near(d, k, bg)) return '.'; let best = 0, bd = 1e9; rgb.forEach((c, j) => { const dd = (c[0] - d[k]) ** 2 + (c[1] - d[k + 1]) ** 2 + (c[2] - d[k + 2]) ** 2; if (dd < bd) { bd = dd; best = j; } }); return best.toString(16); });
+      refreshAll(); $('wsMsg').textContent = 'Turned your picture into pixel art ✓ — touch it up with the pencil';
+    } catch (err) { $('wsMsg').textContent = err.message; }
+  };
+
+  /* ---------- clothing from pictures ---------- */
+  let clKind = 'shirt', clMode = 'fill', clImg = null, clCur = null;
+  const DESIGNS = (() => {
+    const mk = (kind, n, f) => { let px = ''; for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) { const c = f(x, y); px += c ? c.slice(1) : '......'; } return { kind, n, w: 24, h: 24, px, avg: f(12, 12) }; };
+    const rnd = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+    return [
+      mk('shirt', 'Plaid', (x, y) => (x % 8 < 3) && (y % 8 < 3) ? '#111827' : (x % 8 < 3 || y % 8 < 3) ? '#7f1d1d' : '#dc2626'),
+      mk('shirt', 'Tuxedo', (x, y) => { const m = Math.abs(x - 11.5); if (y >= 1 && y <= 3 && m < 2.6) return m < .8 ? '#7f1d1d' : '#dc2626'; if (y < 17 && m < (17 - y) * .4) return m < .6 && y > 5 && y % 4 === 2 ? '#111827' : '#f8fafc'; return '#111827'; }),
+      mk('shirt', 'Galaxy', (x, y) => rnd(x, y) > .93 ? '#ffffff' : ['#1e1b4b', '#312e81', '#4c1d95', '#581c87'][Math.floor((Math.sin(x * .4 + y * .3) + Math.sin(y * .5 - x * .2) + 2) / 4 * 3.99)]),
+      mk('shirt', 'Rainbow', (x, y) => ['#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#8b5cf6'][Math.floor(y / 4)]),
+      mk('shirt', 'Sports #10', (x, y) => { const one = x >= 6 && x <= 7 && y >= 7 && y <= 17, zero = (x >= 10 && x <= 17 && y >= 7 && y <= 17) && !(x >= 12 && x <= 15 && y >= 9 && y <= 15); if (one || zero) return '#ffffff'; return y < 2 ? '#facc15' : '#16a34a'; }),
+      mk('shirt', 'Smiley', (x, y) => { const d = Math.hypot(x - 11.5, y - 11.5); if (d < 7) { if ((Math.hypot(x - 9, y - 9.5) < 1.2) || (Math.hypot(x - 14, y - 9.5) < 1.2)) return '#111827'; if (d > 3 && d < 4.4 && y > 12) return '#111827'; return '#facc15'; } return '#0ea5e9'; }),
+      mk('pants', 'Jeans', (x, y) => (x === 11 || x === 12) ? '#1e3a8a' : y < 2 ? '#1e293b' : rnd(x, y) > .85 ? '#3b82f6' : '#2563eb'),
+      mk('pants', 'Ripped jeans', (x, y) => (y >= 12 && y <= 14 && ((x >= 3 && x <= 8) || (x >= 15 && x <= 20))) ? (y === 13 ? null : '#e5e7eb') : rnd(x, y) > .85 ? '#60a5fa' : '#3b82f6'),
+      mk('pants', 'Camo', (x, y) => ['#365314', '#4d7c0f', '#78350f', '#1c1917'][Math.floor((Math.sin(x * .7) + Math.cos(y * .6 + x * .3) + 2) / 4 * 3.99)]),
+      mk('pants', 'Track pants', (x, y) => (x === 1 || x === 2 || x === 21 || x === 22) ? '#f8fafc' : '#111827'),
+      mk('pants', 'Checkers', (x, y) => ((x >> 2) + (y >> 2)) % 2 ? '#111827' : '#f8fafc'),
+      mk('pants', 'Lava', (x, y) => ['#7f1d1d', '#dc2626', '#f97316', '#facc15'][Math.floor((Math.sin(x * .5 + y * .4) * Math.cos(y * .3) + 1) / 2 * 3.99)]),
+    ];
+  })();
+  const clothURL = c => { const cv = document.createElement('canvas'); cv.width = cv.height = 48; const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(SJLook.clothCanvas(c), 0, 0, 48, 48); return cv.toDataURL(); };
+  function paintCl() {
+    for (const b of $('clKind').children) b.classList.toggle('on', b.dataset.k === clKind);
+    for (const b of $('clMode').children) b.classList.toggle('on', b.dataset.m === clMode);
+    const g2 = $('clGrid').getContext('2d'); g2.clearRect(0, 0, 24, 24); if (clCur) g2.drawImage(SJLook.clothCanvas(clCur), 0, 0);
+    $('clName').placeholder = clKind === 'shirt' ? 'My shirt' : 'My pants';
+  }
+  function paintCloset() {
+    $('clDesigns').innerHTML = DESIGNS.map((d, i) => `<button data-dz="${i}" title="${d.kind}"><img src="${clothURL(d)}" alt=""><span>${d.kind === 'shirt' ? '👕' : '👖'} ${esc(d.n)}</span></button>`).join('');
+    const list = SJLook.Clothes.list();
+    $('clCloset').innerHTML = list.length ? list.map(c => `<button data-cz="${c.id}" title="Tap to load"><img src="${clothURL(c)}" alt=""><span>${c.kind === 'shirt' ? '👕' : '👖'} ${esc(c.n)}</span><span data-del="${c.id}" style="color:#fca5a5">delete</span></button>`).join('') : '<span class="hint">Clothes you save show up here.</span>';
+    paintCl();
+  }
+  const reconvert = () => { if (clImg) { clCur = toCloth(clImg, clMode, $('clBg').checked); paintCl(); } };
+  async function useFile(f) { try { clImg = await loadImg(f); if (!$('clName').value) $('clName').value = (f.name || '').replace(/\.[^.]+$/, '').slice(0, 24); reconvert(); $('clMsg').textContent = 'Looking good! Press “Wear it” to put it on.'; } catch (e) { $('clMsg').textContent = e.message; } }
+  $('clFile').onchange = e => { useFile(e.target.files[0]); e.target.value = ''; };
+  const dz = $('clDrop');
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave = () => dz.classList.remove('over');
+  dz.ondrop = e => { e.preventDefault(); dz.classList.remove('over'); useFile(e.dataTransfer.files[0]); };
+  addEventListener('paste', e => { if (tab !== 'cl') return; const f = [...(e.clipboardData || {}).files || []].find(f => /^image\//.test(f.type)); if (f) useFile(f); });
+  $('clKind').onclick = e => { const b = e.target.closest('[data-k]'); if (b) { clKind = b.dataset.k; paintCl(); } };
+  $('clMode').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { clMode = b.dataset.m; reconvert(); } };
+  $('clBg').onchange = reconvert;
+  $('clDesigns').onclick = e => { const b = e.target.closest('[data-dz]'); if (!b) return; const d = DESIGNS[+b.dataset.dz]; clImg = null; clCur = { w: d.w, h: d.h, px: d.px, avg: d.avg }; clKind = d.kind; $('clName').value = d.n; paintCl(); };
+  $('clCloset').onclick = e => { const del = e.target.closest('[data-del]'); if (del) { SJLook.Clothes.remove(del.dataset.del); paintCloset(); return; } const b = e.target.closest('[data-cz]'); if (!b) return; const c = SJLook.Clothes.list().find(x => x.id === b.dataset.cz); if (!c) return; clImg = null; clCur = { w: c.w, h: c.h, px: c.px, avg: c.avg }; clKind = c.kind; $('clName').value = c.n; paintCl(); };
+  const clName = () => $('clName').value.trim() || (clKind === 'shirt' ? 'My shirt' : 'My pants');
+  $('clSave').onclick = () => { if (!clCur) { $('clMsg').textContent = 'Upload a picture or pick a design first.'; return; } const k = SJLook.Clothes.put({ ...clCur, kind: clKind, n: clName() }); $('clMsg').textContent = k ? `“${k.n}” saved to your closet ✓` : 'Your closet is full on this device — delete something first.'; paintCloset(); };
+  $('clWear').onclick = async () => {
+    if (!clCur) { $('clMsg').textContent = 'Upload a picture or pick a design first.'; return; }
+    const L = ed.get(), next = { ...L, cloth: { ...(L.cloth || {}), [clKind]: { n: clName(), w: clCur.w, h: clCur.h, px: clCur.px } } };
+    if ($('clMatch').checked && clCur.avg) next[clKind === 'shirt' ? 'shirt' : 'pants'] = clCur.avg;
+    ed.set(next); window.SJG && SJG.unlock('tailor'); $('clMsg').textContent = `Wearing your ${clKind} — ` + await saveLook();
+  };
+  $('clOff').onclick = async () => { const L = ed.get(), c = { ...(L.cloth || {}) }; delete c[clKind]; ed.set({ ...L, cloth: Object.keys(c).length ? c : null }); $('clMsg').textContent = `Took off your ${clKind} — ` + await saveLook(); };
+  // preview: you wearing what's on the table
+  const cp = $('clPrev'), cx2 = cp.getContext('2d'); let ct = 0;
+  (function loop() { if (!cp.isConnected) return; requestAnimationFrame(loop); if (tab !== 'cl') return; ct += 1 / 60; const L = ed.get(), next = { ...L }; if (clCur) { next.cloth = { ...(L.cloth || {}), [clKind]: { w: clCur.w, h: clCur.h, px: clCur.px } }; if ($('clMatch').checked && clCur.avg) next[clKind === 'shirt' ? 'shirt' : 'pants'] = clCur.avg; } cx2.clearRect(0, 0, cp.width, cp.height); SJLook.draw(cx2, next, 150, 370, 290, { t: ct, pose: 'walk', noPet: true }); })();
 
   /* ---------- my items ---------- */
   function paintItems() {
@@ -237,6 +357,7 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
 
   paintTpl(); refreshAll();
   window.__avatar = () => ed.get();
+  window.__cloth = { useFile, get: () => clCur, set: c => { clCur = c; paintCl(); }, toCloth, DESIGNS };
   window.__workshop = { get: () => it, show, set: v => { it = v; refreshAll(); }, asItem, store, wear };
 })();
 </script>

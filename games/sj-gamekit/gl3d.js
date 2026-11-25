@@ -225,6 +225,8 @@ gl_FragColor=vec4(c,1.);}`;
       person(look, x, y, z, yaw, anim = {}) {
         const L = Object.assign({ skin: '#f8c9a0', hair: '#4a2f1d', eye: '#1f2937', shirt: '#3b82f6', shirt2: '#f1f5f9', pants: '#334155', shoes: '#111827', hatColor: '#ef4444', accColor: '#111827', heldColor: '#9ca3af', petColor: '#f97316', markColor: '#ef4444', hairStyle: 0, hat: 0, acc: 0, body: 1, shirtStyle: 0, held: 0, pet: 0, faceMark: 0 }, look || {});
         const tm = performance.now() / 1000, CU = sl => window.SJLook && SJLook.custom ? SJLook.custom(L, sl) : null;
+        const cS = window.SJLook && SJLook.cloth ? SJLook.cloth(L, 'shirt') : null, cP = window.SJLook && SJLook.cloth ? SJLook.cloth(L, 'pants') : null;
+        if (cS) L.shirtStyle = 99;
         const k = anim.scale || 1, bw = [0.82, 1, 1.15][L.body] || 1;
         if (anim.shadow !== false) R.shadow(x, anim.groundY == null ? y : anim.groundY, z, 0.42 * k * bw, anim.groundY != null ? clamp01(0.38 - (y - anim.groundY) * 0.08) : 0.38);
         const base = chain(T(x, y, z), RY(yaw), S(k, k, k));
@@ -236,9 +238,11 @@ gl_FragColor=vec4(c,1.);}`;
         for (const [sx, a] of [[-0.13, sw], [0.13, -sw]]) {
           P(sx * bw, 0.8, 0, 0.22 * bw, 0.7, 0.24, L.pants, RX(a));
           R.cube(chain(base, T(sx * bw, 0.8, 0), RX(a), T(0, -0.73, -0.05), S(0.24 * bw, 0.14, 0.34)), L.shoes);
+          if (cP) { const lf = chain(base, T(sx * bw, 0.8, 0), RX(a)), cw = 0.22 * bw / 4, chh = 0.7 / 8; for (const r of SJLook.clothRuns(cP, 4, 8, sx > 0 ? 0 : 0.5, sx > 0 ? 0.5 : 1)) R.cube(chain(lf, T((2 - r.x - r.w / 2) * cw, -(r.y + 0.5) * chh, -0.122), S(r.w * cw, chh, 0.01)), r.c); }
         }
         // torso
         P(0, 1.13, 0, 0.5 * bw, 0.66, 0.3, L.shirt);
+        if (cS) { const cw = 0.5 * bw / 8, chh = 0.66 / 8; for (const r of SJLook.clothRuns(cS, 8, 8)) R.cube(chain(base, T((4 - r.x - r.w / 2) * cw, 1.46 - (r.y + 0.5) * chh, -0.152), S(r.w * cw, chh, 0.01)), r.c); }
         if (L.shirtStyle === 3) for (let i = 0; i < 2; i++) P(0, 0.98 + i * 0.22, 0, 0.51 * bw, 0.07, 0.31, L.shirt2);
         if (L.shirtStyle === 2 || L.shirtStyle === 4) P(0, 1.13, -0.152, 0.12, 0.64, 0.02, L.shirt2);
         if (L.shirtStyle === 5) P(0, 1.2, -0.16, 0.42 * bw, 0.4, 0.04, L.shirt2);
@@ -336,6 +340,13 @@ gl_FragColor=vec4(c,1.);}`;
           case 20: P(0, hy + 0.3, 0.02, 0.48, 0.14, 0.46, L.hatColor); R.cube(chain(base, T(0, hy + 0.42, 0), RY(tm * 12), S(0.55, 0.02, 0.07)), '#facc15'); break;
           case 21: P(0.13, hy + 0.27, 0, 0.22, 0.1, 0.06, L.hatColor); break;
           case 22: for (const sx of [-0.1, 0.1]) { P(sx, hy + 0.36, 0, 0.02, 0.2, 0.02, '#1f2937'); P(sx, hy + 0.48, 0, 0.07, 0.07, 0.07, L.hatColor); } break;
+          case 23: case 24: P(0, hy + 0.23, 0, 0.68, 0.03, 0.68, L.hatColor); P(0, hy + 0.34, 0, 0.42, 0.2, 0.42, L.hatColor); P(0, hy + 0.27, 0, 0.43, 0.05, 0.43, '#111827'); if (L.hat === 24) for (let i = 0; i < 5; i++) { const a = tm * 1.5 + i * 1.256; R.cube(chain(base, T(Math.cos(a) * 0.4, hy + 0.3 + Math.sin(tm * 3 + i) * 0.08, Math.sin(a) * 0.4), RY(a), S(0.05, 0.05, 0.05)), L.hatColor, 1, 1); } break;
+          case 25: { P(0, hy + 0.25, 0.02, 0.54, 0.08, 0.5, L.hatColor); P(-0.255, hy, 0.02, 0.04, 0.52, 0.5, L.hatColor); P(0.255, hy, 0.02, 0.04, 0.52, 0.5, L.hatColor); P(0, hy - 0.02, 0.255, 0.54, 0.56, 0.04, L.hatColor); P(0, hy + 0.22, -0.225, 0.54, 0.035, 0.02, '#facc15'); P(0, hy, -0.214, 0.42, 0.4, 0.004, '#050505'); const ec = L.accColor === '#111827' ? '#ef4444' : L.accColor; for (const sx of [-0.09, 0.09]) R.cube(chain(base, T(sx, hy + 0.02, -0.218), S(0.08, 0.03, 0.005)), ec, 1, 1); break; }
+          case 26: P(0, hy + 0.26, 0, 0.5, 0.14, 0.5, '#cbd5e1'); P(0, hy + 0.2, 0, 0.51, 0.04, 0.51, L.hatColor); for (const sx of [-1, 1]) R.cube(chain(base, T(sx * 0.29, hy + 0.36, 0.05), RZ(sx * -0.4), S(0.04, 0.32, 0.26)), '#f8fafc'); break;
+          case 27: for (const [dx, hh] of [[-0.16, 0.2], [-0.08, 0.3], [0, 0.4], [0.08, 0.3], [0.16, 0.2]]) R.cube(chain(base, T(dx, hy + 0.22 + hh / 2, -0.05), RY(Math.PI / 4), S(0.07, hh, 0.07)), L.hatColor, 1, 0.6); P(0, hy + 0.22, 0, 0.48, 0.05, 0.48, '#e5e7eb'); break;
+          case 28: P(0, hy + 0.24, 0, 0.5, 0.12, 0.5, L.hatColor); P(0, hy + 0.02, -0.215, 0.36, 0.08, 0.01, '#111827'); for (let i = 0; i < 4; i++) { const fh = 0.15 + 0.08 * Math.sin(tm * 9 + i * 1.9); R.cube(chain(base, T(-0.15 + i * 0.1, hy + 0.3 + fh / 2, 0), S(0.08, fh, 0.08)), i % 2 ? '#fde047' : '#f97316', 1, 1); } break;
+          case 29: for (const sx of [-1, 1]) { R.cube(chain(base, T(sx * 0.2, hy + 0.32, 0), RZ(sx * -0.5), S(0.07, 0.3, 0.07)), '#bae6fd', 1, 0.5); R.cube(chain(base, T(sx * 0.3, hy + 0.5, 0), RZ(sx * 0.2), S(0.05, 0.16, 0.05)), '#e0f2fe', 1, 0.5); } break;
+          case 30: P(0, hy + 0.27, 0, 0.5, 0.16, 0.5, '#facc15'); P(0, hy + 0.21, 0, 0.51, 0.04, 0.51, '#b45309'); P(0, hy + 0.5, 0.1, 0.06, 0.3, 0.34, L.hatColor); R.cube(chain(base, T(0, hy + 0.3, -0.255), S(0.07, 0.07, 0.02)), '#ef4444', 1, 0.8); break;
           case 8: P(-0.25, hy, 0, 0.08, 0.2, 0.2, L.hatColor); P(0.25, hy, 0, 0.08, 0.2, 0.2, L.hatColor); P(0, hy + 0.27, 0, 0.5, 0.04, 0.06, L.hatColor); break;
         }
         { const ch = CU('hat'); if (ch) vox(ch, chain(base, T(0, hy + 0.2 + 0.3, 0)), 0.6, 0.46); }
