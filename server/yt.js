@@ -144,7 +144,7 @@ function pipedCard(v) {
   if (v.type === 'playlist') return null;
   const id = pipedId(v.url); if (!id) return null;
   const len = v.duration > 0 ? v.duration : 0;
-  return { type: 'video', id, title: v.title, author: v.uploaderName, authorId: pipedChan(v.uploaderUrl), len, length: len ? fmtLen(len) : (v.duration === -1 && !(v.uploaded > 0) && !v.uploadedDate ? 'LIVE' : ''), views: v.views, published: v.uploaded > 0 ? v.uploaded : 0, ago: v.uploadedDate || '', thumb: thumbOf(id), short: !!v.isShort || (len > 0 && len <= 62) };
+  return { type: 'video', id, title: v.title, author: v.uploaderName, authorId: pipedChan(v.uploaderUrl), len, length: len ? fmtLen(len) : (v.duration === -1 && !v.isShort && !(v.uploaded > 0) && !v.uploadedDate ? 'LIVE' : ''), views: v.views, published: v.uploaded > 0 ? v.uploaded : 0, ago: v.uploadedDate || '', thumb: thumbOf(id), short: !!v.isShort || (len > 0 && len <= 62) };
 }
 function dlCard(e) {
   if (!e || !VID.test(e.id || '')) return null;
@@ -257,24 +257,28 @@ function related(id, title) {
     async () => { const { j: r } = await piped(`/streams/${id}`); return { related: nonEmpty(clean((r.relatedStreams || []).map(pipedCard))), authorThumb: r.uploaderAvatar }; },
   ).catch(async () => ({ related: title ? (await search(title.split(/[|(\[]/)[0].slice(0, 60), 1, 'video').catch(() => [])).filter(v => v.id !== id) : [] })));
 }
+async function chanYtdlp(id, tab) {
+  const j = await ytdlp(`https://www.youtube.com/channel/${id}/${tab}`, { flat: true, end: 30 });
+  return { id, name: j.channel || j.uploader || j.title, thumb: '', banner: '', subs: j.channel_follower_count || 0, desc: j.description || '', videos: clean((j.entries || []).map(e => { const c = dlCard(e); if (c && tab === 'shorts') c.short = true; return c; })) };
+}
 function channel(id, tab) {
   return cached(`ch:${id}:${tab}`, 30 * 60e3, () => any(
     () => race(
       async () => {
         const [{ j: info }, { j: list }] = await Promise.all([inv(`/api/v1/channels/${id}`), inv(`/api/v1/channels/${id}/${tab}`)]);
-        return { id, name: info.author, thumb: https(((info.authorThumbnails || []).slice(-1)[0] || {}).url), banner: https(((info.authorBanners || [])[0] || {}).url), subs: info.subCount, desc: info.description || '', videos: clean((list.videos || list || []).map(x => invCard({ ...x, type: 'video', isShort: tab === 'shorts' }))) };
+        return { id, name: info.author, thumb: https(((info.authorThumbnails || []).slice(-1)[0] || {}).url), banner: https(((info.authorBanners || [])[0] || {}).url), subs: info.subCount, desc: info.description || '', videos: nonEmpty(clean((list.videos || list || []).map(x => invCard({ ...x, type: 'video', isShort: tab === 'shorts' })))) };
       },
       async () => {
         const { j } = await piped(`/channel/${id}`);
         let vids = j.relatedStreams || [];
         if (tab === 'shorts') { const t = (j.tabs || []).find(x => x.name === 'shorts'); if (!t) throw new Error('no shorts tab'); const r = await piped(`/channels/tabs?data=${encodeURIComponent(t.data)}`); vids = r.j.content || []; }
-        return { id, name: j.name, thumb: j.avatarUrl, banner: j.bannerUrl, subs: j.subscriberCount, desc: j.description || '', videos: clean(vids.map(pipedCard)) };
+        let videos = clean(vids.map(pipedCard));
+        // Piped stopped listing a channel's normal videos (only a Shorts tab) — take the list from yt-dlp, keep Piped's name/avatar/banner
+        if (!videos.length) videos = (await chanYtdlp(id, tab)).videos;
+        return { id, name: j.name, thumb: j.avatarUrl, banner: j.bannerUrl, subs: j.subscriberCount, desc: j.description || '', videos: nonEmpty(videos) };
       },
     ),
-    async () => {
-      const j = await ytdlp(`https://www.youtube.com/channel/${id}/${tab}`, { flat: true, end: 30 });
-      return { id, name: j.channel || j.uploader || j.title, thumb: '', banner: '', subs: j.channel_follower_count || 0, desc: j.description || '', videos: clean((j.entries || []).map(e => { const c = dlCard(e); if (c && tab === 'shorts') c.short = true; return c; })) };
-    },
+    () => chanYtdlp(id, tab),
   ), 24 * 3600e3);
 }
 async function feed(ids) {
