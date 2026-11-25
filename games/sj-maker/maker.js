@@ -12,7 +12,8 @@ const kit = window.SJG ? SJG.init('maker', { vs: false, title: 'Game Maker', tro
   { id: 'levels5', name: 'World Builder', desc: 'Make a game with 5 levels', icon: '🗺️' },
 ] }) : null;
 const sfx = n => kit && kit.sfx(n);
-const ORDER = ['P', '#', '=', '-', 'I', 'B', 'O', 'G', 'C', 'K', 'D', 'H', 'X', 'N', 'S', 'L', 'E', 'F', 'Z', 'J', 'T', 'W'];
+const ORDER = E.TILE_ORDER;   // grouped the way the engine lists them
+let palQ = '';
 const E3 = window.MakerEngine3D;
 
 /* ---------------- drafts (this device) ---------------- */
@@ -96,12 +97,15 @@ function renderEditor() {
   renderPalette(); renderLevels(); renderSettings(); drawEditor();
 }
 function renderPalette() {
-  const p = $('palette'); p.innerHTML = '';
+  const p = $('palette'), hadFocus = document.activeElement && document.activeElement.id === 'palQ'; p.innerHTML = '';
+  const q = document.createElement('input'); q.id = 'palQ'; q.type = 'search'; q.placeholder = `🔎 ${ORDER.length} blocks…`; q.value = palQ; q.autocomplete = 'off';
+  q.oninput = () => { palQ = q.value; renderPalette(); }; p.appendChild(q); if (hadFocus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  const hide = E.NOT_IN[game.template] || E.NOT_IN.platformer, needle = palQ.trim().toLowerCase();
   let grp = '';
   for (const ch of ORDER) {
     const [name, group, help] = E.TILES[ch];
-    if (game.template === 'topdown' && ch === '-') continue;
-    if (game.template !== '3d' && ch === 'O') continue;
+    if (hide.has(ch)) continue;
+    if (needle && !(name + ' ' + group + ' ' + help).toLowerCase().includes(needle)) continue;
     if (group !== grp) { grp = group; const h = document.createElement('h4'); h.textContent = group; p.appendChild(h); }
     const b = document.createElement('button'); b.className = 'pt' + (brush === ch ? ' on' : ''); b.title = help; b.dataset.ch = ch;
     const c = document.createElement('canvas'); c.width = c.height = 32; E.drawTile(c.getContext('2d'), ch, 0, 0, 32, game.sprites, 0);
@@ -160,7 +164,7 @@ function drawEditor() {
   eg.imageSmoothingEnabled = false;
   E.drawBackground(eg, game.settings.theme, ed.width, ed.height, 0, 0);
   if (game.template === 'topdown') { eg.fillStyle = 'rgba(0,0,0,.25)'; eg.fillRect(0, 0, ed.width, ed.height); }
-  for (let y = 0; y < lv.h; y++) for (let x = 0; x < lv.w; x++) { const c = lv.tiles[y * lv.w + x]; if (c !== '.') E.drawTile(eg, c, x * s, y * s, s, game.sprites, 0); }
+  for (let y = 0; y < lv.h; y++) for (let x = 0; x < lv.w; x++) { const c = lv.tiles[y * lv.w + x]; if (c !== '.') E.drawTile(eg, c, x * s, y * s, s, game.sprites, 0); if (c !== 'N' && E.TALK.has(c) && (lv.signs || {})[y * lv.w + x]) { eg.font = `${Math.round(s * .45)}px system-ui`; eg.fillText('💬', x * s + s * .55, y * s + s * .35); } }
   eg.strokeStyle = 'rgba(255,255,255,.12)'; eg.lineWidth = 1;
   eg.beginPath(); for (let x = 0; x <= lv.w; x++) { eg.moveTo(x * s + .5, 0); eg.lineTo(x * s + .5, ed.height); } for (let y = 0; y <= lv.h; y++) { eg.moveTo(0, y * s + .5); eg.lineTo(ed.width, y * s + .5); } eg.stroke();
   if (rectStart && hoverCell) { const [ax, ay] = rectStart, [bx, by] = hoverCell; eg.strokeStyle = '#fde047'; eg.lineWidth = 2; eg.strokeRect(Math.min(ax, bx) * s, Math.min(ay, by) * s, (Math.abs(bx - ax) + 1) * s, (Math.abs(by - ay) + 1) * s); }
@@ -175,7 +179,7 @@ function setCell(x, y, ch) {
   if (ch === 'P') t = t.replace(/P/g, '.');
   t = t.slice(0, k) + ch + t.slice(k + 1);
   lv.tiles = t;
-  if (ch !== 'N' && lv.signs) delete lv.signs[k];
+  if (!E.TALK.has(ch) && lv.signs) delete lv.signs[k];
   return true;
 }
 let painting = false, rectStart = null, hoverCell = null, panning = null, lastCell = null;
@@ -208,12 +212,16 @@ addEventListener('pointerup', () => {
   if (painting) { painting = false; afterEdit(); }
 });
 function paintAt([x, y]) {
+  const first = !lastCell;
   // fill the gap between pointer events so fast strokes don't skip cells
   const pts = []; if (lastCell) { const n = Math.max(Math.abs(x - lastCell[0]), Math.abs(y - lastCell[1])); for (let i = 1; i <= n; i++) pts.push([Math.round(lastCell[0] + (x - lastCell[0]) * i / n), Math.round(lastCell[1] + (y - lastCell[1]) * i / n)]); } else pts.push([x, y]);
   lastCell = [x, y];
   for (const [a, b] of pts) {
-    if (setCell(a, b, painting) && painting === 'N') {
-      const txt = prompt('What should this sign say?', ''); if (txt != null) { L().signs = L().signs || {}; L().signs[b * L().w + a] = txt.slice(0, 200); } painting = false;
+    const same = L().tiles[b * L().w + a] === painting;
+    if ((setCell(a, b, painting) || (same && first)) && E.TALK.has(painting)) {
+      const k = b * L().w + a, who = painting === 'N' ? 'this sign say' : `the ${E.TILES[painting][0].toLowerCase()} say`;
+      const txt = prompt(`What should ${who}?`, (L().signs || {})[k] || ''); if (txt != null) { L().signs = L().signs || {}; L().signs[k] = txt.slice(0, 200); }
+      painting = false;
     }
   }
   drawEditor();
@@ -572,8 +580,9 @@ Game types:
 - "3d": seen from above, played in 3D. '.' is floor you walk on, 'O' is a hole you fall into — surround the whole level with 'O' and use 'O' gaps (1-2 tiles) to jump across. '#' is a 1-high block you can jump onto, '=' is a tall wall, '-' a raised ledge, 'J' a spring, 'F' a moving lift, 'E' a spinning bar, 'Z' a laser fence, 'L' lava, 'K'/'D' keys and doors.
 
 Rules: every level has exactly one 'P' (player start) and, unless the win setting is "coins", one 'G' (goal flag) reachable from P. All rows in a level have exactly the same length. Width 20–60, height 10–20 (platformer height 12–16). Put coins 'C' along the route and a few hearts 'H'. Make it fun, fair and a little surprising. The first level should have a sign 'N' with a short friendly hint.
+Make levels lively, not empty: mix block types (r stone, w wood, m metal, a sand, q glass, u gold, c clouds, h ladders, ? mystery blocks, > < conveyors, M/V moving platforms, ! switch with R/U blocks), put decorations (t trees, o bushes, * flowers, p grass, x torches, ~ clouds, 1 2 3 4) on top of the ground, add friendly characters (n villager, z wizard, @ robot, k knight — give each a line in "signs" with their x,y: tips, jokes or story), power-ups ($ + j s b 0) and a mix of enemies (E e Y Q A i f, and a boss % near the end of the last level). Decorations, characters and power-ups stand on the ground, not inside it.
 Answer with ONLY JSON — no explanation, no code fences.`;
-const NEW_FORMAT = `{"title":"…","template":"platformer|topdown|3d","settings":{"win":"goal|coins","lives":1|3|5|0,"theme":0-7 (0 sunny,1 sunset,2 night,3 cave,4 space,5 candy,6 forest,7 snow),"speed":1|2|3,"jump":1|2|3,"doubleJump":true|false,"shoot":true|false,"timer":0|30|60|120},"levels":[{"rows":["…","…"],"signs":[{"x":0,"y":0,"text":"…"}]}]}`;
+const NEW_FORMAT = `{"title":"…","template":"platformer|topdown|3d","settings":{"win":"goal|coins","lives":1|3|5|0,"theme":0-7 (0 sunny,1 sunset,2 night,3 cave,4 space,5 candy,6 forest,7 snow),"speed":1|2|3,"jump":1|2|3,"doubleJump":true|false,"shoot":true|false,"timer":0|30|60|120},"levels":[{"rows":["…","…"],"signs":[{"x":0,"y":0,"text":"what a sign or character says"}]}]}`;
 /* Other AI providers (OpenRouter, Groq… set up in the OpenRouter AI app). Model values look like "ai:<provider>:<model id>". */
 const aiLabel = m => /^ai:/.test(m || '') ? (m.split(':').slice(2).join(':').split('/').pop().replace(/:free$/, '') || 'AI') : 'Claude';
 async function aiModelOptions(pref) {
@@ -615,9 +624,9 @@ function cleanLevel(lv, template, win) {
   let tiles = rows.join(''); const h = rows.length;
   const firstP = tiles.indexOf('P'); if (firstP < 0) { const spot = tiles.indexOf('.'); tiles = tiles.slice(0, spot) + 'P' + tiles.slice(spot + 1); } else tiles = tiles.slice(0, firstP + 1) + tiles.slice(firstP + 1).replace(/P/g, '.');
   if (win !== 'coins' && !tiles.includes('G')) { const spot = tiles.lastIndexOf('.'); tiles = tiles.slice(0, spot) + 'G' + tiles.slice(spot + 1); }
-  const signs = {}; for (const sg of Array.isArray(lv.signs) ? lv.signs : []) { const i = (+sg.y) * w + (+sg.x); if (i >= 0 && i < tiles.length && tiles[i] === 'N' && sg.text) signs[i] = String(sg.text).slice(0, 200); }
+  const signs = {}; for (const sg of Array.isArray(lv.signs) ? lv.signs : []) { const i = (+sg.y) * w + (+sg.x); if (i >= 0 && i < tiles.length && E.TALK.has(tiles[i]) && sg.text) signs[i] = String(sg.text).slice(0, 200); }
   // signs without text get a friendly default
-  [...tiles].forEach((c, i) => { if (c === 'N' && !signs[i]) signs[i] = 'Have fun!'; });
+  [...tiles].forEach((c, i) => { if (E.TALK.has(c) && !signs[i]) signs[i] = c === 'N' ? 'Have fun!' : 'Hello, traveller!'; });
   return { w, h, tiles, signs };
 }
 function cleanGame(j, forceTemplate) {

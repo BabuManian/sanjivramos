@@ -79,3 +79,5 @@ h3{margin:6px 0 8px;font-size:15px}
 #endCard{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:12px}
 .tc.dn{background:rgba(124,92,255,.5)}
 #tcA{width:80px;height:80px}
+#palette #palQ{width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:#0b0e1a;color:inherit;font:inherit;font-size:12.5px}
+@media (max-width:760px){#palette #palQ{display:none}}

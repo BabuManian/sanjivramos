@@ -7,7 +7,7 @@
   'use strict';
   const G3 = window.GL3D, { M } = G3;
   const T = 2;   // world units per tile
-  const TILE_COL = { '.': '#7c9a5e', I: '#bae6fd', W: '#2563eb', '#': '#a16207', '=': '#78716c', '-': '#f59e0b', X: '#22c55e', S: '#9ca3af', D: '#7c2d12' };
+  const TILE_COL = { r: '#6b7280', w: '#b45309', m: '#94a3b8', a: '#fcd34d', q: '#bae6fd', u: '#facc15', R: '#ef4444', h: '#a16207', '.': '#7c9a5e', I: '#bae6fd', W: '#2563eb', '#': '#a16207', '=': '#78716c', '-': '#f59e0b', X: '#22c55e', S: '#9ca3af', D: '#7c2d12' };
   const SKIES = [
     { skyTop: '#2563eb', skyHorizon: '#bfdbfe', clouds: 0.6 }, { skyTop: '#9a3412', skyHorizon: '#fde68a', clouds: 0.5, sunGlow: [1, 0.6, 0.3] },
     { skyTop: '#020617', skyHorizon: '#312e81', stars: 1, amb: [0.25, 0.27, 0.4], sunCol: [0.3, 0.32, 0.5] }, { skyTop: '#1c1917', skyHorizon: '#44403c', amb: [0.3, 0.28, 0.26], sunCol: [0.35, 0.3, 0.25] },
@@ -34,6 +34,8 @@
     return { v: 1, title: 'Sky Steps 3D', template: '3d', settings: { gravity: 1, speed: 2, jump: 2, doubleJump: false, lives: 3, timer: 0, win: 'goal', stomp: false, shoot: false, theme: 0, enemySpeed: 2 }, sprites: {},
       levels: [{ w, h: rows.length, tiles: rows.join(''), signs: { [2 * w + 8]: 'WASD to move, Space to jump, drag the mouse to look around.\nFind the key 🔑 to open the castle door!' } }] };
   }
+  // looks for the characters you can talk to (same format as SanjivramOS avatars; missing fields use the defaults)
+  const NPC_LOOK = { n: { shirt: '#2563eb', pants: '#1f2937', hair: '#78350f' }, z: { shirt: '#7c3aed', pants: '#5b21b6', hair: '#e5e7eb' }, '@': { shirt: '#94a3b8', pants: '#475569', skin: '#cbd5e1', hair: '#64748b' }, k: { shirt: '#94a3b8', pants: '#334155', hair: '#cbd5e1' } };
   function run(host, game, o = {}) {
     const cv = document.createElement('canvas'); cv.className = 'pc3d'; cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none';
     host.insertBefore(cv, host.firstChild);
@@ -42,10 +44,10 @@
     const IN = G3.Input(cv);
     const set = Object.assign({ speed: 2, jump: 2, lives: 3, timer: 0, win: 'goal', theme: 0, enemySpeed: 2, doubleJump: false }, game.settings || {});
     const input = { l: false, r: false, u: false, d: false, a: false, b: false, aPressed: false, bPressed: false };
-    let li = o.startLevel || 0, W = null, coins = 0, totalCoins = 0, keys = 0, lives = set.lives || Infinity, deaths = 0, levelT = 0, totalT = 0, state = 'count', countT = o.countdown || 0, raf = 0, last = performance.now(), doors = [], teles = [], signs = [], tpCool = 0, timeLeft = 0, signShown = null;
+    let li = o.startLevel || 0, W = null, coins = 0, totalCoins = 0, keys = 0, lives = set.lives || Infinity, deaths = 0, levelT = 0, totalT = 0, state = 'count', countT = o.countdown || 0, raf = 0, last = performance.now(), doors = [], teles = [], signs = [], npcs = [], tpCool = 0, speedT = 0, timeLeft = 0, signShown = null;
     const look = () => window.SJLook ? SJLook.cached : null;
     function loadLevel(i) {
-      li = i; const L = game.levels[i]; doors = []; teles = []; signs = []; keys = 0; levelT = 0; timeLeft = set.timer || 0;
+      li = i; const L = game.levels[i]; doors = []; teles = []; signs = []; npcs = []; speedT = 0; keys = 0; levelT = 0; timeLeft = set.timer || 0;
       if (W) W.clear();
       W = Obby3D.create({ R, input: IN, look, onDie, onCoin: () => { coins++; o.sfx && o.sfx('coin'); }, onPower, onCheckpoint: () => o.sfx && o.sfx('power') });
       W.speedMul = [0.75, 0.75, 1, 1.3][set.speed] || 1; W.jumpMul = [0.85, 0.85, 1, 1.15][set.jump] || 1; W.doubleJump = !!set.doubleJump;
@@ -77,6 +79,28 @@
           case 'Z': floor(); W.add({ k: 'laser', b: [x0, 0, cz - 0.1, x1, 2, cz + 0.1], chunk, period: 2.4 / espd * 1.4, on: 0.45, phase: x * 0.3 }); break;
           case 'T': floor(0, '#6d28d9'); teles.push({ x: cx, z: cz }); break;
           case 'P': floor(); start = [cx, 0.05, cz]; break;
+          case 'r': case 'w': case 'm': case 'a': case 'q': case 'u': case 'R': case 'h': W.add({ k: 'solid', b: [x0, -1, z0, x1, 1.2, z1], col: TILE_COL[ch], chunk }); break;
+          case 'U': floor(0, '#3b82f6'); break;
+          case '!': floor(0, '#ef4444'); break;
+          case 'c': floor(); W.add({ k: 'solid', b: [x0, 1.6, z0, x1, 2.1, z1], col: '#f8fafc', chunk }); break;
+          case '?': W.add({ k: 'solid', b: [x0, -1, z0, x1, 1.2, z1], col: '#f59e0b', chunk }); W.add({ k: 'coin', b: [cx - 0.3, 1.7, cz - 0.3, cx + 0.3, 2.3, cz + 0.3], chunk }); totalCoins++; break;
+          case '>': case '<': W.add({ k: 'conv', b: [x0, -1, z0, x1, 0, z1], chunk, dir: [ch === '>' ? 1 : -1, 0], speed: 3 }); break;
+          case 'M': W.add({ k: 'move', b: [x0, -0.6, z0, x1, 0, z1], chunk, axis: 'x', amp: 3, speed: espd * 0.6, phase: x + y }); break;
+          case 'V': W.add({ k: 'move', b: [x0, -0.6, z0, x1, 0, z1], chunk, axis: 'y', amp: 1.6, speed: espd * 0.8, phase: x + y }); break;
+          case '$': floor(); W.add({ k: 'coin', b: [cx - 0.3, 0.6, cz - 0.3, cx + 0.3, 1.2, cz + 0.3], chunk }); totalCoins++; break;
+          case '+': case 'j': case 's': case 'b': case '0': floor(); W.add({ k: 'power', b: [cx - 0.3, 0.6, cz - 0.3, cx + 0.3, 1.4, cz + 0.3], chunk, type: { '+': 'star', j: 'wings', s: 'speed', b: 'blaster', 0: 'shield' }[ch], col: { '+': '#fde047', j: '#f8fafc', s: '#ef4444', b: '#475569', 0: '#38bdf8' }[ch] }); break;
+          case 'e': case 'i': floor(); W.add({ k: 'kill', b: [x0 + 0.3, 0, z0 + 0.3, x1 - 0.3, 0.7, z1 - 0.3], col: ch === 'i' ? '#bae6fd' : '#16a34a', chunk, glow: false }); break;
+          case 'Y': case 'A': case 'f': case '%': floor(); W.add({ k: 'spin', b: [cx - 0.1, 0, cz - 0.1, cx + 0.1, 1, cz + 0.1], chunk, len: T * { Y: 0.7, A: 0.9, f: 1.3, '%': 1.7 }[ch], speed: espd * { Y: 1, A: 1.6, f: 0.9, '%': 0.7 }[ch], y: 0.55, phase: x * 1.3 + y }); break;
+          case 'Q': floor(); W.add({ k: 'laser', b: [cx - 0.1, 0, z0, cx + 0.1, 2, z1], chunk, period: 2.4 / espd * 1.4, on: 0.45, phase: y * 0.4 }); break;
+          case 'n': case 'z': case '@': case 'k': case 'd': { floor(); const text = (L.signs || {})[y * L.w + x] || (ch === 'd' ? 'Woof! 🐶' : ''); npcs.push({ ch, x: cx, z: cz, y: 0 }); if (text && ch !== 'd') signs.push({ x: cx, z: cz, text, npc: npcs[npcs.length - 1] }); break; }
+          case 't': floor(); W.add({ k: 'solid', b: [cx - 0.2, 0, cz - 0.2, cx + 0.2, 2.2, cz + 0.2], col: '#78350f', chunk, trim: false }); W.add({ k: 'solid', b: [cx - 0.9, 2, cz - 0.9, cx + 0.9, 3.4, cz + 0.9], col: '#16a34a', chunk, trim: false }); break;
+          case 'o': floor(); W.add({ k: 'solid', b: [x0 + 0.2, 0, z0 + 0.2, x1 - 0.2, 0.8, z1 - 0.2], col: '#16a34a', chunk, trim: false }); break;
+          case '3': floor(); W.add({ k: 'solid', b: [x0 + 0.3, 0, z0 + 0.3, x1 - 0.3, 0.6, z1 - 0.3], col: '#78716c', chunk, trim: false }); break;
+          case '4': floor(); W.add({ k: 'solid', b: [x0, 0, cz - 0.08, x1, 0.9, cz + 0.08], col: '#d6a756', chunk, trim: false }); break;
+          case '2': floor(); W.add({ k: 'solid', b: [cx - 0.25, 0, cz - 0.25, cx + 0.25, 1.3, cz + 0.25], col: '#a855f7', chunk, trim: false }); break;
+          case '1': floor(); W.add({ k: 'solid', b: [cx - 0.1, 0, cz - 0.1, cx + 0.1, 0.5, cz + 0.1], col: '#fef3c7', chunk, trim: false }); W.add({ k: 'solid', b: [cx - 0.4, 0.5, cz - 0.4, cx + 0.4, 0.8, cz + 0.4], col: '#dc2626', chunk, trim: false }); break;
+          case 'x': floor(); W.add({ k: 'solid', b: [cx - 0.08, 0, cz - 0.08, cx + 0.08, 1.4, cz + 0.08], col: '#78350f', chunk, trim: false }); break;
+          case '~': floor(); W.add({ k: 'solid', b: [x0, 4, z0 + 0.3, x1, 4.6, z1 - 0.3], col: '#f8fafc', chunk, trim: false }); break;
           default: floor();
         }
       }
@@ -89,6 +113,10 @@
       if (ob.type === 'goal') { if (set.win === 'coins' && coins < totalCoins) { ob.taken = false; banner(`Collect all the coins first (${coins}/${totalCoins})`); return; } levelDone(); }
       if (ob.type === 'heart') { if (lives !== Infinity) lives++; o.sfx && o.sfx('power'); }
       if (ob.type === 'key') { keys++; banner('🔑 Got a key — find a locked door'); }
+      if (ob.type === 'star' || ob.type === 'shield') { if (lives !== Infinity) lives++; banner(ob.type === 'star' ? '⭐ Super star — extra life!' : '🛡️ Shield — extra life!'); o.sfx && o.sfx('power'); }
+      if (ob.type === 'wings') { W.doubleJump = true; banner('🪽 Double jump!'); o.sfx && o.sfx('power'); }
+      if (ob.type === 'speed') { if (!speedT) W.speedMul *= 1.35; speedT = 8; banner('👟 Super speed!'); o.sfx && o.sfx('power'); }
+      if (ob.type === 'blaster') { coins += 5; banner('🔫 +5 coins'); o.sfx && o.sfx('coin'); }
     }
     let bannerT = 0, bannerTxt = '';
     const banner = t => { bannerTxt = t; bannerT = 2.5; };
@@ -113,6 +141,8 @@
       const cam = W.camera(inp, dt);
       // doors open when you walk up with a key; teleporters send you to the next pad; signs show their text
       for (const d of doors) if (!d.open && keys > 0 && Math.hypot(W.P.x - d.x, W.P.z - d.z) < 2.4) { d.open = true; keys--; W.dropChunk(d.id); o.sfx && o.sfx('power'); banner('🚪 Unlocked!'); }
+      if (speedT > 0) { speedT -= dt; if (speedT <= 0) { speedT = 0; W.speedMul /= 1.35; } }
+      for (const n of npcs) if (n.ch === 'd') { const tx = W.P.x - Math.sin(W.P.yaw || 0) * 1.4, tz = W.P.z - Math.cos(W.P.yaw || 0) * 1.4, k = Math.min(1, dt * 3); n.moving = Math.hypot(tx - n.x, tz - n.z) > 0.4; n.x += (tx - n.x) * k; n.z += (tz - n.z) * k; n.y += ((W.P.y || 0) - n.y) * k; }
       tpCool -= dt;
       if (teles.length > 1 && tpCool <= 0 && W.P.ground) { const i = teles.findIndex(t => Math.hypot(W.P.x - t.x, W.P.z - t.z) < 0.9); if (i >= 0) { const t = teles[(i + 1) % teles.length]; W.P.x = t.x; W.P.z = t.z; W.P.y = 0.1; tpCool = 1.2; o.sfx && o.sfx('power'); } }
       const sg = signs.find(s => Math.hypot(W.P.x - s.x, W.P.z - s.z) < 2.6 && s.text);
@@ -125,6 +155,11 @@
         W.render(cam, Object.assign({ fog: [60, 160], view: 120 }, th), r => {
           for (const t of teles) { r.box(t.x - 0.7, 0.01, t.z - 0.7, t.x + 0.7, 0.08, t.z + 0.7, '#a78bfa', 1, 0.8); r.glow([t.x, 0.6, t.z], 1.4, [0.6, 0.4, 1], 0.5); }
           for (const d of doors) if (!d.open) r.glow([d.x, 2.2, d.z], 1.2, [1, 0.8, 0.3], 0.25);
+          for (const n of npcs) {
+            const yaw = Math.atan2(W.P.x - n.x, W.P.z - n.z);
+            if (n.ch === 'd') { const s = Math.sin(yaw), c = Math.cos(yaw); r.box(n.x - 0.35, n.y + 0.25, n.z - 0.35, n.x + 0.35, n.y + 0.7, n.z + 0.35, '#b45309'); r.box(n.x + s * 0.45 - 0.22, n.y + 0.55, n.z + c * 0.45 - 0.22, n.x + s * 0.45 + 0.22, n.y + 0.95, n.z + c * 0.45 + 0.22, '#92400e'); }
+            else r.person(NPC_LOOK[n.ch] || null, n.x, n.y, n.z, yaw, { walk: 0, speed: 0 });
+          }
           if (o.ghosts) for (const g of o.ghosts()) if (g.l === li && g.d3) { r.person(g.look || null, g.x, g.y, g.z, g.f || 0, { walk: performance.now() / 120, speed: g.moving ? 1 : 0 }); }
         });
         // name tags over other players
