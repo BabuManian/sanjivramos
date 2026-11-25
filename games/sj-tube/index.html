@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tube</title>
+<style>
+:root{color-scheme:dark;--bg:#0f0f10;--bg2:#1a1a1c;--bg3:#272729;--fg:#f1f1f1;--mut:#aaa;--red:#ff2a2a;--acc:#3ea6ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+a{color:var(--acc)}
+#app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:56px 1fr;height:100%}
+header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid #222}
+.logo{display:flex;align-items:center;gap:6px;font-weight:800;font-size:19px;letter-spacing:-.5px;cursor:pointer;white-space:nowrap}
+.logo i{display:inline-grid;place-items:center;width:30px;height:21px;border-radius:6px;background:var(--red);font-style:normal;font-size:11px}
+#sform{flex:1;display:flex;max-width:620px;margin:0 auto}
+#q{flex:1;min-width:0;height:38px;border-radius:20px 0 0 20px;border:1px solid #333;background:#121212;color:var(--fg);padding:0 16px;font:inherit;outline:none}
+#q:focus{border-color:var(--acc)}
+#sform button{width:58px;border-radius:0 20px 20px 0;background:#222;border:1px solid #333;border-left:none}
+nav{padding:10px 8px;overflow:auto;border-right:1px solid #1d1d1f}
+nav button{display:flex;align-items:center;gap:14px;width:100%;padding:9px 12px;border-radius:10px;text-align:left}
+nav button:hover{background:var(--bg2)}nav button.on{background:var(--bg3);font-weight:600}
+nav h4{margin:14px 12px 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+nav .sub{font-size:13px}nav .sub img{width:24px;height:24px;border-radius:50%;object-fit:cover}
+main{overflow:auto;position:relative}
+.wrap{padding:18px 20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px 16px}
+.card{cursor:pointer;min-width:0}
+.th{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#222}
+.th img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.card:hover .th img{transform:scale(1.03)}
+.len{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.85);padding:1px 5px;border-radius:5px;font-size:12px;font-weight:600}
+.len.live{background:var(--red)}
+.prog{position:absolute;left:0;bottom:0;height:3px;background:var(--red)}
+.meta{display:flex;gap:10px;margin-top:9px}
+.meta b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:15px;line-height:1.3;font-weight:600}
+.meta small{display:block;color:var(--mut);margin-top:3px;font-size:13px}
+.meta small a{color:var(--mut);text-decoration:none}.meta small a:hover{color:var(--fg)}
+.chcard{display:flex;align-items:center;gap:16px;padding:12px;border-radius:12px;cursor:pointer}
+.chcard:hover{background:var(--bg2)}.chcard img{width:88px;height:88px;border-radius:50%;object-fit:cover}
+h2{margin:0 0 14px;font-size:20px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.chips button{padding:6px 12px;border-radius:8px;background:var(--bg3);font-size:13px;font-weight:600}.chips button.on{background:var(--fg);color:#000}
+.empty{color:var(--mut);text-align:center;padding:60px 20px}
+.err{background:#3b1212;border:1px solid #7f1d1d;color:#fecaca;padding:12px 14px;border-radius:12px;margin:14px 0}
+.btn{padding:8px 16px;border-radius:20px;background:var(--bg3);font-weight:600}
+.btn.red{background:var(--fg);color:#000}.btn.subbed{background:var(--bg3);color:var(--fg)}
+.skel{background:linear-gradient(90deg,#1c1c1e,#2a2a2d,#1c1c1e);background-size:200% 100%;animation:sk 1.2s infinite;border-radius:12px}
+@keyframes sk{to{background-position:-200% 0}}
+/* watch */
+.watch{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:22px;padding:18px 20px;max-width:1700px;margin:0 auto}
+.watch.theater{grid-template-columns:1fr}.watch.theater .side{grid-column:1}
+.player{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9}
+.player video{width:100%;height:100%;display:block;background:#000}
+.watch.theater .player{border-radius:0;aspect-ratio:auto;height:min(78vh,56.25vw)}
+.ptools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.ptools select{background:var(--bg3);color:var(--fg);border:none;border-radius:16px;padding:6px 10px;font:inherit}
+.ptools .sp{flex:1}
+.vt{font-size:20px;font-weight:700;margin:6px 0 10px}
+.owner{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.owner img{width:42px;height:42px;border-radius:50%;object-fit:cover;cursor:pointer;background:#333}
+.owner .n{cursor:pointer}.owner .n b{display:block}.owner .n small{color:var(--mut)}
+.desc{background:var(--bg2);border-radius:12px;padding:12px;margin-top:12px;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:hidden;cursor:pointer;position:relative}
+.desc.open{max-height:none;cursor:auto}
+.desc .st{font-weight:700;display:block;margin-bottom:6px}
+.side .card{display:grid;grid-template-columns:168px 1fr;gap:10px;margin-bottom:10px}
+.side .th{border-radius:8px}.side .meta{margin:0}.side .meta b{font-size:14px}
+.cmt{display:flex;gap:12px;margin:16px 0}.cmt img{width:36px;height:36px;border-radius:50%;flex:none;background:#333}
+.cmt b{font-size:13px}.cmt small{color:var(--mut);font-size:12px}.cmt p{margin:4px 0;white-space:pre-wrap;word-break:break-word}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#f1f1f1;color:#111;padding:9px 16px;border-radius:10px;font-weight:600;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+/* channel */
+.banner{height:170px;background:#222 center/cover;border-radius:14px}
+.chhead{display:flex;align-items:center;gap:18px;margin:16px 0}
+.chhead img{width:110px;height:110px;border-radius:50%;object-fit:cover;background:#333}
+/* shorts */
+.shorts{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none}
+.shorts::-webkit-scrollbar{display:none}
+.short{height:100%;scroll-snap-align:start;scroll-snap-stop:always;display:flex;justify-content:center;align-items:center;gap:14px;padding:12px 0}
+.sbox{position:relative;height:100%;aspect-ratio:9/16;max-width:100%;border-radius:14px;overflow:hidden;background:#000}
+.sbox video,.sbox img.poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sbox .ov{position:absolute;left:0;right:0;bottom:0;padding:60px 14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.75));pointer-events:none}
+.sbox .ov b{display:block;font-size:15px;margin-bottom:6px}.sbox .ov span{cursor:pointer;pointer-events:auto;font-weight:600}
+.sbox .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--red)}
+.sbox .tap{position:absolute;inset:0}
+.sbox .paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:60px;opacity:.85;pointer-events:none}
+.sacts{display:flex;flex-direction:column;gap:16px;align-items:center;align-self:flex-end;padding-bottom:20px}
+.sacts button{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px}
+.sacts button span{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--bg3);font-size:20px}
+.sacts button.on span{background:var(--fg);color:#000}
+.sdraw{position:fixed;right:0;top:56px;bottom:0;width:min(420px,100%);background:var(--bg2);z-index:30;overflow:auto;padding:16px;box-shadow:-10px 0 30px rgba(0,0,0,.5)}
+.sload{color:var(--mut);display:grid;place-items:center;position:absolute;inset:0;font-size:13px}
+#bnav{display:none}
+@media (max-width:900px){
+  #app{grid-template-columns:minmax(0,1fr);grid-template-rows:52px 1fr 54px}
+  header{gap:8px;padding:0 10px}#sform{min-width:0}#sform button{width:46px}
+  header{grid-column:1}.logo span{display:none}
+  nav{display:none}
+  #bnav{display:flex;border-top:1px solid #222;background:var(--bg)}
+  #bnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;gap:2px}
+  #bnav button.on{color:#fff;font-weight:700}#bnav button i{font-style:normal;font-size:18px}
+  .watch{grid-template-columns:1fr;padding:0}.watch .info,.watch .side{padding:0 12px}.player{border-radius:0}
+  .wrap{padding:12px}.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px 12px}
+  .short{gap:0}.sacts{position:absolute;right:8px;bottom:70px;z-index:2}.sbox{border-radius:0;width:100%;aspect-ratio:auto}
+}
+</style></head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo" data-go="home"><i>▶</i><span>Tube</span></div>
+    <form id="sform"><input id="q" placeholder="Search" autocomplete="off" enterkeyhint="search"><button title="Search">🔍</button></form>
+    <button class="btn" id="setBtn" title="Settings">⚙</button>
+  </header>
+  <nav id="nav"></nav>
+  <main id="main"></main>
+  <div id="bnav"><button data-go="home"><i>🏠</i>Home</button><button data-go="shorts"><i>⚡</i>Shorts</button><button data-go="subs"><i>📺</i>Subs</button><button data-go="library"><i>📚</i>Library</button></div>
+</div>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s), main = $('#main');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// your subscriptions, history and settings live in a "webos." key, so they're saved to your SanjivramOS account too
+const KEY = 'webos.tube';
+const DEF = { subs: [], history: [], later: [], liked: [], progress: {}, set: { quality: '720', autoplay: true, sponsor: true, speed: 1, region: 'US', captions: '' } };
+let D; try { D = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY)) || {}); D.set = Object.assign({}, DEF.set, D.set || {}); } catch { D = JSON.parse(JSON.stringify(DEF)); }
+let saveT = null; const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch {} }, 300); };
+const api = async (path, opts = {}) => {
+  const r = await fetch('/yt/api/' + path, { credentials: 'same-origin', signal: opts.signal });
+  let j = {}; try { j = await r.json(); } catch {}
+  if (r.status === 404 && !j.error) throw new Error('Tube needs the updated server — in Termux run: sanjivramos restart');
+  if (!r.ok) throw new Error(j.error || `Error ${r.status}`);
+  return j;
+};
+function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2200); }
+const num = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n);
+const ago = v => { if (v.ago) return v.ago; if (!v.published) return ''; const s = (Date.now() - v.published) / 1000; for (const [n, u] of [[31536000, 'year'], [2592000, 'month'], [604800, 'week'], [86400, 'day'], [3600, 'hour'], [60, 'minute']]) if (s >= n) { const k = Math.floor(s / n); return `${k} ${u}${k > 1 ? 's' : ''} ago`; } return 'just now'; };
+const isSub = id => D.subs.some(s => s.id === id);
+function toggleSub(ch) { if (!ch || !ch.id) return; if (isSub(ch.id)) { D.subs = D.subs.filter(s => s.id !== ch.id); toast('Unsubscribed'); } else { D.subs.unshift({ id: ch.id, name: ch.name, thumb: ch.thumb || '' }); toast('Subscribed to ' + ch.name); } save(); renderNav(); }
+const cardOf = v => ({ id: v.id, title: v.title, author: v.author, authorId: v.authorId, len: v.len, length: v.length, views: v.views, published: v.published, ago: v.ago, thumb: v.thumb, short: v.short });
+
+/* ---------------- navigation ---------------- */
+let view = 'home', ctrl = null;
+const NAV = [['home', '🏠', 'Home'], ['shorts', '⚡', 'Shorts'], ['subs', '📺', 'Subscriptions'], ['history', '🕘', 'History'], ['later', '⏰', 'Watch later'], ['liked', '👍', 'Liked']];
+function renderNav() {
+  $('#nav').innerHTML = NAV.map(([k, i, l]) => `<button data-go="${k}" class="${view === k ? 'on' : ''}"><span>${i}</span>${l}</button>`).join('') +
+    (D.subs.length ? `<h4>Subscriptions</h4>` + D.subs.slice(0, 40).map(s => `<button class="sub" data-ch="${esc(s.id)}">${s.thumb ? `<img src="${esc(s.thumb)}" alt="${esc(s.name)}">` : '📺'}<span>${esc(s.name)}</span></button>`).join('') : '');
+  document.querySelectorAll('#bnav [data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === view || (view === 'later' || view === 'history' || view === 'liked') && b.dataset.go === 'library'));
+}
+function go(v, arg, push = true) {
+  if (ctrl) ctrl.abort(); ctrl = new AbortController(); stopPlayers();
+  view = v; renderNav();
+  if (push) history.pushState({ v, arg }, '', '#' + v + (arg ? '/' + encodeURIComponent(arg) : ''));
+  main.scrollTop = 0;
+  ({ home, shortsView, subs, library: () => listView('history'), history: () => listView('history'), later: () => listView('later'), liked: () => listView('liked'), search: () => searchView(arg), watch: () => watch(arg), channel: () => channelView(arg) })[v === 'shorts' ? 'shortsView' : v](arg);
+}
+addEventListener('popstate', e => { const s = e.state || parseHash(); go(s.v || 'home', s.arg, false); });
+function parseHash() { const [v, a] = location.hash.slice(1).split('/'); return { v: v || 'home', arg: a ? decodeURIComponent(a) : undefined }; }
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); go(g.dataset.go); return; }
+  const c = e.target.closest('[data-ch]'); if (c) { e.preventDefault(); e.stopPropagation(); go('channel', c.dataset.ch); return; }
+  const v = e.target.closest('[data-v]'); if (v) { e.preventDefault(); const vd = v.dataset; if (vd.short === '1' && view !== 'watch') go('shorts', vd.v); else go('watch', vd.v); }
+});
+$('#sform').onsubmit = e => { e.preventDefault(); const q = $('#q').value.trim(); if (q) go('search', q); };
+$('#setBtn').onclick = settings;
+
+/* ---------------- lists ---------------- */
+const skel = n => `<div class="grid">${Array.from({ length: n }, () => `<div><div class="skel" style="aspect-ratio:16/9"></div><div class="skel" style="height:14px;margin-top:10px;width:80%"></div><div class="skel" style="height:12px;margin-top:8px;width:50%"></div></div>`).join('')}</div>`;
+function card(v) {
+  if (v.type === 'channel') return `<div class="chcard" data-ch="${esc(v.id)}"><img src="${esc(v.thumb)}" alt="${esc(v.name)}"><div><b style="font-size:17px">${esc(v.name)}</b><div style="color:var(--mut);font-size:13px">${v.subs ? num(v.subs) + ' subscribers' : ''}${v.videos ? ' · ' + num(v.videos) + ' videos' : ''}</div><div style="color:var(--mut);font-size:13px;margin-top:4px">${esc((v.desc || '').slice(0, 140))}</div></div></div>`;
+  const p = D.progress[v.id], pct = p && v.len ? Math.min(100, p / v.len * 100) : 0;
+  return `<div class="card" data-v="${esc(v.id)}" data-short="${v.short ? 1 : 0}"><div class="th"><img loading="lazy" src="${esc(v.thumb)}" alt="${esc(v.title)}">${v.length ? `<span class="len${v.length === 'LIVE' ? ' live' : ''}">${v.short ? '⚡ ' : ''}${esc(v.length)}</span>` : ''}${pct ? `<span class="prog" style="width:${pct}%"></span>` : ''}</div>
+    <div class="meta"><div><b>${esc(v.title)}</b><small>${v.authorId ? `<a href="#" data-ch="${esc(v.authorId)}">${esc(v.author || '')}</a>` : esc(v.author || '')}</small><small>${[v.views != null && v.views >= 0 ? num(v.views) + ' views' : '', ago(v)].filter(Boolean).join(' · ')}</small></div></div></div>`;
+}
+function errBox(e, retry) { return `<div class="err">⚠ ${esc(e.message)} ${retry ? '<button class="btn" id="retry" style="margin-left:8px">Retry</button>' : ''}</div>`; }
+async function home() {
+  main.innerHTML = `<div class="wrap"><div class="chips" id="cats"></div><div id="list">${skel(12)}</div></div>`;
+  const cats = ['Trending', 'Music', 'Gaming', 'Minecraft', 'Roblox', 'Football', 'Science', 'Coding', 'Funny', 'Animals', 'Cooking', 'Movies'];
+  $('#cats').innerHTML = cats.map((c, i) => `<button class="${i ? '' : 'on'}" data-cat="${c}">${c}</button>`).join('');
+  $('#cats').onclick = e => { const b = e.target.closest('[data-cat]'); if (!b) return; $('#cats').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); load(b.dataset.cat); };
+  const load = async cat => {
+    $('#list').innerHTML = skel(12);
+    try { const j = cat === 'Trending' ? await api('home?region=' + D.set.region, ctrl) : await api('search?q=' + encodeURIComponent(cat), ctrl); $('#list').innerHTML = j.items.length ? `<div class="grid">${j.items.map(card).join('')}</div>` : '<div class="empty">Nothing here right now.</div>'; }
+    catch (e) { if (e.name === 'AbortError') return; $('#list').innerHTML = errBox(e, true); $('#retry').onclick = () => load(cat); }
+  };
+  load('Trending');
+}
+async function searchView(q) {
+  $('#q').value = q; let page = 1, type = 'video', busy = false;
+  main.innerHTML = `<div class="wrap"><div class="chips"><button class="on" data-t="video">Videos</button><button data-t="channel">Channels</button></div><div id="list">${skel(8)}</div><div id="more"></div></div>`;
+  main.querySelector('.chips').onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; type = b.dataset.t; page = 1; main.querySelectorAll('.chips button').forEach(x => x.classList.toggle('on', x === b)); $('#list').innerHTML = skel(8); load(); };
+  const load = async () => {
+    busy = true;
+    try { const j = await api(`search?q=${encodeURIComponent(q)}&page=${page}&type=${type}`, ctrl); const html = j.items.map(card).join(''); if (page === 1) $('#list').innerHTML = j.items.length ? `<div class="${type === 'channel' ? '' : 'grid'}">${html}</div>` : `<div class="empty">No results for “${esc(q)}”.</div>`; else $('#list').firstElementChild.insertAdjacentHTML('beforeend', html); $('#more').innerHTML = j.items.length >= 10 ? '<div style="text-align:center;margin:20px"><button class="btn" id="mb">Load more</button></div>' : ''; const mb = $('#mb'); if (mb) mb.onclick = () => { page++; load(); }; }
+    catch (e) { if (e.name !== 'AbortError') { $('#list').innerHTML = errBox(e, true); $('#retry').onclick = load; } }
+    busy = false;
+  };
+  load();
+}
+function listView(kind) {
+  view = kind; renderNav();
+  const names = { history: 'History', later: 'Watch later', liked: 'Liked videos' };
+  const tabs = `<div class="chips">${Object.entries(names).map(([k, l]) => `<button class="${k === kind ? 'on' : ''}" data-go="${k}">${l}</button>`).join('')}</div>`;
+  const list = D[kind] || [];
+  main.innerHTML = `<div class="wrap"><h2>${names[kind]}</h2>${tabs}${list.length ? `<div class="grid">${list.map(card).join('')}</div><div style="margin-top:20px"><button class="btn" id="clr">Clear ${names[kind].toLowerCase()}</button></div>` : '<div class="empty">Nothing here yet.</div>'}</div>`;
+  const c = $('#clr'); if (c) c.onclick = () => { if (!confirm('Clear ' + names[kind].toLowerCase() + '?')) return; D[kind] = []; if (kind === 'history') D.progress = {}; save(); listView(kind); };
+}
+async function subs() {
+  if (!D.subs.length) { main.innerHTML = `<div class="wrap"><h2>Subscriptions</h2><div class="empty">Subscribe to channels and their newest videos show up here.<br><br>Your subscriptions are saved to your SanjivramOS account.</div></div>`; return; }
+  main.innerHTML = `<div class="wrap"><h2>Subscriptions</h2><div id="list">${skel(12)}</div></div>`;
+  try { const j = await api('feed?ids=' + D.subs.map(s => s.id).join(','), ctrl); $('#list').innerHTML = j.items.length ? `<div class="grid">${j.items.map(card).join('')}</div>` : '<div class="empty">No new videos.</div>'; }
+  catch (e) { if (e.name !== 'AbortError') { $('#list').innerHTML = errBox(e, true); $('#retry').onclick = subs; } }
+}
+async function channelView(id) {
+  main.innerHTML = `<div class="wrap"><div class="skel banner"></div><div id="ch"></div></div>`;
+  let tab = 'videos';
+  const load = async () => {
+    try {
+      const c = await api(`channel/${id}?tab=${tab}`, ctrl);
+      main.querySelector('.wrap').innerHTML = `${c.banner ? `<div class="banner" style="background-image:url('${esc(c.banner)}')"></div>` : ''}
+        <div class="chhead">${c.thumb ? `<img src="${esc(c.thumb)}" alt="${esc(c.name)}">` : ''}<div style="flex:1"><h2 style="margin:0">${esc(c.name)}</h2><div style="color:var(--mut)">${c.subs ? num(c.subs) + ' subscribers' : ''}</div><div style="color:var(--mut);font-size:13px;margin-top:6px;max-width:700px">${esc((c.desc || '').slice(0, 220))}</div></div><button class="btn ${isSub(id) ? 'subbed' : 'red'}" id="subB">${isSub(id) ? 'Subscribed ✓' : 'Subscribe'}</button></div>
+        <div class="chips"><button data-tab="videos" class="${tab === 'videos' ? 'on' : ''}">Videos</button><button data-tab="shorts" class="${tab === 'shorts' ? 'on' : ''}">Shorts</button></div>
+        ${c.videos.length ? `<div class="grid">${c.videos.map(v => card({ ...v, author: v.author || c.name, authorId: id })).join('')}</div>` : '<div class="empty">No videos.</div>'}`;
+      $('#subB').onclick = () => { toggleSub({ id, name: c.name, thumb: c.thumb }); $('#subB').className = 'btn ' + (isSub(id) ? 'subbed' : 'red'); $('#subB').textContent = isSub(id) ? 'Subscribed ✓' : 'Subscribe'; };
+      main.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; load(); });
+    } catch (e) { if (e.name !== 'AbortError') { main.querySelector('.wrap').innerHTML = errBox(e, true); $('#retry').onclick = load; } }
+  };
+  load();
+}
+
+/* ---------------- the player ---------------- */
+let P = null;   // { v: video data, video, audio, timer }
+function stopPlayers() { if (P) { savePos(); clearInterval(P.timer); try { P.video.pause(); P.video.removeAttribute('src'); P.video.load(); } catch {} if (P.audio) { P.audio.pause(); P.audio.src = ''; } P = null; } stopShorts(); }
+function savePos() { if (!P || !P.video || !P.v) return; const t = P.video.currentTime; if (t > 10 && P.v.len && t < P.v.len - 20) D.progress[P.v.id] = Math.round(t); else delete D.progress[P.v.id]; const keys = Object.keys(D.progress); if (keys.length > 400) delete D.progress[keys[0]]; save(); }
+function pickStreams(v, q) {
+  const S = v.streams || { progressive: [], video: [], audio: [] };
+  const prog = S.progressive.slice().sort((a, b) => (parseInt(b.label) || 0) - (parseInt(a.label) || 0));
+  if (q === 'audio' && S.audio.length) return { audioOnly: S.audio.sort((a, b) => b.bitrate - a.bitrate)[0] };
+  const want = q === 'auto' ? 720 : +q || 720;
+  const hd = S.video.filter(x => x.height && x.height <= want).sort((a, b) => b.height - a.height)[0];
+  const bestProg = prog.find(x => (parseInt(x.label) || 0) <= want) || prog[prog.length - 1];
+  // HD (video + separate audio) only when it beats the combined stream
+  if (hd && S.audio.length && (!bestProg || hd.height > (parseInt(bestProg.label) || 0))) return { video: hd, audio: S.audio.sort((a, b) => b.bitrate - a.bitrate)[0], fallback: bestProg };
+  return { prog: bestProg };
+}
+async function watch(id) {
+  main.innerHTML = `<div class="watch" id="w"><div class="info"><div class="player skel"></div><div class="skel" style="height:22px;margin-top:14px;width:70%"></div></div><div class="side">${'<div class="skel" style="height:94px;margin-bottom:10px"></div>'.repeat(6)}</div></div>`;
+  let v; try { v = await api('video/' + id, ctrl); } catch (e) { if (e.name !== 'AbortError') { main.innerHTML = `<div class="wrap">${errBox(e, true)}</div>`; $('#retry').onclick = () => watch(id); } return; }
+  if (view !== 'watch') return;
+  D.history = [{ ...cardOf(v), type: 'video', length: v.len ? fmt(v.len) : '', at: Date.now() }].concat(D.history.filter(x => x.id !== id)).slice(0, 300); save();
+  const S = v.streams, qualities = [...new Set([...S.progressive.map(x => parseInt(x.label) || 0), ...S.video.map(x => x.height)].filter(Boolean))].sort((a, b) => b - a);
+  const liked = D.liked.some(x => x.id === id), later = D.later.some(x => x.id === id);
+  main.innerHTML = `<div class="watch${D.set.theater ? ' theater' : ''}" id="w"><div class="info">
+    <div class="player"><video id="vid" controls playsinline autoplay preload="auto" poster="https://i.ytimg.com/vi/${id}/maxresdefault.jpg"></video></div>
+    <div class="ptools"><select id="qsel" title="Quality"><option value="auto">Auto (720p)</option>${qualities.map(q => `<option value="${q}">${q}p${q > 360 ? ' HD' : ''}</option>`).join('')}${S.audio.length ? '<option value="audio">Audio only</option>' : ''}</select>
+      <select id="spd" title="Speed">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(s => `<option value="${s}"${s === D.set.speed ? ' selected' : ''}>${s}×</option>`).join('')}</select>
+      ${S.captions.length ? `<select id="cap" title="Captions"><option value="">CC off</option>${S.captions.map((c, i) => `<option value="${i}">${esc(c.label)}</option>`).join('')}</select>` : ''}
+      <button class="btn" id="theater" title="Theater mode (t)">⬌</button><button class="btn" id="pip" title="Picture in picture">⧉</button><span class="sp"></span>
+      <label style="font-size:13px;color:var(--mut)"><input type="checkbox" id="auto" ${D.set.autoplay ? 'checked' : ''}> Autoplay next</label></div>
+    <div class="vt">${esc(v.title)}</div>
+    <div class="owner">${v.authorThumb ? `<img src="${esc(v.authorThumb)}" data-ch="${esc(v.authorId)}" alt="${esc(v.author)}">` : ''}<div class="n" data-ch="${esc(v.authorId)}"><b>${esc(v.author)}</b><small>${esc(v.subs || '')}</small></div>
+      <button class="btn ${isSub(v.authorId) ? 'subbed' : 'red'}" id="subB">${isSub(v.authorId) ? 'Subscribed ✓' : 'Subscribe'}</button><span style="flex:1"></span>
+      <button class="btn${liked ? ' red' : ''}" id="like">👍 ${v.likes != null ? num(v.likes) : 'Like'}</button><button class="btn${later ? ' red' : ''}" id="later">⏰ Later</button><button class="btn" id="share">↗ Share</button></div>
+    <div class="desc" id="desc"><span class="st">${v.views != null ? num(v.views) + ' views' : ''} · ${esc(ago(v))}</span>${linkify(v.desc || 'No description.')}</div>
+    <div style="margin-top:18px"><button class="btn" id="cmtB">💬 Show comments</button><div id="cmts"></div></div>
+  </div><div class="side">${v.related.length ? v.related.map(card).join('') : '<div class="empty">No related videos.</div>'}</div></div>`;
+  if (!v.related.length) api(`related/${id}?title=${encodeURIComponent(v.title || '')}`, ctrl).then(r => {
+    if (!P || P.v !== v) return; v.related = r.related || [];
+    const side = main.querySelector('.side'); if (side) side.innerHTML = v.related.length ? v.related.map(card).join('') : '<div class="empty">No related videos.</div>';
+    const av = r.authorThumb; if (av && !main.querySelector('.owner img')) main.querySelector('.owner').insertAdjacentHTML('afterbegin', `<img src="${esc(av)}" data-ch="${esc(v.authorId)}" alt="${esc(v.author)}">`);
+  }).catch(() => {});
+  const vid = $('#vid');
+  P = { v, video: vid, audio: null, timer: 0, sponsor: [] };
+  const choose = q => {
+    const pick = pickStreams(v, q), t = vid.currentTime || (D.progress[id] && D.progress[id] < (v.len || 1e9) - 20 ? D.progress[id] : 0), wasPaused = vid.paused && vid.currentTime > 0;
+    if (P.audio) { P.audio.pause(); P.audio.src = ''; P.audio = null; }
+    clearInterval(P.timer);
+    if (pick.audioOnly) { vid.src = pick.audioOnly.url; }
+    else if (pick.prog) vid.src = pick.prog.url;
+    else if (pick.video) {
+      // HD: video and audio come separately — the audio follows the video
+      vid.src = pick.video.url; const a = P.audio = new Audio(pick.audio.url); a.preload = 'auto';
+      const sync = () => { if (!P || P.audio !== a) return; if (Math.abs(a.currentTime - vid.currentTime) > 0.25) a.currentTime = vid.currentTime; a.playbackRate = vid.playbackRate; a.volume = vid.volume; a.muted = vid.muted; };
+      vid.onplay = () => { sync(); a.play().catch(() => {}); }; vid.onpause = () => a.pause(); vid.onseeked = sync; vid.onratechange = sync; vid.onvolumechange = sync; vid.onwaiting = () => a.pause(); vid.onplaying = () => { sync(); a.play().catch(() => {}); };
+      vid.muted = false; P.timer = setInterval(sync, 600);
+      vid.onerror = () => { if (pick.fallback) { toast('HD didn’t load — switching to ' + pick.fallback.label); a.pause(); P.audio = null; clearInterval(P.timer); vid.src = pick.fallback.url; vid.currentTime = t; vid.play().catch(() => {}); } };
+    }
+    if (!pick.prog && !pick.video && !pick.audioOnly) { $('.player').insertAdjacentHTML('beforeend', '<div class="sload">No playable stream for this video.</div>'); return; }
+    vid.playbackRate = D.set.speed;
+    vid.addEventListener('loadedmetadata', () => { if (t) vid.currentTime = t; vid.playbackRate = D.set.speed; if (!wasPaused) vid.play().catch(() => {}); }, { once: true });
+  };
+  $('#qsel').value = qualities.includes(+D.set.quality) || D.set.quality === 'audio' ? D.set.quality : 'auto';
+  choose($('#qsel').value);
+  $('#qsel').onchange = e => { D.set.quality = e.target.value; save(); choose(e.target.value); };
+  $('#spd').onchange = e => { D.set.speed = +e.target.value; save(); vid.playbackRate = D.set.speed; };
+  const cap = $('#cap'); if (cap) cap.onchange = e => { for (const t of vid.querySelectorAll('track')) t.remove(); if (e.target.value !== '') { const c = S.captions[+e.target.value], tr = document.createElement('track'); tr.kind = 'subtitles'; tr.label = c.label; tr.srclang = c.lang || 'en'; tr.src = c.url; tr.default = true; vid.appendChild(tr); setTimeout(() => { if (vid.textTracks[0]) vid.textTracks[0].mode = 'showing'; }, 100); } };
+  $('#theater').onclick = () => { D.set.theater = !D.set.theater; save(); $('#w').classList.toggle('theater', !!D.set.theater); };
+  $('#pip').onclick = () => { if (document.pictureInPictureElement) document.exitPictureInPicture(); else vid.requestPictureInPicture && vid.requestPictureInPicture().catch(() => toast('Picture-in-picture isn’t available here')); };
+  $('#auto').onchange = e => { D.set.autoplay = e.target.checked; save(); };
+  $('#subB').onclick = () => { toggleSub({ id: v.authorId, name: v.author, thumb: v.authorThumb }); $('#subB').className = 'btn ' + (isSub(v.authorId) ? 'subbed' : 'red'); $('#subB').textContent = isSub(v.authorId) ? 'Subscribed ✓' : 'Subscribe'; };
+  const toggleList = (k, btn) => { const has = D[k].some(x => x.id === id); D[k] = has ? D[k].filter(x => x.id !== id) : [{ ...cardOf(v), type: 'video', length: v.len ? fmt(v.len) : '' }].concat(D[k]); save(); btn.classList.toggle('red', !has); toast(has ? 'Removed' : k === 'liked' ? 'Added to Liked videos' : 'Saved to Watch later'); };
+  $('#like').onclick = e => toggleList('liked', e.currentTarget); $('#later').onclick = e => toggleList('later', e.currentTarget);
+  $('#share').onclick = () => { const link = 'https://www.youtube.com/watch?v=' + id; (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copied'), () => prompt('Copy the link', link)); };
+  $('#desc').onclick = e => { if (e.target.closest('[data-t]')) { vid.currentTime = +e.target.closest('[data-t]').dataset.t; vid.play(); return; } if (e.target.tagName !== 'A') $('#desc').classList.add('open'); };
+  $('#cmtB').onclick = () => loadComments(id, null);
+  vid.addEventListener('ended', () => { savePos(); if (D.set.autoplay && v.related[0]) { toast('Up next: ' + v.related[0].title); setTimeout(() => { if (P && P.v === v) go('watch', v.related[0].id); }, 1500); } });
+  vid.addEventListener('timeupdate', () => { for (const s of P && P.sponsor || []) if (vid.currentTime >= s.start && vid.currentTime < s.end - 0.5 && !s.done) { s.done = true; vid.currentTime = s.end; toast('Skipped ' + ({ sponsor: 'sponsor', selfpromo: 'self-promotion', interaction: 'subscribe reminder', intro: 'intro', outro: 'outro' }[s.cat] || s.cat)); } });
+  setInterval(() => { if (P && P.v === v && !vid.paused) savePos(); }, 10000);
+  if (D.set.sponsor) api('sponsor/' + id).then(j => { if (P && P.v === v) P.sponsor = j.segments || []; }).catch(() => {});
+}
+const fmt = s => { s = Math.max(0, s | 0); const h = s / 3600 | 0, m = (s % 3600) / 60 | 0, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+function linkify(t) {
+  return esc(t).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>`)
+    .replace(/(^|\s)((\d{1,2}:)?\d{1,2}:\d{2})(?=\s|$)/g, (m, sp, ts) => { const p = ts.split(':').map(Number), sec = p.reduce((a, b) => a * 60 + b, 0); return `${sp}<a href="#" data-t="${sec}">${ts}</a>`; });
+}
+async function loadComments(id, next) {
+  const box = $('#cmts'), b = $('#cmtB'); if (b) b.remove();
+  box.insertAdjacentHTML('beforeend', '<div class="skel cl" style="height:60px;margin:14px 0"></div>');
+  try {
+    const j = await api(`comments/${id}${next ? '?c=' + encodeURIComponent(next) : ''}`, ctrl);
+    box.querySelectorAll('.cl').forEach(x => x.remove());
+    box.insertAdjacentHTML('beforeend', j.comments.map(c => `<div class="cmt">${c.thumb ? `<img src="${esc(c.thumb)}" alt="${esc(c.author)}">` : '<img alt="">'}<div><b>${esc(c.author)}</b> <small>${esc(c.ago || '')}${c.pinned ? ' · 📌 pinned' : ''}${c.hearted ? ' · ❤️' : ''}</small><p>${linkify(c.text)}</p><small>👍 ${num(c.likes || 0)}${c.replies ? ' · ' + c.replies + ' replies' : ''}</small></div></div>`).join('') || '<div class="empty">No comments.</div>');
+    if (j.next) { const m = document.createElement('button'); m.className = 'btn'; m.textContent = 'More comments'; m.onclick = () => { m.remove(); loadComments(id, j.next); }; box.appendChild(m); }
+  } catch (e) { box.querySelectorAll('.cl').forEach(x => x.remove()); box.insertAdjacentHTML('beforeend', errBox(e)); }
+}
+
+/* ---------------- Shorts: swipe up for the next one ---------------- */
+let SH = null;
+function stopShorts() { if (!SH) return; SH.io.disconnect(); for (const el of SH.root.querySelectorAll('video')) { el.pause(); el.removeAttribute('src'); el.load(); } SH = null; }
+async function shortsView(startId) {
+  main.innerHTML = '<div class="shorts" id="sh"></div>';
+  const root = $('#sh'); let page = 1, loading = false, items = [];
+  const io = new IntersectionObserver(ents => { for (const e of ents) if (e.isIntersecting && e.intersectionRatio > 0.6) activate(e.target); }, { root, threshold: [0.6] });
+  SH = { root, io, cur: null, muted: false };
+  const add = list => {
+    for (const v of list) {
+      if (items.some(x => x.id === v.id)) continue; items.push(v);
+      const liked = D.liked.some(x => x.id === v.id);
+      const el = document.createElement('div'); el.className = 'short'; el.dataset.id = v.id;
+      el.innerHTML = `<div class="sbox"><img class="poster" src="https://i.ytimg.com/vi/${esc(v.id)}/oar2.jpg" onerror="this.onerror=null;this.src='${esc(v.thumb)}'" alt=""><div class="tap"></div><div class="ov"><b>${esc(v.title)}</b><span data-ch="${esc(v.authorId || '')}">@${esc(v.author || '')}</span></div><div class="bar"></div></div>
+        <div class="sacts"><button data-a="like" class="${liked ? 'on' : ''}"><span>♥</span>Like</button><button data-a="cmt"><span>💬</span>Comments</button><button data-a="sub" class="${isSub(v.authorId) ? 'on' : ''}"><span>＋</span>Subscribe</button><button data-a="mute"><span>🔊</span>Sound</button><button data-a="share"><span>↗</span>Share</button><button data-a="full"><span>▶</span>Full video</button></div>`;
+      el._v = v; root.appendChild(el); io.observe(el);
+    }
+  };
+  const more = async () => {
+    if (loading) return; loading = true;
+    try { const j = await api('shorts?page=' + page++, ctrl); add(j.items); if (!j.items.length && page < 4) { loading = false; return more(); } }
+    catch (e) { if (e.name !== 'AbortError' && !root.children.length) root.innerHTML = `<div class="wrap">${errBox(e, true)}</div>`, $('#retry') && ($('#retry').onclick = () => shortsView(startId)); }
+    loading = false;
+  };
+  async function activate(el) {
+    if (!SH || SH.cur === el) return; SH.cur = el;
+    for (const other of root.querySelectorAll('.short')) { const ov = other.querySelector('video'); if (ov && other !== el) ov.pause(); }
+    const box = el.querySelector('.sbox'), v = el._v;
+    let vd = box.querySelector('video');
+    if (!vd) {
+      vd = document.createElement('video'); vd.loop = true; vd.playsInline = true; vd.setAttribute('playsinline', ''); vd.muted = SH.muted; box.insertBefore(vd, box.querySelector('.tap'));
+      box.insertAdjacentHTML('beforeend', '<div class="sload">Loading…</div>');
+      try {
+        const info = await api('video/' + v.id, ctrl), pick = pickStreams(info, '720');
+        if (info.author) { v.author = info.author; v.authorId = info.authorId; const sp = el.querySelector('.ov span'); sp.textContent = '@' + info.author; sp.dataset.ch = info.authorId || ''; }
+        if (info.len) v.len = info.len;
+        const src = pick.prog || pick.video; if (!src) throw new Error('No playable stream');
+        vd.src = src.url;
+        if (pick.video && !pick.prog) { const a = new Audio(pick.audio.url); vd._a = a; const sync = () => { if (Math.abs(a.currentTime - vd.currentTime) > 0.25) a.currentTime = vd.currentTime; a.muted = vd.muted; }; vd.onplay = () => { sync(); a.play().catch(() => {}); }; vd.onpause = () => a.pause(); vd.onseeked = sync; vd.ontimeupdate = () => { if (Math.abs(a.currentTime - vd.currentTime) > 0.4) sync(); }; }
+        D.history = [{ ...cardOf(v), type: 'video', at: Date.now() }].concat(D.history.filter(x => x.id !== v.id)).slice(0, 300); save();
+      } catch (e) { const l = box.querySelector('.sload'); if (l) l.textContent = '⚠ ' + e.message; return; }
+      vd.addEventListener('playing', () => { const l = box.querySelector('.sload'); if (l) l.remove(); const p = box.querySelector('.poster'); if (p) p.style.display = 'none'; });
+      vd.addEventListener('timeupdate', () => { box.querySelector('.bar').style.width = (vd.currentTime / (vd.duration || 1) * 100) + '%'; });
+    }
+    if (SH && SH.cur === el) vd.play().catch(() => { SH.muted = true; vd.muted = true; vd.play().catch(() => {}); });
+    if (root.lastElementChild === el || root.children[root.children.length - 3] === el) more();
+  }
+  root.addEventListener('click', e => {
+    const s = e.target.closest('.short'); if (!s) return; const v = s._v, vd = s.querySelector('video');
+    if (e.target.closest('.tap') && vd) { if (vd.paused) { vd.play(); s.querySelector('.paused') && s.querySelector('.paused').remove(); } else { vd.pause(); s.querySelector('.sbox').insertAdjacentHTML('beforeend', '<div class="paused">⏸</div>'); } return; }
+    const a = e.target.closest('[data-a]'); if (!a) return;
+    const act = a.dataset.a;
+    if (act === 'like') { const has = D.liked.some(x => x.id === v.id); D.liked = has ? D.liked.filter(x => x.id !== v.id) : [{ ...cardOf(v), type: 'video' }].concat(D.liked); save(); a.classList.toggle('on', !has); }
+    if (act === 'sub') { toggleSub({ id: v.authorId, name: v.author }); a.classList.toggle('on', isSub(v.authorId)); }
+    if (act === 'mute') { SH.muted = !SH.muted; for (const x of root.querySelectorAll('video')) x.muted = SH.muted; a.querySelector('span').textContent = SH.muted ? '🔇' : '🔊'; }
+    if (act === 'share') { const link = 'https://www.youtube.com/shorts/' + v.id; (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copied'), () => prompt('Copy the link', link)); }
+    if (act === 'full') go('watch', v.id);
+    if (act === 'cmt') { const d = document.createElement('div'); d.className = 'sdraw'; d.innerHTML = `<div style="display:flex;align-items:center"><h2 style="flex:1;margin:0">Comments</h2><button class="btn" id="cx">✕</button></div><div id="cmts"></div>`; document.body.appendChild(d); $('#cx').onclick = () => d.remove(); loadComments(v.id, null); }
+  });
+  addEventListener('keydown', SH.key = e => { if (view !== 'shorts' || e.target.tagName === 'INPUT') return; if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); root.scrollBy({ top: root.clientHeight, behavior: 'smooth' }); } if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); root.scrollBy({ top: -root.clientHeight, behavior: 'smooth' }); } if (e.key === 'm') root.querySelector('.short [data-a=mute]') && SH.cur && SH.cur.querySelector('[data-a=mute]').click(); });
+  if (startId) { try { const v = await api('video/' + startId, ctrl); add([{ ...cardOf(v), id: startId, thumb: v.thumb }]); } catch {} }
+  more();
+}
+
+/* ---------------- settings ---------------- */
+function settings() {
+  stopPlayers(); view = 'settings'; renderNav();
+  const regions = ['US', 'GB', 'IN', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'MX', 'ES', 'IT', 'KR', 'NL', 'SE', 'PH', 'ID', 'NG', 'ZA'];
+  main.innerHTML = `<div class="wrap" style="max-width:640px"><h2>Tube settings</h2>
+    <p><label>Trending region <select id="reg">${regions.map(r => `<option${r === D.set.region ? ' selected' : ''}>${r}</option>`).join('')}</select></label></p>
+    <p><label>Default quality <select id="dq">${['auto', '1080', '720', '480', '360', 'audio'].map(q => `<option value="${q}"${q === D.set.quality ? ' selected' : ''}>${q === 'auto' ? 'Auto' : q === 'audio' ? 'Audio only' : q + 'p'}</option>`).join('')}</select></label></p>
+    <p><label><input type="checkbox" id="sb" ${D.set.sponsor ? 'checked' : ''}> Skip sponsors, intros and “subscribe” reminders (SponsorBlock)</label></p>
+    <p><label><input type="checkbox" id="ap" ${D.set.autoplay ? 'checked' : ''}> Autoplay the next video</label></p>
+    <p style="color:var(--mut);font-size:13px">Tube gets videos through Invidious, then Piped, then yt-dlp on your SanjivramOS server, and streams them through the server — YouTube never sees this device. Subscriptions, history and likes are saved to your SanjivramOS account.</p>
+    <p id="st" style="color:var(--mut);font-size:13px"></p>
+    <p><button class="btn" id="exp">Export subscriptions</button> <button class="btn" id="imp">Import subscriptions (JSON / CSV)</button></p></div>`;
+  $('#reg').onchange = e => { D.set.region = e.target.value; save(); };
+  $('#dq').onchange = e => { D.set.quality = e.target.value; save(); };
+  $('#sb').onchange = e => { D.set.sponsor = e.target.checked; save(); };
+  $('#ap').onchange = e => { D.set.autoplay = e.target.checked; save(); };
+  api('status').then(j => { $('#st').textContent = `Server: ${j.last ? 'last answered by ' + j.last : 'no requests yet'} · yt-dlp ${j.ytdlp ? 'installed ✓' : 'not installed'}${j.lastErr ? ' · last problem: ' + j.lastErr : ''}`; }).catch(e => { $('#st').textContent = '⚠ ' + e.message; });
+  $('#exp').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(D.subs, null, 2)], { type: 'application/json' })); a.download = 'tube-subscriptions.json'; a.click(); };
+  $('#imp').onclick = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,.csv'; i.onchange = async () => { const t = await i.files[0].text(); let n = 0; const addSub = (id, name) => { if (/^UC[\w-]{22}$/.test(id) && !isSub(id)) { D.subs.push({ id, name: name || id, thumb: '' }); n++; } }; try { const j = JSON.parse(t); for (const s of Array.isArray(j) ? j : j.subscriptions || []) addSub(s.id || s.channelId || s.url && (/UC[\w-]{22}/.exec(s.url) || [])[0], s.name || s.title); } catch { for (const line of t.split('\n')) { const m = /(UC[\w-]{22})[^,]*,(?:[^,]*,)?\s*"?([^",\n]+)/.exec(line); if (m) addSub(m[1], m[2]); } } save(); renderNav(); toast(`Imported ${n} subscription${n === 1 ? '' : 's'}`); }; i.click(); };
+}
+
+/* ---------------- keyboard ---------------- */
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || view !== 'watch' || !P) return;
+  const v = P.video, k = e.key.toLowerCase();
+  if (k === 'k' || k === ' ') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  if (k === 'j') v.currentTime -= 10; if (k === 'l') v.currentTime += 10;
+  if (k === 'arrowleft') v.currentTime -= 5; if (k === 'arrowright') v.currentTime += 5;
+  if (k === 'm') v.muted = !v.muted;
+  if (k === 'f') (document.fullscreenElement ? document.exitFullscreen() : $('.player').requestFullscreen()).catch(() => {});
+  if (k === 't') $('#theater').click();
+  if (e.shiftKey && k === 'n' && P.v.related[0]) go('watch', P.v.related[0].id);
+});
+addEventListener('pagehide', savePos);
+
+renderNav();
+const start = parseHash(); go(start.v, start.arg, false); history.replaceState(start, '', location.hash || '#home');
+window.__tube = { get D() { return D; }, go, get P() { return P; }, pickStreams, get view() { return view; } };
+})();
+</script>
+</body></html>

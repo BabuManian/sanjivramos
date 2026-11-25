@@ -24,6 +24,7 @@ import { ensureDesktop } from './vnc.js';
 import { initSocial, handleSocial, socialUpgrade, ipBan, bannedPage, noteVisit, claudeGate } from './social.js';
 import { playUpgrade, playApi, startLan } from './play.js';
 import { initMaker, makerApi } from './maker.js';
+import { ytApi } from './yt.js';
 import https from 'node:https';
 import crypto from 'node:crypto';
 import { ensureCert } from './tls.js';
@@ -113,6 +114,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith('/social/')) { handleSocial(req, res, url); return; }
   if (playApi(req, res, url)) return;
   if (url.pathname.startsWith('/maker/api/')) { makerApi(req, res, url); return; }
+  if (url.pathname.startsWith('/yt/')) { ytApi(req, res, url).catch(e => { if (!res.headersSent) { res.writeHead(500); res.end(e.message); } }); return; }
   // Files: the native file manager for this machine (and Linux files as wallpapers).
   if (url.pathname.startsWith('/linux-fs/')) { handleFiles(req, res, url, shellOk(req), readJson); return; }
   // Linux apps from the App Store: start a GUI app on the desktop, or add/remove an app in the Linux desktop's menus.
