@@ -6,13 +6,15 @@
 // Routes (signed-in, "Use the YouTube app" permission):
 //   GET /yt/api/status · home?region= · search?q=&page=&type= · shorts?page=&q= · video/:id · related/:id?title=
 //       channel/:id?tab=videos|shorts · feed?ids=UC..,UC.. · sponsor/:id · prefetch?ids=a,b,c
-//   GET /yt/stream?t=TOKEN
+//   GET /yt/stream?t=TOKEN · /yt/img?u=<YouTube image URL> (thumbnails/avatars fetched by this server, cached on disk)
 // Env: SJ_YT_INSTANCES (Invidious bases), SJ_YT_PIPED (extra Piped API bases), SJ_YT_NO_YTDLP=1, SJ_YT_NO_WARM=1
 import { spawn, execFileSync } from 'node:child_process';
 import readline from 'node:readline';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
+import fs from 'node:fs';
+import path from 'node:path';
 import { permGate } from './social.js';
 
 const UA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36';
@@ -312,6 +314,52 @@ async function stream(req, res, t) {
   Readable.fromWeb(up.body).on('error', () => res.destroy()).pipe(res);
 }
 
+/* ---------------- images: thumbnails + avatars come through this server (WebP when YouTube has it), cached on disk ---------------- */
+const IMG_HOST = /(^|\.)(ytimg\.com|ggpht\.com|googleusercontent\.com)$|^proxy\.piped\.|^pipedproxy\./;
+const IMG_DIR = path.join(path.resolve(process.env.SANJIVRAM_DATA || fileURLToPath(new URL('..', import.meta.url))), '.yt-img');
+const IMG_MAX = 4000, imgBusy = new Map(); let imgCount = -1;
+function imgPrune() {
+  try {
+    const files = fs.readdirSync(IMG_DIR).map(n => { const f = path.join(IMG_DIR, n); return { f, t: fs.statSync(f).mtimeMs }; }).sort((a, b) => a.t - b.t);
+    for (const x of files.slice(0, Math.max(0, files.length - IMG_MAX * 0.8))) fs.rmSync(x.f, { force: true });
+    imgCount = Math.min(files.length, IMG_MAX * 0.8);
+  } catch { imgCount = 0; }
+}
+async function fetchImg(u) {
+  const tries = [u];
+  const m = /^https:\/\/i\d?\.ytimg\.com\/vi\/([\w-]{11})\/(\w+)\.jpg$/.exec(u);
+  if (m) tries.unshift(`https://i.ytimg.com/vi_webp/${m[1]}/${m[2]}.webp`);   // about a third smaller
+  for (const t of tries) {
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 8000);
+    try {
+      const r = await fetch(t, { headers: { 'user-agent': UA }, signal: ac.signal });
+      const type = r.headers.get('content-type') || '';
+      if (r.ok && /^image\//.test(type)) { const buf = Buffer.from(await r.arrayBuffer()); if (buf.length > 200) return { type, buf }; }
+    } catch {} finally { clearTimeout(tm); }
+  }
+  throw new Error('no image');
+}
+async function serveImg(req, res, u) {
+  let host = ''; try { const x = new URL(u); if (x.protocol === 'https:') host = x.hostname; } catch {}
+  if (!host || !IMG_HOST.test(host)) { res.writeHead(400, { 'content-type': 'text/plain' }); res.end('Not a YouTube image'); return; }
+  const key = crypto.createHash('sha1').update(u).digest('hex'), file = path.join(IMG_DIR, key);
+  const out = (type, buf) => { res.writeHead(200, { 'content-type': type, 'content-length': buf.length, 'cache-control': 'private, max-age=604800, immutable' }); res.end(buf); };
+  try { const buf = fs.readFileSync(file); const n = buf.indexOf(10); out(buf.subarray(0, n).toString(), buf.subarray(n + 1)); return; } catch {}
+  let p = imgBusy.get(key);
+  if (!p) {
+    p = fetchImg(u).then(r => {
+      try {
+        fs.mkdirSync(IMG_DIR, { recursive: true }); fs.writeFileSync(file, Buffer.concat([Buffer.from(r.type + '\n'), r.buf]));
+        if (imgCount < 0) imgPrune(); else if (++imgCount > IMG_MAX) imgPrune();
+      } catch {}
+      return r;
+    }).finally(() => imgBusy.delete(key));
+    imgBusy.set(key, p);
+  }
+  try { const r = await p; out(r.type, r.buf); }
+  catch { res.writeHead(404, { 'content-type': 'text/plain', 'cache-control': 'max-age=300' }); res.end('Image not found'); }
+}
+
 /* ---------------- router ---------------- */
 export async function ytApi(req, res, url) {
   const p = url.pathname;
@@ -322,6 +370,7 @@ export async function ytApi(req, res, url) {
   lastUse = Date.now();
   try {
     if (p === '/yt/stream') { await stream(req, res, url.searchParams.get('t') || ''); return true; }
+    if (p === '/yt/img') { await serveImg(req, res, url.searchParams.get('u') || ''); return true; }
     const q = k => url.searchParams.get(k) || '', page = Math.max(1, Math.min(20, +q('page') || 1));
     const region = /^[A-Z]{2}$/.test(q('region')) ? q('region') : 'US';
     let m;
