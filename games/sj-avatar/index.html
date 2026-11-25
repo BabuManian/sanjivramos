@@ -67,7 +67,7 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
 
 <section id="t-char">
   <div id="ed"></div>
-  <div class="bar"><button class="btn pri" id="save">Save as my character</button><button class="btn" id="keep">☆ Keep in wardrobe</button><span class="msg" id="msg"></span></div>
+  <div class="bar"><button class="btn pri" id="save">Save as my character</button><button class="btn" id="keep">☆ Keep in wardrobe</button><button class="btn red" id="reset" title="Go back to the starting character">↺ Reset</button><span class="msg" id="msg"></span></div>
   <h3>Wardrobe</h3><div class="saved" id="saved"></div>
 </section>
 
@@ -160,6 +160,13 @@ input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background
   const where = w => w === 'account' ? 'Saved to your account ✓ — everyone sees it in online games' : w === 'local' ? 'Saved on this device ✓ (sign in to Messages to keep it on your account)' : 'Couldn’t reach the server — saved on this device';
   const saveLook = async () => { const L = ed.get(); const w = await SJLook.save(L); window.SJG && SJG.unlock('made'); if (L.custom && Object.keys(L.custom).length >= 3) window.SJG && SJG.unlock('fullfit'); return w; };
   $('save').onclick = async () => { $('msg').textContent = where(await saveLook()); };
+  let resetT = 0;
+  $('reset').onclick = async () => {
+    const btn = $('reset');
+    if (!resetT) { btn.textContent = '↺ Tap again to reset'; $('msg').textContent = 'This puts your character back to the default look (your wardrobe and items are kept).'; resetT = setTimeout(() => { resetT = 0; btn.textContent = '↺ Reset'; $('msg').textContent = ''; }, 4000); return; }
+    clearTimeout(resetT); resetT = 0; btn.textContent = '↺ Reset';
+    ed.set({ ...SJLook.DEF }); $('msg').textContent = 'Character reset — ' + where(await SJLook.save(ed.get()));
+  };
   paint();
 
   /* ---------- item workshop ---------- */

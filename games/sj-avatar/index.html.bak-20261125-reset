@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Character Creator</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;min-height:100%;background:#0b1020;color:#e5e7eb;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:920px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}p.sub{margin:0 0 12px;opacity:.7}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+[hidden]{display:none!important}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button{padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.07);font-weight:600}
+.tabs button.on{background:#3b6cff;color:#fff}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.btn{border-radius:10px;padding:8px 14px;font-weight:600;background:rgba(255,255,255,.1);color:#fff}
+.btn.pri{background:#3b6cff}.btn.sm{padding:5px 9px;font-size:12px}.btn.red{background:rgba(239,68,68,.25)}
+.msg{opacity:.85;font-size:13px}
+.saved{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.saved>button{border-radius:12px;padding:4px;background:rgba(255,255,255,.06);position:relative}
+.saved img{width:56px;height:56px;border-radius:10px;display:block}
+.saved .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;font-size:12px;line-height:20px;padding:0}
+h3{margin:18px 0 6px;font-size:13px;opacity:.7;text-transform:uppercase;letter-spacing:.06em}
+/* workshop */
+.ws{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px}
+@media (max-width:700px){.ws{grid-template-columns:1fr}}
+#grid{width:100%;max-width:380px;aspect-ratio:1;touch-action:none;border-radius:12px;display:block;cursor:crosshair;image-rendering:pixelated}
+.tools{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.tools button{min-width:38px;height:36px;padding:0 8px;border-radius:9px;background:rgba(255,255,255,.08);font-size:15px}
+.tools button.on{background:#3b6cff;color:#fff}
+.pal{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:10px;max-width:380px}
+.pal button{aspect-ratio:1;border-radius:8px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)}
+.pal button.on{outline:3px solid #fff;outline-offset:1px}
+.palrow{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;opacity:.85}
+.palrow input[type=color]{width:34px;height:30px;border:none;background:none;padding:0}
+.slots{display:flex;flex-wrap:wrap;gap:5px}
+.slots button{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.07)}
+.slots button.on{background:rgba(96,165,250,.25);outline:2px solid #60a5fa}
+input.txt{width:100%;box-sizing:border-box;font:inherit;color:inherit;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:8px 10px}
+#prev{width:100%;max-width:240px;aspect-ratio:3/4;border-radius:14px;background:radial-gradient(circle at 50% 30%,#334155,#0f172a);display:block;margin:8px 0}
+.tpl{display:flex;flex-wrap:wrap;gap:6px}
+.tpl button{display:flex;flex-direction:column;align-items:center;gap:2px;width:66px;padding:5px 2px;border-radius:10px;background:rgba(255,255,255,.06);font-size:11px}
+.tpl img{width:40px;height:40px;image-rendering:pixelated}
+.hint{font-size:12px;opacity:.6;margin:6px 0}
+/* my items */
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.card{background:rgba(255,255,255,.05);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.card.worn{outline:2px solid #22c55e}
+.card img{width:72px;height:72px;image-rendering:pixelated;border-radius:8px;background:repeating-conic-gradient(#334155 0 25%,#1e293b 0 50%) 0 0/12px 12px}
+.card b{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card small{opacity:.6}
+.card .row{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.imp{display:flex;gap:6px;margin-top:14px}
+/* clothing */
+.drop{border:2px dashed rgba(255,255,255,.2);border-radius:14px;padding:18px;text-align:center;cursor:pointer;display:block}
+.drop.over{border-color:#60a5fa;background:rgba(96,165,250,.1)}
+.drop input{display:none}
+#clGrid{width:100%;max-width:240px;aspect-ratio:1;image-rendering:pixelated;border-radius:10px;display:block;margin:10px 0;background:repeating-conic-gradient(#334155 0 25%,#1e293b 0 50%) 0 0/16px 16px}
+.chk{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.designs{display:flex;flex-wrap:wrap;gap:6px}
+.designs button{display:flex;flex-direction:column;align-items:center;gap:2px;width:74px;padding:5px 2px;border-radius:10px;background:rgba(255,255,255,.06);font-size:11px}
+.designs img{width:44px;height:44px;image-rendering:pixelated;border-radius:6px}
+</style></head>
+<body><main>
+<h1>🧍 Character Creator</h1>
+<p class="sub">Design the character that represents you in online games — and draw your own hats, badges, wings, pets and more.</p>
+<div class="tabs" id="tabs"><button data-t="char" class="on">🧍 Character</button><button data-t="ws">🎨 Item Workshop</button><button data-t="cl">👕 Clothing</button><button data-t="mine">🎒 My Items</button></div>
+
+<section id="t-char">
+  <div id="ed"></div>
+  <div class="bar"><button class="btn pri" id="save">Save as my character</button><button class="btn" id="keep">☆ Keep in wardrobe</button><span class="msg" id="msg"></span></div>
+  <h3>Wardrobe</h3><div class="saved" id="saved"></div>
+</section>
+
+<section id="t-ws" hidden>
+  <div class="ws">
+    <div>
+      <canvas id="grid" width="384" height="384"></canvas>
+      <div class="tools" id="tools">
+        <button data-tool="pen" class="on" title="Pencil">✏️</button><button data-tool="erase" title="Eraser">🧽</button><button data-tool="fill" title="Fill">🪣</button><button data-tool="pick" title="Pick a colour from the picture">💧</button>
+        <button data-act="mirror" title="Mirror drawing (left/right)">🪞</button><button data-act="undo" title="Undo">↩️</button><button data-act="redo" title="Redo">↪️</button>
+        <button data-act="flip" title="Flip left/right">⇆</button><button data-act="up" title="Move up">⬆</button><button data-act="down" title="Move down">⬇</button><button data-act="left" title="Move left">⬅</button><button data-act="right" title="Move right">➡</button><button data-act="clear" title="Clear">🗑️</button><label class="btn sm" style="display:inline-flex;align-items:center;height:36px;box-sizing:border-box" title="Turn a picture into pixel art with these colours">📷 From picture<input type="file" id="wsPic" accept="image/*" hidden></label>
+      </div>
+      <div class="pal" id="pal"></div>
+      <div class="palrow"><input type="color" id="palEdit" title="Change this colour"><span>Tap a colour to paint with it · use this box to change it to any colour</span></div>
+    </div>
+    <div>
+      <h3 style="margin-top:0">What is it?</h3>
+      <div class="slots" id="slots"></div>
+      <div class="hint" id="slotHint"></div>
+      <h3>Name</h3>
+      <input class="txt" id="iname" maxlength="24" placeholder="My cool item">
+      <canvas id="prev" width="300" height="400"></canvas>
+      <div class="bar" style="margin-top:4px"><button class="btn pri" id="wsWear">👕 Save &amp; wear</button><button class="btn" id="wsSave">💾 Save to My Items</button><button class="btn" id="wsNew">➕ New</button></div>
+      <div class="msg" id="wsMsg" style="margin-top:6px"></div>
+      <h3>Start from a design</h3>
+      <div class="tpl" id="tpl"></div>
+    </div>
+  </div>
+</section>
+
+<section id="t-cl" hidden>
+  <div class="ws">
+    <div>
+      <div class="slots" id="clKind"><button data-k="shirt" class="on">👕 Shirt</button><button data-k="pants">👖 Pants</button></div>
+      <label class="drop" id="clDrop" style="margin-top:10px">📷 <b>Upload a picture</b><br><span class="hint">or drop one here — any photo, drawing or logo</span><input type="file" id="clFile" accept="image/*"></label>
+      <h3>How it fits</h3>
+      <div class="slots" id="clMode"><button data-m="fill" class="on">Fill</button><button data-m="fit">Fit</button><button data-m="stretch">Stretch</button></div>
+      <label class="chk"><input type="checkbox" id="clBg"> Remove plain background</label>
+      <label class="chk"><input type="checkbox" id="clMatch" checked> Match sleeves / colour to the picture</label>
+      <canvas id="clGrid" width="24" height="24"></canvas>
+      <div class="hint" id="clHint">Shirts cover your chest. For pants, the left half of the picture goes on the left leg and the right half on the right leg.</div>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Name</h3>
+      <input class="txt" id="clName" maxlength="24" placeholder="My shirt">
+      <canvas id="clPrev" width="300" height="400" style="width:100%;max-width:240px;aspect-ratio:3/4;border-radius:14px;background:radial-gradient(circle at 50% 30%,#334155,#0f172a);display:block;margin:8px 0"></canvas>
+      <div class="bar" style="margin-top:4px"><button class="btn pri" id="clWear">👕 Wear it</button><button class="btn" id="clSave">💾 Save to closet</button><button class="btn" id="clOff">Take off</button></div>
+      <div class="msg" id="clMsg" style="margin-top:6px"></div>
+      <h3>Try a design</h3><div class="designs" id="clDesigns"></div>
+      <h3>My closet</h3><div class="designs" id="clCloset"></div>
+    </div>
+  </div>
+</section>
+
+<section id="t-mine" hidden>
+  <div class="items" id="items"></div>
+  <h3>Share items</h3>
+  <p class="hint">Press <b>Copy code</b> on an item and send it to a friend. Paste a code you got here to add that item to your collection.</p>
+  <div class="imp"><input class="txt" id="impCode" placeholder="Paste an item code (SJITEM:…)"><button class="btn" id="impBtn">Add</button></div>
+  <div class="msg" id="mineMsg" style="margin-top:6px"></div>
+</section>
+</main>
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script>
+(async () => {
+  window.SJG && SJG.init('avatar', { title: 'Character Creator', vs: false, trophies: [
+    { id: 'made', name: 'Looking Good', desc: 'Save your character', icon: '🧍' },
+    { id: 'designer', name: 'Designer', desc: 'Make your own item in the Item Workshop', icon: '🎨' },
+    { id: 'collector', name: 'Collector', desc: 'Have 10 items you made', icon: '🎒' },
+    { id: 'fullfit', name: 'All Mine', desc: 'Wear your own items in 3 slots at once', icon: '👑' },
+    { id: 'tailor', name: 'Tailor', desc: 'Wear a shirt or pants you made', icon: '👕' },
+  ] });
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const SLOT_NAME = Object.fromEntries(SJLook.SLOTS.map(([id, n, ic]) => [id, ic + ' ' + n]));
+  const SLOT_HINT = { hat: 'Sits on top of the head — draw it touching the bottom of the grid.', face: 'Covers the face — the eyes are about halfway down.', badge: 'A small picture on your chest.', back: 'Big, behind your body — wings, capes, shells…', held: 'In your hand — the hand holds it near the bottom middle.', pet: 'Follows you around and hops.' };
+
+  /* ---------- tabs ---------- */
+  let tab = 'char';
+  const show = t => { tab = t; for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.t === t); for (const s of ['char', 'ws', 'cl', 'mine']) $('t-' + s).hidden = s !== t; if (t === 'mine') paintItems(); if (t === 'cl') paintCloset(); if (t === 'char') ed.refresh(); };
+  $('tabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) show(b.dataset.t); };
+
+  /* ---------- character ---------- */
+  const ed = SJLook.editor($('ed'), await SJLook.get(), null, { workshop: () => show('ws') });
+  const W = { get() { try { return JSON.parse(localStorage.getItem('sjlook.wardrobe')) || []; } catch { return []; } }, set(v) { try { localStorage.setItem('sjlook.wardrobe', JSON.stringify(v.slice(0, 24))); } catch {} } };
+  const paint = () => { const list = W.get(); $('saved').innerHTML = list.length ? list.map((l, i) => `<button data-i="${i}" title="Wear this"><img src="${SJLook.face(l, 112)}" alt=""><span class="x" data-del="${i}">×</span></button>`).join('') : '<span style="opacity:.6">Outfits you keep show up here.</span>'; };
+  $('saved').onclick = e => { const d = e.target.closest('[data-del]'); if (d) { const l = W.get(); l.splice(+d.dataset.del, 1); W.set(l); paint(); return; } const b = e.target.closest('[data-i]'); if (b) ed.set(W.get()[+b.dataset.i]); };
+  $('keep').onclick = () => { W.set([ed.get(), ...W.get()]); paint(); };
+  const where = w => w === 'account' ? 'Saved to your account ✓ — everyone sees it in online games' : w === 'local' ? 'Saved on this device ✓ (sign in to Messages to keep it on your account)' : 'Couldn’t reach the server — saved on this device';
+  const saveLook = async () => { const L = ed.get(); const w = await SJLook.save(L); window.SJG && SJG.unlock('made'); if (L.custom && Object.keys(L.custom).length >= 3) window.SJG && SJG.unlock('fullfit'); return w; };
+  $('save').onclick = async () => { $('msg').textContent = where(await saveLook()); };
+  paint();
+
+  /* ---------- item workshop ---------- */
+  const N = 16, cv = $('grid'), g = cv.getContext('2d'), CELL = cv.width / N;
+  let it = blank('hat'), tool = 'pen', col = 0, mirror = false, undo = [], redo = [], drawing = false, lastCell = -1;
+  function blank(slot) { return { id: null, n: '', s: slot, p: SJLook.IPAL.slice(), d: Array(256).fill('.') }; }
+  const asItem = () => ({ n: $('iname').value.trim() || 'My ' + SJLook.SLOTS.find(x => x[0] === it.s)[1].toLowerCase(), s: it.s, p: it.p.slice(), d: it.d.join(''), id: it.id || undefined });
+  function drawGrid() {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const ch = it.d[y * N + x];
+      g.fillStyle = ch === '.' ? ((x + y) % 2 ? '#1e293b' : '#273449') : it.p[parseInt(ch, 16)];
+      g.fillRect(x * CELL, y * CELL, CELL, CELL);
+    }
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1; g.beginPath();
+    for (let i = 1; i < N; i++) { g.moveTo(i * CELL + .5, 0); g.lineTo(i * CELL + .5, cv.height); g.moveTo(0, i * CELL + .5); g.lineTo(cv.width, i * CELL + .5); }
+    g.stroke();
+    if (mirror) { g.strokeStyle = 'rgba(96,165,250,.8)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cv.width / 2, 0); g.lineTo(cv.width / 2, cv.height); g.stroke(); }
+  }
+  function paintPal() {
+    $('pal').innerHTML = it.p.map((c, i) => `<button data-c="${i}" class="${i === col && tool !== 'erase' ? 'on' : ''}" style="background:${c}" title="${c}"></button>`).join('');
+    $('palEdit').value = it.p[col];
+  }
+  function paintSlots() {
+    $('slots').innerHTML = SJLook.SLOTS.map(([id, n, ic]) => `<button data-s="${id}" class="${it.s === id ? 'on' : ''}">${ic} ${n}</button>`).join('');
+    $('slotHint').textContent = SLOT_HINT[it.s];
+  }
+  function paintTpl() { $('tpl').innerHTML = SJLook.TEMPLATES.map((t, i) => `<button data-tp="${i}" title="${esc(SLOT_NAME[t.s])}"><img src="${SJLook.itemURL(t, 40)}" alt=""><span>${esc(t.n)}</span></button>`).join('') + `<button data-tp="-1"><div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px">⬜</div><span>Blank</span></button>`; }
+  const refreshAll = () => { drawGrid(); paintPal(); paintSlots(); for (const b of $('tools').querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === tool); $('tools').querySelector('[data-act="mirror"]').classList.toggle('on', mirror); };
+  const snap = () => JSON.stringify([it.d, it.p]);
+  const push = () => { undo.push(snap()); if (undo.length > 80) undo.shift(); redo = []; };
+  const restore = s => { const [d, p] = JSON.parse(s); it.d = d; it.p = p; refreshAll(); };
+  const cellAt = e => { const r = cv.getBoundingClientRect(); const x = Math.floor((e.clientX - r.left) / r.width * N), y = Math.floor((e.clientY - r.top) / r.height * N); return x < 0 || y < 0 || x >= N || y >= N ? -1 : y * N + x; };
+  const setCell = (i, ch) => { it.d[i] = ch; if (mirror) { const x = i % N, y = i / N | 0; it.d[y * N + (N - 1 - x)] = ch; } };
+  function fill(i, ch) { const from = it.d[i]; if (from === ch) return; const st = [i]; while (st.length) { const k = st.pop(); if (it.d[k] !== from) continue; it.d[k] = ch; const x = k % N, y = k / N | 0; if (x > 0) st.push(k - 1); if (x < N - 1) st.push(k + 1); if (y > 0) st.push(k - N); if (y < N - 1) st.push(k + N); } }
+  function apply(i) {
+    if (i < 0) return;
+    if (tool === 'pick') { const ch = it.d[i]; if (ch === '.') { tool = 'erase'; } else { col = parseInt(ch, 16); tool = 'pen'; } refreshAll(); return; }
+    const ch = tool === 'erase' ? '.' : col.toString(16);
+    if (tool === 'fill') { fill(i, ch); if (mirror) { const x = i % N, y = i / N | 0; fill(y * N + (N - 1 - x), ch); } }
+    else setCell(i, ch);
+    drawGrid();
+  }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); const i = cellAt(e); if (i < 0) return; if (tool !== 'pick') push(); drawing = tool === 'pen' || tool === 'erase'; lastCell = i; apply(i); });
+  cv.addEventListener('pointermove', e => { if (!drawing) return; const i = cellAt(e); if (i >= 0 && i !== lastCell) { lastCell = i; apply(i); } });
+  addEventListener('pointerup', () => { drawing = false; });
+  $('pal').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; col = +b.dataset.c; if (tool === 'erase' || tool === 'pick') tool = 'pen'; refreshAll(); };
+  $('palEdit').oninput = () => { it.p[col] = $('palEdit').value; drawGrid(); };
+  $('palEdit').onchange = () => paintPal();
+  $('palEdit').onfocus = () => push();
+  const shift = (dx, dy) => { const n = Array(256).fill('.'); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < N && ny < N) n[ny * N + nx] = it.d[y * N + x]; } it.d = n; };
+  $('tools').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tool) { tool = b.dataset.tool; refreshAll(); return; }
+    const a = b.dataset.act;
+    if (a === 'mirror') mirror = !mirror;
+    else if (a === 'undo') { if (undo.length) { redo.push(snap()); restore(undo.pop()); } return; }
+    else if (a === 'redo') { if (redo.length) { undo.push(snap()); restore(redo.pop()); } return; }
+    else { push(); if (a === 'clear') it.d = Array(256).fill('.'); if (a === 'flip') { const n = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) n.push(it.d[y * N + (N - 1 - x)]); it.d = n; } if (a === 'up') shift(0, -1); if (a === 'down') shift(0, 1); if (a === 'left') shift(-1, 0); if (a === 'right') shift(1, 0); }
+    refreshAll();
+  };
+  $('slots').onclick = e => { const b = e.target.closest('[data-s]'); if (b) { it.s = b.dataset.s; paintSlots(); } };
+  $('tpl').onclick = e => { const b = e.target.closest('[data-tp]'); if (!b) return; push(); const i = +b.dataset.tp; if (i < 0) { it = { ...blank(it.s) }; $('iname').value = ''; } else { const t = SJLook.TEMPLATES[i]; it = { id: null, n: t.n, s: t.s, p: t.p.slice(), d: t.d.split('') }; $('iname').value = t.n; } refreshAll(); };
+  function load(item) { it = { id: item.id || null, n: item.n, s: item.s, p: item.p.slice(), d: item.d.split('') }; $('iname').value = item.n; undo = []; redo = []; refreshAll(); show('ws'); }
+  const isEmpty = () => it.d.every(c => c === '.');
+  function store() {
+    if (isEmpty()) { $('wsMsg').textContent = 'Draw something first!'; return null; }
+    const saved = SJLook.Items.put(asItem()); if (!saved) { $('wsMsg').textContent = 'Couldn’t save that item.'; return null; }
+    it.id = saved.id; window.SJG && SJG.unlock('designer'); if (SJLook.Items.list().length >= 10) window.SJG && SJG.unlock('collector');
+    return saved;
+  }
+  async function wear(item) {
+    const L = ed.get(), c = { ...(L.custom || {}) }, k = SJLook.cleanItem(item, item.s);
+    c[k.s] = { n: k.n, s: k.s, p: k.p, d: k.d }; ed.set({ ...L, custom: c });
+    return where(await saveLook());
+  }
+  async function takeOff(slot) { const L = ed.get(), c = { ...(L.custom || {}) }; delete c[slot]; ed.set({ ...L, custom: Object.keys(c).length ? c : null }); return where(await saveLook()); }
+  $('wsSave').onclick = () => { const s = store(); if (s) $('wsMsg').textContent = `“${s.n}” saved to My Items ✓`; };
+  $('wsWear').onclick = async () => { const s = store(); if (s) $('wsMsg').textContent = `Wearing “${s.n}” — ` + await wear(s); };
+  $('wsNew').onclick = () => { push(); it = blank(it.s); $('iname').value = ''; refreshAll(); $('wsMsg').textContent = ''; };
+
+  // live preview: you, wearing what you're drawing
+  const pc = $('prev'), px = pc.getContext('2d'); let pt = 0;
+  (function loop() {
+    if (!pc.isConnected) return; requestAnimationFrame(loop); if (tab !== 'ws') return; pt += 1 / 60;
+    const L = ed.get(), item = { n: 'x', s: it.s, p: it.p, d: it.d.join('') };
+    px.clearRect(0, 0, pc.width, pc.height);
+    SJLook.draw(px, { ...L, custom: { ...(L.custom || {}), [it.s]: item } }, it.s === 'pet' ? 190 : 150, 370, 270, { t: pt, pose: it.s === 'held' ? 'idle' : 'walk', face: 1 });
+  })();
+
+  /* ---------- pictures → pixels ---------- */
+  const loadImg = file => new Promise((res, rej) => { if (!file || !/^image\//.test(file.type)) return rej(new Error('That isn’t a picture.')); const u = URL.createObjectURL(file), im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Couldn’t open that picture.')); im.src = u; });
+  /** scale a picture down to w×h (in halving steps so it stays smooth) → RGBA data */
+  function shrink(img, W, H, mode) {
+    let src = img, sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
+    while (sw > W * 4 || sh > H * 4) { const c = document.createElement('canvas'); c.width = Math.max(1, sw >> 1); c.height = Math.max(1, sh >> 1); const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); src = c; sw = c.width; sh = c.height; }
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    if (mode === 'stretch') x.drawImage(src, 0, 0, W, H);
+    else { const k = mode === 'fill' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh), dw = sw * k, dh = sh * k; x.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh); }
+    return x.getImageData(0, 0, W, H).data;
+  }
+  const hex2 = v => v.toString(16).padStart(2, '0');
+  const near = (d, i, bg) => bg && Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) < 60;
+  function toCloth(img, mode, removeBg) {
+    const W = 24, H = 24, d = shrink(img, W, H, mode); let px = '', R = 0, G = 0, B = 0, n = 0;
+    const bg = removeBg ? [d[0], d[1], d[2]] : null;
+    for (let i = 0; i < W * H; i++) { const k = i * 4; if (d[k + 3] < 128 || near(d, k, bg)) { px += '......'; continue; } px += hex2(d[k]) + hex2(d[k + 1]) + hex2(d[k + 2]); R += d[k]; G += d[k + 1]; B += d[k + 2]; n++; }
+    return { w: W, h: H, px, avg: n ? '#' + [R, G, B].map(v => hex2(Math.round(v / n))).join('') : null };
+  }
+  $('wsPic').onchange = async e => {
+    try {
+      const img = await loadImg(e.target.files[0]); e.target.value = ''; push();
+      const d = shrink(img, 16, 16, 'fit'), bg = d[3] > 128 ? [d[0], d[1], d[2]] : null, rgb = it.p.map(h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; });
+      it.d = Array.from({ length: 256 }, (_, i) => { const k = i * 4; if (d[k + 3] < 128 || near(d, k, bg)) return '.'; let best = 0, bd = 1e9; rgb.forEach((c, j) => { const dd = (c[0] - d[k]) ** 2 + (c[1] - d[k + 1]) ** 2 + (c[2] - d[k + 2]) ** 2; if (dd < bd) { bd = dd; best = j; } }); return best.toString(16); });
+      refreshAll(); $('wsMsg').textContent = 'Turned your picture into pixel art ✓ — touch it up with the pencil';
+    } catch (err) { $('wsMsg').textContent = err.message; }
+  };
+
+  /* ---------- clothing from pictures ---------- */
+  let clKind = 'shirt', clMode = 'fill', clImg = null, clCur = null;
+  const DESIGNS = (() => {
+    const mk = (kind, n, f, avg) => { let px = ''; for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) { const c = f(x, y); px += c ? c.slice(1) : '......'; } return { kind, n, w: 24, h: 24, px, avg: avg || f(12, 12) }; };
+    const rnd = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+    /* flames licking up from the bottom: h = how tall the fire is in each column, cols = [tip, middle, core] colours */
+    const flame = (bg, cols, tall = 1, seed = 0, top = false) => (x, y) => {
+      const yy = top ? y : 23 - y, h = (9 + 4.5 * Math.sin(x * .62 + seed) + 2.5 * Math.sin(x * 1.45 + seed * 2) + 1.5 * Math.cos(x * 2.9 + seed)) * tall, k = yy / Math.max(1, h);
+      if (k > 1) return bg; return k > .7 ? cols[0] : k > .38 ? cols[1] : cols[2];
+    };
+    const FIRE = ['#dc2626', '#f97316', '#facc15'], BLUE = ['#1d4ed8', '#38bdf8', '#e0f2fe'], GREEN = ['#15803d', '#4ade80', '#ecfccb'], PURPLE = ['#7e22ce', '#d946ef', '#fbcfe8'];
+    return [
+      mk('shirt', 'Fire shirt', flame('#111827', FIRE), '#111827'),
+      mk('shirt', 'Big fire', flame('#111827', FIRE, 1.6, 1.3), '#111827'),
+      mk('shirt', 'Blue fire', flame('#0f172a', BLUE, 1.1, 2.1), '#0f172a'),
+      mk('shirt', 'Green fire', flame('#111827', GREEN, 1.2, .7), '#111827'),
+      mk('shirt', 'Purple fire', flame('#1e1b4b', PURPLE, 1.2, 3.3), '#1e1b4b'),
+      mk('shirt', 'Fire on white', flame('#f8fafc', FIRE, 1, 4.2), '#f8fafc'),
+      mk('shirt', 'Fire + skull', (x, y) => { const sk = Math.hypot(x - 11.5, y - 8) < 4.2 || (y >= 11 && y <= 13 && Math.abs(x - 11.5) < 2.6); if (sk) { if ((Math.hypot(x - 10, y - 8) < 1.3) || (Math.hypot(x - 13, y - 8) < 1.3) || (y === 13 && x % 2 === 0)) return '#111827'; return '#f8fafc'; } return flame('#111827', FIRE, .9, 5)(x, y); }, '#111827'),
+      mk('pants', 'Fire pants', flame('#111827', FIRE, .9, .4), '#111827'),
+      mk('pants', 'Blue fire pants', flame('#0f172a', BLUE, .9, 1.7), '#0f172a'),
+      mk('shirt', 'Plaid', (x, y) => (x % 8 < 3) && (y % 8 < 3) ? '#111827' : (x % 8 < 3 || y % 8 < 3) ? '#7f1d1d' : '#dc2626'),
+      mk('shirt', 'Tuxedo', (x, y) => { const m = Math.abs(x - 11.5); if (y >= 1 && y <= 3 && m < 2.6) return m < .8 ? '#7f1d1d' : '#dc2626'; if (y < 17 && m < (17 - y) * .4) return m < .6 && y > 5 && y % 4 === 2 ? '#111827' : '#f8fafc'; return '#111827'; }),
+      mk('shirt', 'Galaxy', (x, y) => rnd(x, y) > .93 ? '#ffffff' : ['#1e1b4b', '#312e81', '#4c1d95', '#581c87'][Math.floor((Math.sin(x * .4 + y * .3) + Math.sin(y * .5 - x * .2) + 2) / 4 * 3.99)]),
+      mk('shirt', 'Rainbow', (x, y) => ['#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#8b5cf6'][Math.floor(y / 4)]),
+      mk('shirt', 'Sports #10', (x, y) => { const one = x >= 6 && x <= 7 && y >= 7 && y <= 17, zero = (x >= 10 && x <= 17 && y >= 7 && y <= 17) && !(x >= 12 && x <= 15 && y >= 9 && y <= 15); if (one || zero) return '#ffffff'; return y < 2 ? '#facc15' : '#16a34a'; }),
+      mk('shirt', 'Smiley', (x, y) => { const d = Math.hypot(x - 11.5, y - 11.5); if (d < 7) { if ((Math.hypot(x - 9, y - 9.5) < 1.2) || (Math.hypot(x - 14, y - 9.5) < 1.2)) return '#111827'; if (d > 3 && d < 4.4 && y > 12) return '#111827'; return '#facc15'; } return '#0ea5e9'; }),
+      mk('pants', 'Jeans', (x, y) => (x === 11 || x === 12) ? '#1e3a8a' : y < 2 ? '#1e293b' : rnd(x, y) > .85 ? '#3b82f6' : '#2563eb'),
+      mk('pants', 'Ripped jeans', (x, y) => (y >= 12 && y <= 14 && ((x >= 3 && x <= 8) || (x >= 15 && x <= 20))) ? (y === 13 ? null : '#e5e7eb') : rnd(x, y) > .85 ? '#60a5fa' : '#3b82f6'),
+      mk('pants', 'Camo', (x, y) => ['#365314', '#4d7c0f', '#78350f', '#1c1917'][Math.floor((Math.sin(x * .7) + Math.cos(y * .6 + x * .3) + 2) / 4 * 3.99)]),
+      mk('pants', 'Track pants', (x, y) => (x === 1 || x === 2 || x === 21 || x === 22) ? '#f8fafc' : '#111827'),
+      mk('pants', 'Checkers', (x, y) => ((x >> 2) + (y >> 2)) % 2 ? '#111827' : '#f8fafc'),
+      mk('pants', 'Lava', (x, y) => ['#7f1d1d', '#dc2626', '#f97316', '#facc15'][Math.floor((Math.sin(x * .5 + y * .4) * Math.cos(y * .3) + 1) / 2 * 3.99)]),
+    ];
+  })();
+  const clothURL = c => { const cv = document.createElement('canvas'); cv.width = cv.height = 48; const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(SJLook.clothCanvas(c), 0, 0, 48, 48); return cv.toDataURL(); };
+  function paintCl() {
+    for (const b of $('clKind').children) b.classList.toggle('on', b.dataset.k === clKind);
+    for (const b of $('clMode').children) b.classList.toggle('on', b.dataset.m === clMode);
+    const g2 = $('clGrid').getContext('2d'); g2.clearRect(0, 0, 24, 24); if (clCur) g2.drawImage(SJLook.clothCanvas(clCur), 0, 0);
+    $('clName').placeholder = clKind === 'shirt' ? 'My shirt' : 'My pants';
+  }
+  function paintCloset() {
+    $('clDesigns').innerHTML = DESIGNS.map((d, i) => `<button data-dz="${i}" title="${d.kind}"><img src="${clothURL(d)}" alt=""><span>${d.kind === 'shirt' ? '👕' : '👖'} ${esc(d.n)}</span></button>`).join('');
+    const list = SJLook.Clothes.list();
+    $('clCloset').innerHTML = list.length ? list.map(c => `<button data-cz="${c.id}" title="Tap to load"><img src="${clothURL(c)}" alt=""><span>${c.kind === 'shirt' ? '👕' : '👖'} ${esc(c.n)}</span><span data-del="${c.id}" style="color:#fca5a5">delete</span></button>`).join('') : '<span class="hint">Clothes you save show up here.</span>';
+    paintCl();
+  }
+  const reconvert = () => { if (clImg) { clCur = toCloth(clImg, clMode, $('clBg').checked); paintCl(); } };
+  async function useFile(f) { try { clImg = await loadImg(f); if (!$('clName').value) $('clName').value = (f.name || '').replace(/\.[^.]+$/, '').slice(0, 24); reconvert(); $('clMsg').textContent = 'Looking good! Press “Wear it” to put it on.'; } catch (e) { $('clMsg').textContent = e.message; } }
+  $('clFile').onchange = e => { useFile(e.target.files[0]); e.target.value = ''; };
+  const dz = $('clDrop');
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add('over'); }; dz.ondragleave = () => dz.classList.remove('over');
+  dz.ondrop = e => { e.preventDefault(); dz.classList.remove('over'); useFile(e.dataTransfer.files[0]); };
+  addEventListener('paste', e => { if (tab !== 'cl') return; const f = [...(e.clipboardData || {}).files || []].find(f => /^image\//.test(f.type)); if (f) useFile(f); });
+  $('clKind').onclick = e => { const b = e.target.closest('[data-k]'); if (b) { clKind = b.dataset.k; paintCl(); } };
+  $('clMode').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { clMode = b.dataset.m; reconvert(); } };
+  $('clBg').onchange = reconvert;
+  $('clDesigns').onclick = e => { const b = e.target.closest('[data-dz]'); if (!b) return; const d = DESIGNS[+b.dataset.dz]; clImg = null; clCur = { w: d.w, h: d.h, px: d.px, avg: d.avg }; clKind = d.kind; $('clName').value = d.n; paintCl(); };
+  $('clCloset').onclick = e => { const del = e.target.closest('[data-del]'); if (del) { SJLook.Clothes.remove(del.dataset.del); paintCloset(); return; } const b = e.target.closest('[data-cz]'); if (!b) return; const c = SJLook.Clothes.list().find(x => x.id === b.dataset.cz); if (!c) return; clImg = null; clCur = { w: c.w, h: c.h, px: c.px, avg: c.avg }; clKind = c.kind; $('clName').value = c.n; paintCl(); };
+  const clName = () => $('clName').value.trim() || (clKind === 'shirt' ? 'My shirt' : 'My pants');
+  $('clSave').onclick = () => { if (!clCur) { $('clMsg').textContent = 'Upload a picture or pick a design first.'; return; } const k = SJLook.Clothes.put({ ...clCur, kind: clKind, n: clName() }); $('clMsg').textContent = k ? `“${k.n}” saved to your closet ✓` : 'Your closet is full on this device — delete something first.'; paintCloset(); };
+  $('clWear').onclick = async () => {
+    if (!clCur) { $('clMsg').textContent = 'Upload a picture or pick a design first.'; return; }
+    const L = ed.get(), next = { ...L, cloth: { ...(L.cloth || {}), [clKind]: { n: clName(), w: clCur.w, h: clCur.h, px: clCur.px } } };
+    if ($('clMatch').checked && clCur.avg) next[clKind === 'shirt' ? 'shirt' : 'pants'] = clCur.avg;
+    ed.set(next); window.SJG && SJG.unlock('tailor'); $('clMsg').textContent = `Wearing your ${clKind} — ` + await saveLook();
+  };
+  $('clOff').onclick = async () => { const L = ed.get(), c = { ...(L.cloth || {}) }; delete c[clKind]; ed.set({ ...L, cloth: Object.keys(c).length ? c : null }); $('clMsg').textContent = `Took off your ${clKind} — ` + await saveLook(); };
+  // preview: you wearing what's on the table
+  const cp = $('clPrev'), cx2 = cp.getContext('2d'); let ct = 0;
+  (function loop() { if (!cp.isConnected) return; requestAnimationFrame(loop); if (tab !== 'cl') return; ct += 1 / 60; const L = ed.get(), next = { ...L }; if (clCur) { next.cloth = { ...(L.cloth || {}), [clKind]: { w: clCur.w, h: clCur.h, px: clCur.px } }; if ($('clMatch').checked && clCur.avg) next[clKind === 'shirt' ? 'shirt' : 'pants'] = clCur.avg; } cx2.clearRect(0, 0, cp.width, cp.height); SJLook.draw(cx2, next, 150, 370, 290, { t: ct, pose: 'walk', noPet: true }); })();
+
+  /* ---------- my items ---------- */
+  function paintItems() {
+    const list = SJLook.Items.list(), L = ed.get(), worn = sl => L.custom && L.custom[sl];
+    $('items').innerHTML = list.length ? list.map(x => { const on = worn(x.s) && worn(x.s).d === x.d && worn(x.s).p.join() === x.p.join(); return `<div class="card${on ? ' worn' : ''}" data-id="${x.id}"><img src="${SJLook.itemURL(x, 72)}" alt=""><b title="${esc(x.n)}">${esc(x.n)}</b><small>${SLOT_NAME[x.s]}${on ? ' · wearing' : ''}</small><div class="row">${on ? `<button class="btn sm" data-a="off">Take off</button>` : `<button class="btn sm pri" data-a="wear">Wear</button>`}<button class="btn sm" data-a="edit">Edit</button><button class="btn sm" data-a="copy">Copy</button><button class="btn sm" data-a="code">Copy code</button><button class="btn sm red" data-a="del">🗑</button></div></div>`; }).join('')
+      : '<p class="hint" style="grid-column:1/-1">Nothing yet — open the 🎨 Item Workshop and draw something!</p>';
+  }
+  $('items').onclick = async e => {
+    const b = e.target.closest('[data-a]'), card = e.target.closest('[data-id]'); if (!b || !card) return;
+    const x = SJLook.Items.list().find(i => i.id === card.dataset.id); if (!x) return;
+    const a = b.dataset.a;
+    if (a === 'wear') $('mineMsg').textContent = `Wearing “${x.n}” — ` + await wear(x);
+    if (a === 'off') $('mineMsg').textContent = 'Took it off — ' + await takeOff(x.s);
+    if (a === 'edit') return load(x);
+    if (a === 'copy') { SJLook.Items.put({ ...x, id: undefined, n: (x.n + ' copy').slice(0, 24) }); }
+    if (a === 'del') { if (!confirm(`Delete “${x.n}”?`)) return; SJLook.Items.remove(x.id); }
+    if (a === 'code') { const code = SJLook.Items.code(x); $('impCode').value = code; $('impCode').select(); try { await navigator.clipboard.writeText(code); $('mineMsg').textContent = 'Code copied ✓ — send it to a friend'; } catch { $('mineMsg').textContent = 'Code is in the box below — copy it from there'; } }
+    paintItems();
+  };
+  $('impBtn').onclick = () => { const x = SJLook.Items.parse($('impCode').value); if (!x) { $('mineMsg').textContent = 'That isn’t an item code.'; return; } const s = SJLook.Items.put(x); $('impCode').value = ''; $('mineMsg').textContent = `Added “${s.n}” ✓`; paintItems(); };
+
+  paintTpl(); refreshAll();
+  window.__avatar = () => ed.get();
+  window.__cloth = { useFile, get: () => clCur, set: c => { clCur = c; paintCl(); }, toCloth, DESIGNS };
+  window.__workshop = { get: () => it, show, set: v => { it = v; refreshAll(); }, asItem, store, wear };
+})();
+</script>
+</body></html>
