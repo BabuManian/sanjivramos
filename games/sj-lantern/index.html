@@ -161,17 +161,17 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 /* =================== WORLD =================== */
-const HALF = 100, SEED = 7741, rnd = G3.rng(SEED), N1 = G3.noise2(SEED), N2 = G3.noise2(SEED + 9);
-const LAKE = [60, 50, 15];
+const HALF = 160, SEED = 7741, rnd = G3.rng(SEED), N1 = G3.noise2(SEED), N2 = G3.noise2(SEED + 9);
+const LAKE = [96, 80, 15];
 const LM = {   // landmarks
   camp: { x: 0, z: 0, name: 'Camp' },
-  cabin: { x: 42, z: -30, name: 'Ranger cabin' },
-  stones: { x: -55, z: -45, name: 'Standing stones' },
-  dock: { x: 60, z: 50, name: 'Lake dock' },
-  tower: { x: -60, z: 55, name: 'Fire watchtower' },
-  cave: { x: 4, z: 60, name: 'Hollow cave' },
-  mill: { x: -82, z: 2, name: 'Old mill' },
-  oldcamp: { x: 78, z: -72, name: 'Abandoned camp' },
+  cabin: { x: 67, z: -48, name: 'Ranger cabin' },
+  stones: { x: -88, z: -72, name: 'Standing stones' },
+  dock: { x: 96, z: 80, name: 'Lake dock' },
+  tower: { x: -96, z: 88, name: 'Fire watchtower' },
+  cave: { x: 6, z: 96, name: 'Hollow cave' },
+  mill: { x: -131, z: 3, name: 'Old mill' },
+  oldcamp: { x: 125, z: -115, name: 'Abandoned camp' },
 };
 const inCaveRock = (x, z) => Math.abs(x - LM.cave.x) < 9.5 && z > LM.cave.z - 1.5 && z < LM.cave.z + 24.5;
 function rawH(x, z) {
@@ -179,7 +179,7 @@ function rawH(x, z) {
   h *= smooth(9, 22, Math.hypot(x, z));
   for (const k in LM) if (k !== 'camp' && k !== 'dock') { const l = LM[k], d = Math.hypot(x - l.x, z - l.z); h = lerp(h, 0.3, 1 - smooth(7, 15, d)); }
   const dl = Math.hypot(x - LAKE[0], z - LAKE[1]); if (dl < LAKE[2]) h -= (1 - dl / LAKE[2]) ** 1.5 * 5;
-  h += smooth(80, 100, Math.max(Math.abs(x), Math.abs(z))) * 6;   // hills at the edge of the map
+  h += smooth(HALF - 20, HALF, Math.max(Math.abs(x), Math.abs(z))) * 6;   // hills at the edge of the map
   if (inCaveRock(x, z)) h = Math.min(h, 0);   // the cave's rock covers this
   return h;
 }
@@ -202,16 +202,16 @@ function groundCol(x, z, h) {
 }
 
 // --- static things: trees, rocks, bushes, scrap (grouped in chunks so chopping a tree rebuilds only its chunk)
-const CH = 25, NCH = HALF * 2 / CH;
+const CH = 20, NCH = HALF * 2 / CH;
 const trees = [], rocks = [], bushes = [], scraps = [];
 const nearLM = (x, z, r) => { for (const k in LM) if (Math.hypot(x - LM[k].x, z - LM[k].z) < r) return true; return false; };
-for (let i = 0; i < 1100 && trees.length < 760; i++) {
+for (let i = 0; i < 2900 && trees.length < 1950; i++) {
   const x = (rnd() * 2 - 1) * (HALF - 3), z = (rnd() * 2 - 1) * (HALF - 3);
   if (Math.hypot(x, z) < 12 || nearLM(x, z, 10) || inCaveRock(x, z) || Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2] + 1 || onPath(x, z) < 2.2) continue;
   trees.push({ id: trees.length, x, z, s: 0.8 + rnd() * 0.7, kind: rnd() < 0.78 ? 0 : 1, hp: 0, alive: true, y: groundH(x, z) });
 }
-for (let i = 0; i < 160; i++) { const x = (rnd() * 2 - 1) * 95, z = (rnd() * 2 - 1) * 95; if (Math.hypot(x, z) < 11 || nearLM(x, z, 8) || inCaveRock(x, z) || onPath(x, z) < 2) continue; rocks.push({ id: rocks.length, x, z, s: 0.6 + rnd() * 0.9, left: 3, y: groundH(x, z) }); }
-for (let i = 0; i < 120; i++) { const x = (rnd() * 2 - 1) * 92, z = (rnd() * 2 - 1) * 92; if (Math.hypot(x, z) < 10 || nearLM(x, z, 7) || inCaveRock(x, z) || onPath(x, z) < 2) continue; bushes.push({ id: bushes.length, x, z, berries: 3, regrow: 0, y: groundH(x, z) }); }
+for (let i = 0; i < 410; i++) { const x = (rnd() * 2 - 1) * (HALF - 5), z = (rnd() * 2 - 1) * (HALF - 5); if (Math.hypot(x, z) < 11 || nearLM(x, z, 8) || inCaveRock(x, z) || onPath(x, z) < 2) continue; rocks.push({ id: rocks.length, x, z, s: 0.6 + rnd() * 0.9, left: 3, y: groundH(x, z) }); }
+for (let i = 0; i < 310; i++) { const x = (rnd() * 2 - 1) * (HALF - 8), z = (rnd() * 2 - 1) * (HALF - 8); if (Math.hypot(x, z) < 10 || nearLM(x, z, 7) || inCaveRock(x, z) || onPath(x, z) < 2) continue; bushes.push({ id: bushes.length, x, z, berries: 3, regrow: 0, y: groundH(x, z) }); }
 for (const k of ['cabin', 'stones', 'tower', 'cave', 'mill', 'oldcamp', 'dock']) for (let i = 0; i < 3; i++) { const l = LM[k], a = rnd() * 6.28, r = 4 + rnd() * 4; scraps.push({ id: scraps.length, x: l.x + Math.cos(a) * r, z: l.z + Math.sin(a) * r, taken: false, battery: i === 0 }); }
 const chunkOf = (x, z) => clamp(Math.floor((x + HALF) / CH), 0, NCH - 1) * NCH + clamp(Math.floor((z + HALF) / CH), 0, NCH - 1);
 const chunks = Array.from({ length: NCH * NCH }, (_, i) => ({ i, cx: -HALF + Math.floor(i / NCH) * CH + CH / 2, cz: -HALF + (i % NCH) * CH + CH / 2, mesh: null, dirty: true, boxes: [] }));
@@ -376,8 +376,8 @@ let S = null, P = null, mode = 'story', running = false, paused = false, enemies
 function fresh(m) {
   mode = m;
   S = { mode: m, night: 0, t: 25, isNight: false, fire: 70, hp: 100, food: 80, stam: 100, inv: { wood: 2, stone: 0, scrap: 0, berries: 3, cans: 1, batteries: 1, posts: 0 }, cap: 20, tools: { axe: false, spear: false, lantern: false, ring: false },
-    weather: 'clear', wxK: 0, plots: [], traps: [], raidsWon: 0, held: 'hands', ammo: { arrows: 0, bullets: 0, shells: 0 }, mag: { revolver: 0, shotgun: 0 }, chests: [], armor: 0, wolves: 0, cooked: 0, sack: [], sackCap: 5, drops: [], dropN: 0, beds: 0, junkTaken: [], flash: 100, flashOn: false, lanternOn: false, pages: [], stones: [], placed: 0, chopped: [], rocksUsed: {}, berriesT: {}, scrapsTaken: [], posts: [], kills: 0, chops: 0, deaths: 0, beaconLit: false, finalNight: false, wardenGone: 0 };
-  { const jr = G3.rng(SEED + 77); for (let i = 0; i < 60; i++) { const x = (jr() * 2 - 1) * 90, z = (jr() * 2 - 1) * 90; if (Math.hypot(x, z) < 15 || inCaveRock(x, z) || Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2]) continue; const id = jr() < 0.12 ? 'battery' : jr() < 0.12 ? 'can' : JUNK[(jr() * JUNK.length) | 0]; S.drops.push({ u: ++S.dropN, id, x, z, y: groundH(x, z) }); } }
+    weather: 'clear', wxK: 0, plots: [], traps: [], raidsWon: 0, held: 'hands', ammo: { arrows: 0, bullets: 0, shells: 0 }, mag: { revolver: 0, shotgun: 0 }, chests: [], armor: 0, wolves: 0, cooked: 0, sack: [], sackCap: 5, drops: [], dropN: 0, beds: 0, junkTaken: [], flash: 100, flashOn: false, lanternOn: false, pages: [], stones: [], placed: 0, mapV: 2, chopped: [], rocksUsed: {}, berriesT: {}, scrapsTaken: [], posts: [], kills: 0, chops: 0, deaths: 0, beaconLit: false, finalNight: false, wardenGone: 0 };
+  { const jr = G3.rng(SEED + 77); for (let i = 0; i < 150; i++) { const x = (jr() * 2 - 1) * (HALF - 10), z = (jr() * 2 - 1) * (HALF - 10); if (Math.hypot(x, z) < 15 || inCaveRock(x, z) || Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2]) continue; const id = jr() < 0.12 ? 'battery' : jr() < 0.12 ? 'can' : JUNK[(jr() * JUNK.length) | 0]; S.drops.push({ u: ++S.dropN, id, x, z, y: groundH(x, z) }); } }
   P = Object.assign(G3.Body(1.5, 0, 6), { yaw: Math.PI, face: Math.PI, walk: 0, swing: 0, swingT: 0, hurtT: 0, inv: 0 });
   camYaw = Math.PI * 0.85; camPitch = -0.25;
 }
@@ -389,7 +389,7 @@ function applyWorldState() {
 }
 const SAVE = 'sj-lantern-save';
 function save() { if (!S || S.mode !== 'story' || S.over) return; try { localStorage.setItem(SAVE, JSON.stringify({ S, P: { x: P.x, y: P.y, z: P.z, yaw: P.yaw } })); } catch {} }
-function loadSave() { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (!d || !d.S) return false; fresh('story'); S = Object.assign(S, d.S); Object.assign(P, d.P); applyWorldState(); return true; } catch { return false; } }
+function loadSave() { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (!d || !d.S) return false; if (d.S.mapV !== 2) { for (const k of ['chopped', 'scrapsTaken', 'junkTaken']) d.S[k] = []; for (const k of ['rocksUsed', 'berriesT']) d.S[k] = {}; delete d.S.drops; delete d.S.dropN; d.S.mapV = 2; d.P = { x: 1.5, y: 0, z: 6, yaw: Math.PI }; } fresh('story'); S = Object.assign(S, d.S); Object.assign(P, d.P); applyWorldState(); return true; } catch { return false; } }
 
 /* =================== HELPERS =================== */
 function log(t) { const d = document.createElement('div'); d.textContent = t; $('log').appendChild(d); while ($('log').children.length > 5) $('log').firstChild.remove(); setTimeout(() => d.remove(), 6000); }
@@ -666,8 +666,8 @@ const AN = {
   alpha: { hp: 130, spd: 6.4, dmg: 15, aggro: 19, r: 0.85, h: 0.75, size: 1.3, meat: 2, pelt: 2 },
   bear: { hp: 400, spd: 5.4, dmg: 26, aggro: 12, r: 1.3, h: 1.1, size: 1.9, meat: 4, pelt: 0 },
 };
-const DENS = [{ x: -32, z: 30 }, { x: 30, z: 28 }, { x: -38, z: -22 }, { x: 58, z: -15 }];
-const BEAR_DEN = { x: -80, z: -78 };
+const DENS = [{ x: -51, z: 48 }, { x: 48, z: 45 }, { x: -61, z: -35 }, { x: 93, z: -24 }, { x: 20, z: -110 }, { x: -120, z: 60 }];
+const BEAR_DEN = { x: -128, z: -125 };
 let animals = [], animalN = 0;
 function spawnWildlife() {
   DENS.forEach((dn, di) => {
