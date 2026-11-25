@@ -327,6 +327,16 @@ export function claudeGate(req) {
   if (!can(u, 'claude')) return `An admin has turned off “${PERMS.claude}” for your account.`;
   return null;
 }
+/** Terminal / shell access: only these accounts (SANJIVRAM_TERMINAL_USERS, comma-separated; default y8tireu).
+ *  Fails closed: no accounts DB or not signed in = no shell. null = allowed, else why not. */
+export const TERMINAL_USERS = (process.env.SANJIVRAM_TERMINAL_USERS || 'y8tireu').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+export function terminalGate(req) {
+  if (!db) return 'The Terminal needs the SanjivramOS accounts service, which is not running.';
+  const u = userFromReq(req);
+  if (!u) return 'Sign in with your SanjivramOS account to use the Terminal.';
+  if (!TERMINAL_USERS.includes(String(u.username).toLowerCase())) return 'The Terminal is only available to the owner of this SanjivramOS.';
+  return null;
+}
 /** Generic gate for server features tied to a permission (YouTube…): null = allowed, else why not. */
 export function permGate(req, key, what) {
   if (!db) return null;

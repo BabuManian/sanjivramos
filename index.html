@@ -10132,7 +10132,16 @@ async function serverShell(win, opts = {}) {
 Apps.register({
   id: 'terminal', name: 'Terminal', icon: 'app-terminal', color: 'linear-gradient(135deg,#475569,#0f172a)',
   width: 720, height: 450, keywords: 'shell console command line cli bash', aliases: ['shell', 'console', 'cmd', 'bash'],
+  /* Terminal is owner-only: just @y8tireu (the server checks /shell too). */
+  owners: ['y8tireu'],
   launch(win, args) {
+    if (location.protocol !== 'file:' && !(Social.me && this.owners.includes(String(Social.me.username).toLowerCase()))) {
+      if (!Social.checked && !(args && args._waited)) { win.body.innerHTML = '<div class="cl-gate"><div class="cl-gate-card"><p>Checking your account…</p></div></div>'; const t0 = Date.now(); const tick = () => (Social.checked || Date.now() - t0 > 4000) ? this.launch(win, Object.assign({}, args, { _waited: true })) : setTimeout(tick, 100); tick(); return; }
+      if (!(Social.me && this.owners.includes(String(Social.me.username).toLowerCase()))) {
+        win.body.innerHTML = `<div class="cl-gate"><div class="cl-gate-card"><div class="cl-gate-logo">${svg('terminal')}</div><h2>Terminal is locked</h2><p>${Social.me ? `<b>@${esc(Social.me.username)}</b> can't use the Terminal.` : 'You are not signed in.'} Only the owner of this SanjivramOS can open it.</p></div></div>`;
+        return;
+      }
+    }
     if (SanjServer.shell && !(args && args.sanjsh)) { serverShell(win); return; }
     win.body.innerHTML = `<div class="term"><div class="term-out"></div><div class="term-line"><span class="term-prompt"></span><input class="term-in" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Terminal input"></div></div>`;
     const term = $('.term', win.body), out = $('.term-out', win.body), input = $('.term-in', win.body), promptEl = $('.term-prompt', win.body);

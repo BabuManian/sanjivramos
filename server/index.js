@@ -19,7 +19,7 @@ import { serveGame, gameRedirect, installedGames, gamesApi } from './games.js';
 import { parseSpec, runGui, exportDesktop, removeDesktop, readJson, scanApps, iconFileOk, sysInfo, distros } from './linuxapps.js';
 import { spawn } from 'node:child_process';
 import { ensureDesktop } from './vnc.js';
-import { initSocial, handleSocial, socialUpgrade, ipBan, bannedPage, noteVisit, claudeGate } from './social.js';
+import { initSocial, handleSocial, socialUpgrade, ipBan, bannedPage, noteVisit, claudeGate, terminalGate } from './social.js';
 import { playUpgrade, playApi, startLan } from './play.js';
 import { initMaker, makerApi } from './maker.js';
 import { ytApi } from './yt.js';
@@ -253,6 +253,7 @@ server.on('upgrade', (req, socket, head) => {
     let sameSite = false;
     try { sameSite = new URL(req.headers.origin).host === req.headers.host; } catch {}
     if (!shellOk(req) || !sameSite) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
+    if (url.pathname === '/shell' && terminalGate(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }   // terminal: owner account only
     if (url.pathname === '/claude' && claudeGate(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }   // needs a Messages account
     if (vnc) handleVnc(req, socket, head, vnc); else if (url.pathname === '/claude') handleClaude(req, socket, head); else if (url.pathname === '/vip') handleVip(req, socket, head); else handleShell(req, socket, head);
     return;
