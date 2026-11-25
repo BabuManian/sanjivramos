@@ -93,13 +93,25 @@ const USER_RE = /^[a-zA-Z0-9_.]{3,24}$/;
 const prefsOf = u => { if (!u) return {}; if (u._p) return u._p; let p = {}; try { p = JSON.parse(u.prefs || '{}') || {}; } catch {} return p; };
 // Privacy: people can hide being online / last seen, and what they're playing.
 /* game character ("look"): colours + part numbers, made in the Character app (games/sj-avatar) and shown in online games */
-const LOOK_COLORS = ['skin', 'hair', 'eye', 'shirt', 'shirt2', 'pants', 'shoes', 'hatColor', 'accColor'], LOOK_PARTS = ['hairStyle', 'eyes', 'mouth', 'shirtStyle', 'hat', 'acc', 'body', 'brows'];
+const LOOK_COLORS = ['skin', 'hair', 'eye', 'shirt', 'shirt2', 'pants', 'shoes', 'hatColor', 'accColor', 'markColor', 'heldColor', 'petColor', 'auraColor'], LOOK_PARTS = ['hairStyle', 'eyes', 'mouth', 'shirtStyle', 'hat', 'acc', 'body', 'brows', 'faceMark', 'held', 'pet', 'aura'];
+const LOOK_SLOTS = ['hat', 'face', 'badge', 'back', 'held', 'pet'];
 function cleanLook(l) {
   if (!l || typeof l !== 'object') return null;
   const o = {};
   for (const k of LOOK_COLORS) if (typeof l[k] === 'string' && /^#[0-9a-f]{6}$/i.test(l[k])) o[k] = l[k].toLowerCase();
   for (const k of LOOK_PARTS) if (Number.isInteger(l[k]) && l[k] >= 0 && l[k] < 32) o[k] = l[k];
   if (typeof l.title === 'string') o.title = l.title.replace(/[\u0000-\u001f<>]/g, '').slice(0, 24);
+  // items people drew themselves (Item Workshop): 16×16 pixels, 16-colour palette, one per slot
+  if (l.custom && typeof l.custom === 'object') {
+    const c = {};
+    for (const sl of LOOK_SLOTS) {
+      const it = l.custom[sl];
+      if (!it || typeof it.d !== 'string' || !/^[.0-9a-f]{256}$/.test(it.d) || !Array.isArray(it.p) || it.p.length > 16) continue;
+      if (!it.p.every(x => typeof x === 'string' && /^#[0-9a-f]{6}$/i.test(x))) continue;
+      c[sl] = { n: String(it.n || '').replace(/[\u0000-\u001f<>]/g, '').slice(0, 24), s: sl, p: it.p.map(x => x.toLowerCase()), d: it.d };
+    }
+    if (Object.keys(c).length) o.custom = c;
+  }
   return Object.keys(o).length ? o : null;
 }
 const publicUser = u => { if (!u) return u; const p = prefsOf(u); return { id: u.id, username: u.username, display: u.display, avatar: u.avatar || null, bio: u.bio || '', look: p.look || null, online: p.showOnline === false ? false : sockets.has(u.id), lastSeen: p.showOnline === false ? null : (u.last_seen || null), activity: p.showActivity === false ? null : (activity.get(u.id) || null) }; };

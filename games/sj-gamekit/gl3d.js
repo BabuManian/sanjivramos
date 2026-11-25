@@ -223,11 +223,14 @@ gl_FragColor=vec4(c,1.);}`;
       },
       /** a SanjivramOS character as boxes. anim = {walk: phase (0 = still), speed 0..1, swing 0..1 (arm attack), hold: '#hex' item colour, sit} */
       person(look, x, y, z, yaw, anim = {}) {
-        const L = Object.assign({ skin: '#f8c9a0', hair: '#4a2f1d', eye: '#1f2937', shirt: '#3b82f6', shirt2: '#f1f5f9', pants: '#334155', shoes: '#111827', hatColor: '#ef4444', accColor: '#111827', hairStyle: 0, hat: 0, acc: 0, body: 1, shirtStyle: 0 }, look || {});
+        const L = Object.assign({ skin: '#f8c9a0', hair: '#4a2f1d', eye: '#1f2937', shirt: '#3b82f6', shirt2: '#f1f5f9', pants: '#334155', shoes: '#111827', hatColor: '#ef4444', accColor: '#111827', heldColor: '#9ca3af', petColor: '#f97316', markColor: '#ef4444', hairStyle: 0, hat: 0, acc: 0, body: 1, shirtStyle: 0, held: 0, pet: 0, faceMark: 0 }, look || {});
+        const tm = performance.now() / 1000, CU = sl => window.SJLook && SJLook.custom ? SJLook.custom(L, sl) : null;
         const k = anim.scale || 1, bw = [0.82, 1, 1.15][L.body] || 1;
         if (anim.shadow !== false) R.shadow(x, anim.groundY == null ? y : anim.groundY, z, 0.42 * k * bw, anim.groundY != null ? clamp01(0.38 - (y - anim.groundY) * 0.08) : 0.38);
         const base = chain(T(x, y, z), RY(yaw), S(k, k, k));
         const P = (tx, ty, tz, sx, sy, sz, col, rot) => R.cube(rot ? chain(base, T(tx, ty, tz), rot, T(0, -sy / 2, 0), S(sx, sy, sz)) : chain(base, T(tx, ty, tz), S(sx, sy, sz)), col);
+        /* your own pixel items as boxes: one box per run of same-coloured pixels; m = centre of the picture, size = its width */
+        const vox = (it, m, size, depth) => { const rs = window.SJLook && SJLook.runs(it); if (!rs) return; const u = size / 16; for (const r of rs) R.cube(chain(m, T((8 - r.x - r.w / 2) * u, (7.5 - r.y) * u, 0), S(r.w * u, u, depth)), r.c); };
         const sw = Math.sin(anim.walk || 0) * 0.7 * (anim.speed == null ? 1 : anim.speed);
         // legs swing from the hip; shoes ride on the leg (+x = rotation brings the foot forward, i.e. towards -z)
         for (const [sx, a] of [[-0.13, sw], [0.13, -sw]]) {
@@ -239,16 +242,49 @@ gl_FragColor=vec4(c,1.);}`;
         if (L.shirtStyle === 3) for (let i = 0; i < 2; i++) P(0, 0.98 + i * 0.22, 0, 0.51 * bw, 0.07, 0.31, L.shirt2);
         if (L.shirtStyle === 2 || L.shirtStyle === 4) P(0, 1.13, -0.152, 0.12, 0.64, 0.02, L.shirt2);
         if (L.shirtStyle === 5) P(0, 1.2, -0.16, 0.42 * bw, 0.4, 0.04, L.shirt2);
+        if (L.shirtStyle === 6) { P(0, 1.3, -0.152, 0.16, 0.3, 0.02, '#f8fafc'); P(0, 1.25, -0.16, 0.06, 0.3, 0.02, L.shirt2); }
+        if (L.shirtStyle === 7) P(0, 0.72, 0, 0.62 * bw, 0.36, 0.44, L.shirt);
+        if (L.shirtStyle === 8) { P(0, 1.02, -0.155, 0.4 * bw, 0.44, 0.02, L.pants); P(-0.16 * bw, 1.3, -0.155, 0.06, 0.3, 0.02, L.pants); P(0.16 * bw, 1.3, -0.155, 0.06, 0.3, 0.02, L.pants); }
+        if (L.shirtStyle === 10 || L.shirtStyle === 12) P(0, 1.25, 0, 0.51 * bw, 0.1, 0.31, L.shirt2);
+        if (L.shirtStyle === 11) P(0, 0.58, 0, 0.56 * bw, 0.66, 0.36, L.shirt);
+        if (L.shirtStyle === 13) { P(0, 1.03, 0, 0.53 * bw, 0.88, 0.33, '#f1f5f9'); P(0, 1.13, -0.168, 0.14, 0.64, 0.01, L.shirt); }
+        if (L.acc === 7) for (const sx of [-1, 1]) R.cube(chain(base, T(sx * 0.32, 1.3, 0.2), RY(sx * (0.5 + Math.sin(tm * 6) * 0.15)), RZ ? RZ(sx * -0.3) : I4(), S(0.5, 0.42, 0.03)), L.accColor);
+        if (L.acc === 8) P(0, 1.43, -0.165, 0.18, 0.08, 0.02, L.accColor);
+        if (L.acc === 9) P(0, 1.18, -0.165, 0.07, 0.38, 0.02, L.accColor);
+        if (L.acc === 10) { P(0, 1.4, -0.16, 0.3, 0.03, 0.02, '#facc15'); P(0, 1.33, -0.165, 0.07, 0.08, 0.02, L.accColor); }
+        if (L.acc === 13) { P(-0.11, 1.15, 0.23, 0.15, 0.44, 0.15, '#9ca3af'); P(0.11, 1.15, 0.23, 0.15, 0.44, 0.15, '#9ca3af'); }
+        if (L.acc === 14) P(0, 0.78, 0.18, 0.08, 0.08, 0.45, L.accColor, RX(0.7 + Math.sin(tm * 4) * 0.15));
+        { const cb = CU('back'); if (cb) vox(cb, chain(base, T(0, 1.2, 0.2)), 1.1, 0.05); const bd = CU('badge'); if (bd) vox(bd, chain(base, T(0.08 * bw, 1.25, -0.16)), 0.22, 0.02); }
         if (L.acc === 5) P(0, 1.13, 0.22, 0.38, 0.46, 0.16, L.accColor);
         if (L.acc === 6) P(0, 0.98, 0.19, 0.5 * bw, 0.9, 0.04, L.accColor, RX(0.12 + Math.abs(sw) * 0.2));
         if (L.acc === 4) P(0, 1.43, 0, 0.54 * bw, 0.1, 0.34, L.accColor);
         // arms (right arm swings for attacks)
-        const armCol = L.shirtStyle === 0 || L.shirtStyle === 4 ? L.skin : L.shirt;
+        const armCol = [0, 4, 9, 12].includes(L.shirtStyle) ? L.skin : L.shirtStyle === 13 ? '#f1f5f9' : L.shirt, lookHeld = !anim.hold && !anim.noHeld && (L.held || CU('held'));
         // arms swing opposite to the legs; the right arm raises (+x rotation = forward) to hold or swing
-        const atk = anim.swing ? 2.4 - anim.swing * 2.9 : anim.hold ? 0.55 : sw * 0.9;
+        const atk = anim.swing ? 2.4 - anim.swing * 2.9 : anim.hold ? 0.55 : lookHeld ? 0.35 + sw * 0.2 : sw * 0.9;
         P(-0.33 * bw, 1.42, 0, 0.16, 0.62, 0.18, armCol, RX(-sw * 0.9));
         P(0.33 * bw, 1.42, 0, 0.16, 0.62, 0.18, armCol, RX(atk));
         if (anim.hold) R.cube(chain(base, T(0.33 * bw, 1.42, 0), RX(atk), T(0, -0.62, -0.2), S(0.08, 0.08, 0.5)), anim.hold, 1, anim.holdGlow || 0);
+        else if (lookHeld) {
+          const hb = chain(base, T(0.33 * bw, 1.42, 0), RX(atk), T(0, -0.62, 0), RX(-atk)), Q = (tx, ty, tz, sx, sy, sz, col, g) => R.cube(chain(hb, T(tx, ty, tz), S(sx, sy, sz)), col, 1, g || 0), c = L.heldColor, ci = CU('held');
+          if (ci) vox(ci, chain(hb, RY(Math.PI / 2), T(0, 0.24, 0)), 0.8, 0.05);
+          else switch (L.held) {
+            case 1: Q(0, 0.48, -0.05, 0.04, 0.8, 0.1, '#e5e7eb'); Q(0, 0.06, -0.05, 0.06, 0.05, 0.3, c); Q(0, -0.04, -0.05, 0.05, 0.14, 0.05, '#78350f'); break;
+            case 2: Q(0, 0.2, -0.05, 0.04, 0.5, 0.04, '#3f2a1d'); Q(0, 0.5, -0.05, 0.12, 0.12, 0.12, c, 0.8); break;
+            case 3: Q(0.1, 0.05, -0.05, 0.05, 0.45, 0.4, c); Q(0.13, 0.05, -0.05, 0.02, 0.2, 0.2, '#f8fafc'); break;
+            case 4: Q(0, 0.6, 0, 0.01, 1.2, 0.01, '#e5e7eb'); Q(0, 1.3, 0, 0.32, 0.38, 0.32, c); break;
+            case 5: Q(0, 0.1, -0.1, 0.1, 0.4, 0.32, c); Q(0, 0.5, -0.1, 0.05, 0.5, 0.06, '#78350f'); break;
+            case 6: Q(0, 0.02, 0, 0.1, 0.16, 0.1, '#d97706'); Q(0, 0.16, 0, 0.14, 0.14, 0.14, c); break;
+            case 7: Q(0, 0.6, 0, 0.03, 1.3, 0.03, '#9ca3af'); Q(0, 1.05, -0.2, 0.02, 0.28, 0.38, c); break;
+            case 8: Q(0, 0.2, 0, 0.06, 0.5, 0.06, '#78350f'); Q(0, 0.5, 0, 0.12, 0.16 + Math.sin(tm * 18) * 0.03, 0.12, '#f97316', 1); break;
+            case 9: Q(0, 0.05, -0.05, 0.03, 0.2, 0.12, c); break;
+            case 10: Q(0, 0.6, 0, 0.03, 1.2, 0.03, '#334155'); Q(0, 1.2, 0, 0.9, 0.06, 0.9, c); Q(0, 1.26, 0, 0.5, 0.06, 0.5, c); break;
+            case 11: Q(0, 0.25, 0, 0.05, 0.55, 0.05, '#92400e'); Q(0, 0.55, 0, 0.14, 0.14, 0.32, c); break;
+            case 12: Q(0, 0.1, -0.15, 0.04, 0.7, 0.04, c); Q(0, 0.1, -0.05, 0.01, 0.6, 0.01, '#e5e7eb'); break;
+            case 13: Q(0, 0.2, 0, 0.02, 0.4, 0.02, '#f8fafc'); Q(0, 0.45, 0, 0.04, 0.2, 0.2, c); break;
+            case 14: R.cube(chain(hb, RX(0.6), T(0, 0.7, 0), S(0.03, 1.5, 0.03)), '#78350f'); break;
+          }
+        }
         // head
         const hy = 1.72;
         P(0, hy, 0, 0.44, 0.42, 0.42, L.skin);
@@ -256,6 +292,14 @@ gl_FragColor=vec4(c,1.);}`;
         P(0, hy - 0.11, -0.212, 0.12, 0.03, 0.01, '#7f1d1d');
         if (L.acc === 1 || L.acc === 2) P(0, hy + 0.02, -0.22, 0.36, 0.09, 0.02, L.acc === 2 ? '#0a0a0a' : L.accColor);
         if (L.acc === 3) P(0, hy - 0.1, -0.22, 0.4, 0.16, 0.02, L.accColor);
+        if (L.acc === 11) P(-0.09, hy + 0.02, -0.22, 0.11, 0.11, 0.02, '#0a0a0a');
+        if (L.acc === 12) P(0.09, hy + 0.02, -0.22, 0.11, 0.11, 0.015, '#facc15');
+        if (L.acc === 15) { P(-0.23, hy - 0.1, 0, 0.03, 0.07, 0.03, L.accColor); P(0.23, hy - 0.1, 0, 0.03, 0.07, 0.03, L.accColor); }
+        if (L.faceMark === 2) { P(-0.14, hy - 0.06, -0.213, 0.08, 0.04, 0.01, '#f9a8d4'); P(0.14, hy - 0.06, -0.213, 0.08, 0.04, 0.01, '#f9a8d4'); }
+        if (L.faceMark === 3) P(0, hy - 0.075, -0.216, 0.18, 0.04, 0.01, L.hair);
+        if (L.faceMark === 4) { P(0, hy - 0.17, -0.1, 0.46, 0.14, 0.26, L.hair); P(0, hy - 0.075, -0.216, 0.18, 0.04, 0.01, L.hair); }
+        if (L.faceMark === 7) { P(-0.15, hy - 0.05, -0.213, 0.1, 0.025, 0.01, L.markColor); P(0.15, hy - 0.05, -0.213, 0.1, 0.025, 0.01, L.markColor); }
+        { const cf = CU('face'); if (cf) vox(cf, chain(base, T(0, hy, -0.218)), 0.46, 0.01); }
         if (L.hairStyle !== 7) {
           P(0, hy + 0.24, 0.01, 0.47, 0.1, 0.45, L.hair);
           if ([2, 3, 8].includes(L.hairStyle)) P(0, hy - 0.05, 0.19, 0.47, 0.52, 0.1, L.hair);
@@ -263,6 +307,12 @@ gl_FragColor=vec4(c,1.);}`;
           if (L.hairStyle === 5) P(0, hy + 0.36, 0.08, 0.18, 0.16, 0.18, L.hair);
           if (L.hairStyle === 6) P(0, hy + 0.3, 0, 0.52, 0.14, 0.5, L.hair);
           if (L.hairStyle === 8) P(0, hy - 0.08, 0.3, 0.12, 0.4, 0.12, L.hair);
+          if (L.hairStyle === 10) P(0, hy + 0.12, 0.08, 0.64, 0.6, 0.52, L.hair);
+          if (L.hairStyle === 11) { P(-0.2, hy - 0.22, 0.14, 0.08, 0.5, 0.08, L.hair); P(0.2, hy - 0.22, 0.14, 0.08, 0.5, 0.08, L.hair); }
+          if (L.hairStyle === 12) { P(-0.3, hy + 0.06, 0.08, 0.15, 0.3, 0.15, L.hair); P(0.3, hy + 0.06, 0.08, 0.15, 0.3, 0.15, L.hair); }
+          if (L.hairStyle === 13) P(0, hy + 0.36, 0, 0.46, 0.22, 0.44, L.hair);
+          if (L.hairStyle === 14) { P(-0.1, hy + 0.32, 0.02, 0.2, 0.12, 0.3, L.hair, RZ ? RZ(0.4) : null); P(0.12, hy + 0.33, -0.04, 0.2, 0.12, 0.3, L.hair, RX(0.4)); }
+          if (L.hairStyle === 15) P(0, hy - 0.12, 0.19, 0.5, 0.66, 0.1, L.hair);
         }
         switch (L.hat) {
           case 1: P(0, hy + 0.3, 0.02, 0.48, 0.14, 0.46, L.hatColor); P(0, hy + 0.25, -0.28, 0.42, 0.04, 0.18, L.hatColor); break;
@@ -272,7 +322,37 @@ gl_FragColor=vec4(c,1.);}`;
           case 5: P(0, hy + 0.12, 0, 0.47, 0.07, 0.47, L.hatColor); break;
           case 6: P(0, hy + 0.08, 0.02, 0.5, 0.56, 0.5, L.hatColor); P(0, hy + 0.02, -0.25, 0.36, 0.14, 0.02, '#7dd3fc'); break;
           case 7: R.cube(chain(base, T(0, hy + 0.5, 0), RY(Math.PI / 4), S(0.32, 0.6, 0.32)), L.hatColor); P(0, hy + 0.24, 0, 0.6, 0.05, 0.6, L.hatColor); break;
+          case 9: P(0, hy + 0.24, 0, 0.84, 0.04, 0.84, L.hatColor); P(0, hy + 0.36, 0, 0.42, 0.22, 0.42, L.hatColor); break;
+          case 10: P(0, hy + 0.32, 0, 0.66, 0.2, 0.32, '#111827'); P(0, hy + 0.32, -0.165, 0.08, 0.08, 0.01, '#f8fafc'); break;
+          case 11: R.cube(chain(base, T(0, hy + 0.48, 0), RY(Math.PI / 4), S(0.2, 0.52, 0.2)), L.hatColor); P(0, hy + 0.76, 0, 0.1, 0.1, 0.1, '#facc15'); break;
+          case 12: P(-0.1, hy + 0.48, 0.02, 0.09, 0.42, 0.05, L.hatColor); P(0.1, hy + 0.48, 0.02, 0.09, 0.42, 0.05, L.hatColor); break;
+          case 13: P(-0.15, hy + 0.3, 0, 0.12, 0.14, 0.06, L.hatColor); P(0.15, hy + 0.3, 0, 0.12, 0.14, 0.06, L.hatColor); break;
+          case 14: for (const [a, b, w, d] of [[0, 0.18, 0.36, 0.04], [0, -0.18, 0.36, 0.04], [0.18, 0, 0.04, 0.36], [-0.18, 0, 0.04, 0.36]]) R.cube(chain(base, T(a, hy + 0.5 + Math.sin(tm * 3) * 0.02, b), S(w, 0.03, d)), '#fde047', 1, 0.9); break;
+          case 15: P(-0.15, hy + 0.3, 0, 0.07, 0.18, 0.07, L.hatColor, RZ ? RZ(0.3) : null); P(0.15, hy + 0.3, 0, 0.07, 0.18, 0.07, L.hatColor, RZ ? RZ(-0.3) : null); break;
+          case 16: P(0, hy + 0.42, 0, 0.46, 0.38, 0.46, '#f8fafc'); break;
+          case 17: P(0.2, hy + 0.22, -0.1, 0.13, 0.13, 0.05, L.hatColor); P(0.2, hy + 0.22, -0.13, 0.05, 0.05, 0.02, '#facc15'); break;
+          case 18: P(0, hy + 0.32, 0, 0.46, 0.2, 0.46, '#dc2626'); P(0, hy + 0.23, 0, 0.5, 0.07, 0.5, '#f8fafc'); P(0, hy + 0.46, 0.18, 0.1, 0.1, 0.1, '#f8fafc'); break;
+          case 19: P(0, hy + 0.3, 0, 0.5, 0.22, 0.5, '#9ca3af'); P(-0.3, hy + 0.38, 0, 0.08, 0.22, 0.08, '#f5f5f4'); P(0.3, hy + 0.38, 0, 0.08, 0.22, 0.08, '#f5f5f4'); break;
+          case 20: P(0, hy + 0.3, 0.02, 0.48, 0.14, 0.46, L.hatColor); R.cube(chain(base, T(0, hy + 0.42, 0), RY(tm * 12), S(0.55, 0.02, 0.07)), '#facc15'); break;
+          case 21: P(0.13, hy + 0.27, 0, 0.22, 0.1, 0.06, L.hatColor); break;
+          case 22: for (const sx of [-0.1, 0.1]) { P(sx, hy + 0.36, 0, 0.02, 0.2, 0.02, '#1f2937'); P(sx, hy + 0.48, 0, 0.07, 0.07, 0.07, L.hatColor); } break;
           case 8: P(-0.25, hy, 0, 0.08, 0.2, 0.2, L.hatColor); P(0.25, hy, 0, 0.08, 0.2, 0.2, L.hatColor); P(0, hy + 0.27, 0, 0.5, 0.04, 0.06, L.hatColor); break;
+        }
+        { const ch = CU('hat'); if (ch) vox(ch, chain(base, T(0, hy + 0.2 + 0.3, 0)), 0.6, 0.46); }
+        // pet: trots/floats beside you
+        if (!anim.noPet) {
+          const ci = CU('pet'), fly = [3, 5, 6, 7].includes(L.pet), py = (fly ? 1.1 + Math.sin(tm * 3) * 0.08 : Math.abs(Math.sin(tm * 4)) * (L.pet === 8 ? 0.15 : 0.03)), pb = chain(base, T(-0.62, py, 0.35)), c = L.petColor;
+          const Q = (tx, ty, tz, sx, sy, sz, col, g) => R.cube(chain(pb, T(tx, ty, tz), S(sx, sy, sz)), col, 1, g || 0);
+          if (ci) vox(ci, chain(pb, T(0, 0.3, 0)), 0.6, 0.18);
+          else if (L.pet) {
+            Q(0, 0.2, 0, 0.26, 0.2, 0.4, c); Q(0, 0.38, -0.24, 0.24, 0.22, 0.2, c); Q(-0.06, 0.4, -0.345, 0.04, 0.04, 0.01, '#111'); Q(0.06, 0.4, -0.345, 0.04, 0.04, 0.01, '#111');
+            if (L.pet === 1 || L.pet === 8 || L.pet === 13) { const tall = L.pet === 8 ? 0.22 : 0.08; Q(-0.07, 0.52 + tall / 2, -0.24, 0.06, tall, 0.04, c); Q(0.07, 0.52 + tall / 2, -0.24, 0.06, tall, 0.04, c); }
+            if (L.pet === 2) { Q(-0.13, 0.36, -0.24, 0.04, 0.16, 0.08, '#78350f'); Q(0.13, 0.36, -0.24, 0.04, 0.16, 0.08, '#78350f'); Q(0, 0.33, -0.36, 0.1, 0.07, 0.06, '#f5f5f4'); }
+            if (L.pet !== 4 && L.pet !== 6 && L.pet !== 3 && L.pet !== 7) for (const [a, b] of [[-0.09, -0.13], [0.09, -0.13], [-0.09, 0.13], [0.09, 0.13]]) Q(a, 0.06, b, 0.06, 0.12, 0.06, c);
+            if (L.pet === 3 || L.pet === 7) { const f = Math.sin(tm * 14) * 0.5; R.cube(chain(pb, T(-0.14, 0.26, 0), RZ ? RZ(f) : I4(), T(-0.14, 0, 0), S(0.28, 0.03, 0.2)), L.pet === 7 ? '#7c2d12' : c); R.cube(chain(pb, T(0.14, 0.26, 0), RZ ? RZ(-f) : I4(), T(0.14, 0, 0), S(0.28, 0.03, 0.2)), L.pet === 7 ? '#7c2d12' : c); }
+            if (L.pet === 5) Q(0, 0.58, -0.24, 0.03, 0.12, 0.03, '#ef4444', 1);
+            if (L.pet === 1 || L.pet === 2 || L.pet === 7) R.cube(chain(pb, T(0, 0.28, 0.22), RX(-0.7 + Math.sin(tm * 8) * 0.2), T(0, 0, 0.1), S(0.05, 0.05, 0.22)), c);
+          }
         }
       },
     };
