@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 import ipaddr from 'ipaddr.js';
 import { handleShell } from './shell.js';
 import { handleVnc, handleVncPort } from './vnc.js';
-import { handleAstream } from './astream.js';
 import { handleClaude, claudeAsk, handleDesktopRelay } from './claude.js';
 import { slanderAction, serveSlander } from './slander.js';
 import { handleVip, chromiumPath } from './vip.js';
@@ -19,7 +18,6 @@ import { handleRestore } from './restore.js';
 import { serveGame, gameRedirect, installedGames, gamesApi } from './games.js';
 import { parseSpec, runGui, exportDesktop, removeDesktop, readJson, scanApps, iconFileOk, sysInfo, distros } from './linuxapps.js';
 import { spawn } from 'node:child_process';
-import { listAndroid, serveAndroidIcon, launchAndroid, adbStatus, adbPair, openAndroidWindow, closeAndroidWindow, deskLaunch } from './android.js';
 import { ensureDesktop } from './vnc.js';
 import { initSocial, handleSocial, socialUpgrade, ipBan, bannedPage, noteVisit, claudeGate } from './social.js';
 import { playUpgrade, playApi, startLan } from './play.js';
@@ -124,8 +122,6 @@ const server = http.createServer((req, res) => {
   // Slander Studio clips (downloaded with yt-dlp on this machine).
   if (url.pathname.startsWith('/slander-audio/')) { if (!shellOk(req)) { res.writeHead(403); res.end(); return; } serveSlander(req, res, url.pathname.slice(15)); return; }
   // Icons of installed Linux apps (only image files inside the system's icon folders).
-  // Icons of the phone's Android apps (from the APK, or its Play Store page), cached in DATA.
-  if (url.pathname === '/android-icon') { if (!shellOk(req)) { res.writeHead(403); res.end(); return; } serveAndroidIcon(DATA, req, res, url.searchParams.get('pkg') || ''); return; }
   if (url.pathname === '/linux-icon') {
     const f = shellOk(req) && iconFileOk(url.searchParams.get('p') || '');
     if (!f) { res.writeHead(404); res.end(); return; }
@@ -221,14 +217,6 @@ async function linuxApp(req, res, action) {
       if (pid <= 1 || pid === process.pid) return reply(400, { error: 'Not allowed' });
       try { process.kill(pid, sig); return reply(200, { ok: true }); } catch (err) { return reply(400, { error: err.code === 'EPERM' ? 'Not allowed to stop that process' : 'No such process' }); }
     }
-    // Android apps on this phone: list them, and open one (Roblox, Discord…) with Termux's `am`.
-    if (action === 'android-apps') return reply(200, await listAndroid(DATA, !!body.force));
-    if (action === 'android-window') return reply(200, await openAndroidWindow(String(body.pkg || ''), body.orient === 'portrait' ? 'portrait' : 'landscape', !!body.full, String(body.size || '')));
-    if (action === 'android-desk-launch') return reply(200, await deskLaunch(body.n, String(body.pkg || ''), body.activity ? String(body.activity) : ''));
-    if (action === 'android-close') return reply(200, await closeAndroidWindow(body.n));
-    if (action === 'adb-status') return reply(200, await adbStatus(!!body.full));
-    if (action === 'adb-pair') return reply(200, await adbPair(body.port, body.code, body.connectPort));
-    if (action === 'android-launch') { const r = await launchAndroid(String(body.pkg || ''), body.activity ? String(body.activity) : ''); return reply(r.ok ? 200 : 500, r); }
     if (action === 'desktop') {
       const cmd = process.env.SANJIVRAM_DESKTOP_CMD, a = ['start', 'stop', 'restart', 'fluxbox', 'xfce', 'apps-start', 'apps-stop'].includes(body.action) ? body.action : null;
       if (!cmd || !a) return reply(400, { error: 'The desktop launcher isn’t set up (run sanjivramos install).' });
@@ -251,9 +239,7 @@ server.on('upgrade', (req, socket, head) => {
   noteVisit(req);
   const url = new URL(req.url, 'http://x');
   // noVNC resolves its "vnc" path next to its page when no host is set, so accept that address too.
-  const andVnc = /^\/vendor\/novnc17\/android(1[0-7])$/.exec(url.pathname);
   const vnc = { '/vnc': 'desktop', '/vendor/novnc17/vnc': 'desktop', '/vendor/novnc17/scrcpy': 'scrcpy', '/vendor/novnc17/firefox': 'firefox', '/vendor/novnc17/apps': 'apps' }[url.pathname];
-  const astream = url.pathname.endsWith('/astream');
   if (url.pathname === '/social' || url.pathname === '/play') {
     // Open to anyone allowed on this site (not only the own network), but only from this site's own pages.
     let same = false;
@@ -262,13 +248,13 @@ server.on('upgrade', (req, socket, head) => {
     if (url.pathname === '/social') socialUpgrade(req, socket, head); else playUpgrade(req, socket, head);
     return;
   }
-  if (url.pathname === '/shell' || url.pathname === '/claude' || url.pathname === '/vip' || vnc || andVnc || astream) {
+  if (url.pathname === '/shell' || url.pathname === '/claude' || url.pathname === '/vip' || vnc) {
     // Browsers resend saved passwords to WebSockets opened by any website, so also require it to come from this site.
     let sameSite = false;
     try { sameSite = new URL(req.headers.origin).host === req.headers.host; } catch {}
     if (!shellOk(req) || !sameSite) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
     if (url.pathname === '/claude' && claudeGate(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }   // needs a Messages account
-    if (astream) handleAstream(req, socket, head, url); else if (andVnc) handleVncPort(req, socket, head, 5900 + +andVnc[1], () => closeAndroidWindow(+andVnc[1])); else if (vnc) handleVnc(req, socket, head, vnc); else if (url.pathname === '/claude') handleClaude(req, socket, head); else if (url.pathname === '/vip') handleVip(req, socket, head); else handleShell(req, socket, head);
+    if (vnc) handleVnc(req, socket, head, vnc); else if (url.pathname === '/claude') handleClaude(req, socket, head); else if (url.pathname === '/vip') handleVip(req, socket, head); else handleShell(req, socket, head);
     return;
   }
   socket.end();
