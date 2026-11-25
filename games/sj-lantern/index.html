@@ -994,7 +994,7 @@ function update(dt) {
     const spd = (running ? 7.2 : 4.4) * (inWater ? 0.55 : 1) * (S.food <= 0 ? 0.7 : 1);
     if (ml > 0.05) { mx /= Math.max(1, ml); mz /= Math.max(1, ml); P.face = Math.atan2(-mx, -mz); P.walk += dt * (running ? 13 : 9); }
     P.vx = lerp(P.vx, mx * spd, Math.min(1, dt * 12)); P.vz = lerp(P.vz, mz * spd, Math.min(1, dt * 12));
-    S.stam = clamp(S.stam + (running ? -22 : 14) * dt, 0, 100);
+    S.stam = 100;   // infinite stamina: run as long as you like
     if ((IN.hit('Space') || IN.hit('Btnjump')) && P.ground) { P.vy = 7.5; G3.tone(260, 0.06, 'triangle', 0.03); }
     if (ml > 0.1 && P.ground && Math.floor(P.walk / Math.PI) !== Math.floor((P.walk - dt * 9) / Math.PI)) G3.noise(0.05, 0.015, 2000);
   } else { P.vx = P.vz = 0; }
@@ -1124,7 +1124,7 @@ let hudT = 0;
 function hud(dt) {
   hudT -= dt; if (hudT > 0) return; hudT = 0.15;
   const bar = (n, v, c) => `<div class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${c}"></i><span>${n}</span></div>`;
-  $('bars').innerHTML = bar('❤ Health', S.hp, '#ef4444') + bar('🍖 Food', S.food, '#f59e0b') + bar('⚡ Stamina', S.stam, '#38bdf8') + bar('🔥 Campfire', S.fire, '#fb923c') + (S.flashOn || S.flash < 100 ? bar('🔦 Battery', S.flash, '#facc15') : '');
+  $('bars').innerHTML = bar('❤ Health', S.hp, '#ef4444') + bar('🍖 Food', S.food, '#f59e0b') + bar('🔥 Campfire', S.fire, '#fb923c') + (S.flashOn || S.flash < 100 ? bar('🔦 Battery', S.flash, '#facc15') : '');
   const left = Math.ceil((S.isNight ? nightLen() : DAY) - S.t);
   $('clock').innerHTML = `<b>${S.isNight ? '🌙 Night ' + S.night : '☀ Day ' + (S.night + 1)}</b><small>${S.isNight ? 'Dawn in ' : 'Dark in '}${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}${S.finalNight ? ' · The Long Night' : ''} · ${WX[S.weather].i} ${WX[S.weather].n}${S.raid ? ' · 🔥 RAID' : ''}</small>`;
   const iv = S.inv; $('inv').innerHTML = `<span style="grid-column:span 2;opacity:.75;font-size:11px">🏕 CAMP PILE</span><span>🪵 ${iv.wood}</span><span>🪨 ${iv.stone}</span><span>⚙️ ${iv.scrap}</span><span>🍓 ${iv.berries}</span><span>🥫 ${iv.cans}</span><span>🔋 ${iv.batteries}</span><span>🛏 ${S.beds}</span><span>🐺 ${S.inv.pelts || 0}</span><span>🍖 ${(S.inv.cooked || 0) + (S.inv.meat || 0)}</span><span>🔆 ${S.stones.length - S.placed}</span>`;
