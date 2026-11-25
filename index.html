@@ -192,6 +192,31 @@ body.wm-busy iframe { pointer-events: none !important; }
 :root[data-icons="glossy"] .app-tile, .ic-prev[data-icons="glossy"].ic-prev.ic-prev .app-tile { background: linear-gradient(180deg, rgba(255,255,255,.55) 0, rgba(255,255,255,.12) 48%, rgba(0,0,0,0) 50%), var(--tile); border-radius: 22.5%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 3px 8px rgba(0,0,0,.35); filter: none; }
 :root[data-icons="glossy"] .app-tile .g, .ic-prev[data-icons="glossy"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; filter: drop-shadow(0 1px 1px rgba(0,0,0,.45)); }
 :root[data-icons="glossy"] .app-tile .art, .ic-prev[data-icons="glossy"].ic-prev.ic-prev .app-tile .art { display: none; }
+/* v25: Liquid Glass icons — translucent refracting glass: a tint layer (::before), a specular sheen + rim (::after), the glyph on top. */
+:root[data-icons^="liquid"] .app-tile:not(.ci-pic), .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile:not(.ci-pic) { isolation: isolate; border-radius: 27%; background: rgba(255,255,255,.06); -webkit-backdrop-filter: blur(7px) saturate(1.9) brightness(1.08); backdrop-filter: blur(7px) saturate(1.9) brightness(1.08); box-shadow: 0 7px 16px -6px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.18); filter: none; }
+:root[data-icons^="liquid"] .app-tile:not(.ci-pic)::before, .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile:not(.ci-pic)::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--tile); opacity: .62; pointer-events: none; }
+:root[data-icons^="liquid"] .app-tile:not(.ci-pic)::after, .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile:not(.ci-pic)::after { content: ''; position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(110% 70% at 28% -8%, rgba(255,255,255,.55), rgba(255,255,255,.12) 45%, rgba(255,255,255,0) 62%), radial-gradient(80% 45% at 70% 108%, rgba(255,255,255,.28), rgba(255,255,255,0) 70%);
+  box-shadow: inset 1.6px 1.6px 0 -.4px rgba(255,255,255,.85), inset -1.2px -1.2px 0 -.2px rgba(255,255,255,.45), inset 0 0 0 1px rgba(255,255,255,.22), inset 0 -6px 10px -6px rgba(0,0,0,.18); }
+:root[data-icons^="liquid"] .app-tile .g, .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile .g { display: block; position: relative; z-index: 1; stroke: rgba(255,255,255,.97); stroke-width: 2.1; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.3)); }
+:root[data-icons^="liquid"] .app-tile .art, .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons^="liquid"] .app-tile .ci-img, :root[data-icons^="liquid"] .app-tile .ci-emoji, .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile .ci-img, .ic-prev[data-icons^="liquid"].ic-prev.ic-prev .app-tile .ci-emoji { position: relative; z-index: 1; }
+/* Clear: almost colourless glass, white glyphs */
+:root[data-icons="liquidclear"] .app-tile:not(.ci-pic), .ic-prev[data-icons="liquidclear"].ic-prev.ic-prev .app-tile:not(.ci-pic) { background: rgba(255,255,255,.1); }
+:root[data-icons="liquidclear"] .app-tile:not(.ci-pic)::before, .ic-prev[data-icons="liquidclear"].ic-prev.ic-prev .app-tile:not(.ci-pic)::before { opacity: .16; }
+:root[data-icons="liquidclear"] .app-tile .g, .ic-prev[data-icons="liquidclear"].ic-prev.ic-prev .app-tile .g { filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+/* Dark: smoked glass, glyphs in the app's own colour */
+:root[data-icons="liquiddark"] .app-tile:not(.ci-pic), .ic-prev[data-icons="liquiddark"].ic-prev.ic-prev .app-tile:not(.ci-pic) { background: rgba(14,15,22,.58); }
+:root[data-icons="liquiddark"] .app-tile:not(.ci-pic)::before, .ic-prev[data-icons="liquiddark"].ic-prev.ic-prev .app-tile:not(.ci-pic)::before { opacity: .14; }
+:root[data-icons="liquiddark"] .app-tile:not(.ci-pic)::after, .ic-prev[data-icons="liquiddark"].ic-prev.ic-prev .app-tile:not(.ci-pic)::after { opacity: .7; }
+:root[data-icons="liquiddark"] .app-tile .g, .ic-prev[data-icons="liquiddark"].ic-prev.ic-prev .app-tile .g { stroke: var(--glyph); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--glyph) 45%, transparent)); }
+/* Tinted: smoked glass, every glyph in the accent colour */
+:root[data-icons="liquidtint"] .app-tile:not(.ci-pic), .ic-prev[data-icons="liquidtint"].ic-prev.ic-prev .app-tile:not(.ci-pic) { background: rgba(14,15,22,.5); }
+:root[data-icons="liquidtint"] .app-tile:not(.ci-pic)::before, .ic-prev[data-icons="liquidtint"].ic-prev.ic-prev .app-tile:not(.ci-pic)::before { background: var(--accent); opacity: .2; }
+:root[data-icons="liquidtint"] .app-tile .g, .ic-prev[data-icons="liquidtint"].ic-prev.ic-prev .app-tile .g { stroke: color-mix(in srgb, var(--accent) 75%, #fff); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 50%, transparent)); }
+/* Keep the glass layers out of other styles' previews while Liquid Glass is the active style */
+:root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]) .app-tile::before, :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]) .app-tile::after { content: none; }
+:root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]):not([data-icons="frost"]) .app-tile { -webkit-backdrop-filter: none; backdrop-filter: none; isolation: auto; }
 :root[data-icons="clay"] .app-tile, .ic-prev[data-icons="clay"].ic-prev.ic-prev .app-tile { background: var(--tile); border-radius: 34%; box-shadow: inset 4px 4px 8px rgba(255,255,255,.35), inset -5px -5px 10px rgba(0,0,0,.28), 6px 8px 14px rgba(0,0,0,.28); filter: none; }
 :root[data-icons="clay"] .app-tile .g, .ic-prev[data-icons="clay"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; stroke-width: 2.4; filter: drop-shadow(1px 2px 1px rgba(0,0,0,.3)); }
 :root[data-icons="clay"] .app-tile .art, .ic-prev[data-icons="clay"].ic-prev.ic-prev .app-tile .art { display: none; }
@@ -5395,6 +5420,10 @@ const layoutPreview = id => `<span class="lp" data-lp="${id}"><i class="lp-top">
 /** Icon styles: the new Pop icons are the default; the older styles stay available. */
 const ICON_STYLES = [
   { id: 'pop', name: 'Pop', desc: 'Full-colour app icons', isNew: true },
+  { id: 'liquid', name: 'Liquid Glass', desc: 'Translucent coloured glass that catches the light', isNew: true },
+  { id: 'liquidclear', name: 'Liquid Clear', desc: 'See-through glass, white symbols', isNew: true },
+  { id: 'liquiddark', name: 'Liquid Dark', desc: 'Smoked glass, glowing coloured symbols', isNew: true },
+  { id: 'liquidtint', name: 'Liquid Tinted', desc: 'Smoked glass in your accent colour', isNew: true },
   { id: 'circle', name: 'Circles', desc: 'Round, colourful', isNew: true },
   { id: 'mono', name: 'Monochrome', desc: 'Minimal, follows the theme', isNew: true },
   { id: 'dark', name: 'Graphite', desc: 'Classic dark tiles' },
@@ -6973,7 +7002,7 @@ const Shell = {
 const Setup = {
   STEPS: ['start', 'look'],
   PACKS: ['neon', 'nordic', 'oled', 'sunset', 'vapor', 'coder', 'retro', 'matrix'],
-  ICONS: ['pop', 'circle', 'glass', 'clay', 'neon', 'material', 'sticker', 'paper'],
+  ICONS: ['pop', 'liquid', 'circle', 'clay', 'neon', 'material', 'sticker', 'paper'],
   step: 0, tab: 'in', picks: null,
   show() {
     Session.state = 'setup';
@@ -15867,6 +15896,7 @@ const THEME_PACKS = [
   { id: 'ubuntu', name: 'Ubuntu Classic', desc: 'Orange Ubuntu with its left-side dock.', sw: ['#e95420', '#2c001e', '#77216f'], s: { layout: 'ubuntu', scheme: 'dark', theme: 'dark', accent: '#e95420', wallpaper: 'ubuntu', font: 'ubuntu', iconStyle: 'pop' } },
   { id: 'cinna', name: 'Mint Cinnamon', desc: 'Linux Mint’s Cinnamon desktop in green.', sw: ['#8fb74a', '#2f2f2f', '#d9e8c4'], s: { layout: 'cinnamon', scheme: 'dark', theme: 'dark', accent: '#8fb74a', wallpaper: 'mint', iconStyle: 'pop', winBtnStyle: 'win' } },
   { id: 'cosmos', name: 'Cosmic', desc: 'Pop!_OS cosmos with a twinkling starfield.', sw: ['#48b9c7', '#111010', '#faa41a'], s: { scheme: 'dark', theme: 'dark', accent: '#48b9c7', wallpaper: 'pop-cosmos', liveWallpaper: 'stars', liveOverlay: true, winTitlebar: 'glass', iconStyle: 'pop' } },
+  { id: 'liquidglass', name: 'Liquid Glass', desc: 'See-through glass icons, glassy title bars and a macOS dock over soft bokeh.', sw: ['#0a84ff', '#1c1c1e', '#bf5af2'], s: { layout: 'mac', scheme: 'dark', theme: 'dark', accent: '#0a84ff', wallpaper: 'g-bokeh-21', iconStyle: 'liquid', winTitlebar: 'glass', winShadow: 'strong', winRadius: 16, dockMagnify: true, font: 'rounded', soundTheme: 'glass' } },
   { id: 'owl', name: 'Night Owl', desc: 'Deep-blue night colours under a field of stars.', sw: ['#82aaff', '#011627', '#c792ea'], s: { scheme: 'nightowl', theme: 'dark', lastDark: 'nightowl', accent: '#82aaff', wallpaper: 'deepspace', liveWallpaper: 'stars', liveOverlay: true, iconStyle: 'glass', winTitlebar: 'glass' } },
   { id: 'hacker', name: 'Mainframe', desc: 'Green-on-black terminal look, blueprint grid, square everything.', sw: ['#22c55e', '#000a03', '#0b2e16'], s: { scheme: 'hacker', theme: 'dark', lastDark: 'hacker', accent: '#22c55e', wallpaper: 'blueprint', font: 'mono', iconStyle: 'neon', winRadius: 0, winTitlebar: 'tint', winShadow: 'none', liveWallpaper: 'matrix', liveOverlay: true, soundTheme: 'retro', twScan: true } },
   { id: 'lava', name: 'Paartheev', desc: 'Horizon reds, a molten gradient and floating bubbles.', sw: ['#e95678', '#1c1e26', '#fab795'], s: { scheme: 'horizon', theme: 'dark', lastDark: 'horizon', accent: '#e95678', wallpaper: 'lava', liveWallpaper: 'bubbles', liveOverlay: true, iconStyle: 'circle', winTitlebar: 'glass', winRadius: 18, font: 'rounded' } },
