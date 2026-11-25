@@ -12,6 +12,8 @@ import http from 'node:http';
 import ipaddr from 'ipaddr.js';
 import { DatabaseSync } from 'node:sqlite';
 import { WebSocketServer } from 'ws';
+import { fileURLToPath } from 'node:url';
+import { claudeText } from './claude.js';
 
 let db, DIR, FILES;
 const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
@@ -79,6 +81,7 @@ export function initSocial(dataDir) {
   hasFts = !!db.prepare(`SELECT name FROM sqlite_master WHERE name='msg_fts'`).get();
   loadBans();
   setInterval(() => { try { db.prepare('DELETE FROM sessions WHERE last < ?').run(Date.now() - 90 * 864e5); } catch {} }, 3600e3).unref();
+  try { initBots(); } catch (e) { log('bots off:', e.message); }
   log('database ready', path.join(DIR, 'social.db'));
 }
 let hasFts = false;
@@ -125,7 +128,7 @@ function cleanLook(l) {
   }
   return Object.keys(o).length ? o : null;
 }
-const publicUser = u => { if (!u) return u; const p = prefsOf(u); return { id: u.id, username: u.username, display: u.display, avatar: u.avatar || null, bio: u.bio || '', look: p.look || null, online: p.showOnline === false ? false : sockets.has(u.id), lastSeen: p.showOnline === false ? null : (u.last_seen || null), activity: p.showActivity === false ? null : (activity.get(u.id) || null) }; };
+const publicUser = u => { if (!u) return u; const p = prefsOf(u); return { id: u.id, username: u.username, display: u.display, avatar: u.avatar || null, bio: u.bio || '', look: p.look || null, online: u.role === 'bot' ? true : p.showOnline === false ? false : sockets.has(u.id), lastSeen: p.showOnline === false ? null : (u.last_seen || null), activity: p.showActivity === false ? null : (activity.get(u.id) || null) }; };
 const userById = id => q1('SELECT * FROM users WHERE id=?', id);
 /* ---------------- IP addresses + IP bans ---------------- */
 const LOOP = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -644,8 +647,83 @@ function iceServers() {
   return list;
 }
 
+/* ---------------- built-in bots: "Claude" (texts you back) and "SanjivramOS" (posts what's new) ----------------
+   Both are normal accounts (role 'bot', random unusable password) so the Messages app needs nothing special.
+   Every account gets a DM with each. Replies come from Claude Code on this machine (claude.js claudeText, no tools).
+   Release notes live in server/updates.json (newest first); new entries are posted to everyone on their next connect. */
+const BOTS = {
+  claude: { username: 'claude', display: 'Claude', bio: 'AI assistant. Text me anything.', avatar: '/vendor/sj-social/bots/claude.svg' },
+  sanjivramos: { username: 'sanjivramos', display: 'SanjivramOS', bio: 'What’s new in SanjivramOS. Ask me about any update.', avatar: '/build/icon.png' },
+};
+const botIds = {};
+const UPDATES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'updates.json');
+let updCache = { t: 0, list: [] };
+function updates() {
+  try { const t = fs.statSync(UPDATES_FILE).mtimeMs; if (t !== updCache.t) updCache = { t, list: JSON.parse(fs.readFileSync(UPDATES_FILE, 'utf8')).filter(u => u && u.id && u.title) }; } catch {}
+  return updCache.list;
+}
+const plain = t => String(t || '').replace(/\*\*([^*]+)\*\*/g, '$1');
+const updText = u => `🆕 ${u.title}\n${plain(u.text)}`;
+function initBots() {
+  for (const [k, b] of Object.entries(BOTS)) {
+    let id = +((q1('SELECT v FROM meta WHERE k=?', 'bot.' + k) || {}).v || 0);
+    if (!id || !userById(id)) {
+      let name = b.username; for (let i = 2; q1('SELECT 1 FROM users WHERE username=?', name); i++) name = `${b.username}.bot${i > 2 ? i : ''}`;
+      const r = run('INSERT INTO users(username,display,salt,hash,avatar,bio,created,role) VALUES(?,?,?,?,?,?,?,?)', name, b.display,
+        crypto.randomBytes(16).toString('hex'), crypto.randomBytes(32).toString('hex'), b.avatar, b.bio, Date.now(), 'bot');
+      id = Number(r.lastInsertRowid); run('INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)', 'bot.' + k, String(id));
+    } else run('UPDATE users SET display=?, avatar=?, bio=?, role=?, banned=0 WHERE id=?', b.display, b.avatar, b.bio, 'bot', id);
+    botIds[k] = id;
+  }
+}
+const isBot = uid => Object.values(botIds).includes(uid);
+function botsHello(me) {
+  if (!botIds.claude || isBot(me.id)) return;
+  const fresh = k => !q1('SELECT 1 FROM convos WHERE dm_key=?', `${Math.min(me.id, botIds[k])}:${Math.max(me.id, botIds[k])}`);
+  if (fresh('claude')) addMessage(dmFor(me.id, botIds.claude).id, botIds.claude, 'text', `Hi ${me.display}! I’m Claude. Text me anything: questions, ideas, homework help, writing, code… I’ll text you back.`);
+  const newSj = fresh('sanjivramos'), cid = dmFor(me.id, botIds.sanjivramos).id;
+  const key = 'bot.seen.' + me.id, list = updates();
+  let seen; try { seen = new Set(JSON.parse((q1('SELECT v FROM meta WHERE k=?', key) || {}).v || 'null')); } catch { seen = null; }
+  if (newSj || !seen) {
+    addMessage(cid, botIds.sanjivramos, 'text', `Welcome to SanjivramOS, ${me.display}! 👋 I’ll post here every time SanjivramOS gets an update. Ask me about any of them, or text “updates” to see the latest.`);
+    if (list[0]) addMessage(cid, botIds.sanjivramos, 'text', 'Latest update:\n\n' + updText(list[0]));
+  } else {
+    for (const u of list.filter(u => !seen.has(u.id)).reverse()) addMessage(cid, botIds.sanjivramos, 'text', updText(u));
+  }
+  run('INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)', key, JSON.stringify(list.map(u => u.id)));
+}
+const botBusy = new Map();   // cid → { again } while a reply is being written
+function botReply(cid, uid) {
+  const ids = memberIds(cid), k = Object.keys(botIds).find(k => ids.includes(botIds[k]));
+  if (!k || isBot(uid)) return;
+  const st = botBusy.get(cid); if (st) { st.again = true; return; }
+  const s = { again: false }, bot = botIds[k]; botBusy.set(cid, s);
+  const typing = () => emitConvo(cid, { t: 'typing', cid, uid: bot, thread: null }, bot);
+  const post = t => { t = String(t || '').trim() || '…'; while (t) { let cut = t.length <= 3900 ? t.length : t.lastIndexOf('\n', 3900); if (cut < 1000) cut = 3900; addMessage(cid, bot, 'text', t.slice(0, cut).trim()); t = t.slice(cut).trim(); } };
+  typing(); const ti = setInterval(typing, 3000);
+  (async () => {
+    do {
+      s.again = false;
+      const me = userById(uid); if (!me) break;
+      const hist = q('SELECT user_id, kind, body FROM messages WHERE convo_id=? AND thread_root IS NULL AND deleted=0 AND kind<>? ORDER BY id DESC LIMIT 30', cid, 'system').reverse();
+      const lastMine = [...hist].reverse().find(m => m.user_id === uid);
+      const list = updates();
+      if (k === 'sanjivramos' && lastMine && lastMine.kind === 'text' && /^\s*(updates?|what'?s new|news|changelog|latest)\s*[?!.]*\s*$/i.test(lastMine.body)) {
+        post('Here’s what’s new:\n\n' + list.slice(0, 5).map(u => `${u.date} · ${updText(u)}`).join('\n\n')); continue;
+      }
+      if (!can(me, 'claude')) { post(k === 'claude' ? `An admin has turned off “${PERMS.claude}” for your account, so I can’t answer.` : 'Text “updates” to see what’s new.'); continue; }
+      const convo = hist.map(m => `${m.user_id === bot ? 'You' : me.display}: ${m.kind === 'text' ? m.body : `[sent a ${m.kind}]`}`).join('\n\n');
+      const system = k === 'claude'
+        ? `You are Claude, made by Anthropic, texting with ${me.display} in the Messages app of SanjivramOS (a web desktop OS). Write like a friendly text message: plain text only (no markdown, headings or tables; Messages shows raw characters), usually 1–4 short paragraphs unless they ask for more. You can't see files, browse or run commands in this chat; for jobs on the computer, suggest the Claude app in SanjivramOS. Don't prefix your reply with your name.`
+        : `You are the “SanjivramOS” updates chat inside the Messages app of SanjivramOS (a web desktop OS made by its owner). Answer questions about SanjivramOS updates and how to use the new features, using these release notes (newest first):\n\n${list.map(u => `${u.date} — ${u.title}: ${plain(u.text)}`).join('\n')}\n\nIf the notes don't cover something, say you don't know yet. Plain text only (no markdown), short and friendly, like a text message. Don't prefix your reply with your name.`;
+      try { post(await claudeText(`The chat so far (oldest first):\n\n${convo}\n\nWrite your next reply to ${me.display}.`, { system, model: k === 'claude' ? 'sonnet' : 'haiku' })); }
+      catch (e) { post(`Sorry, I couldn’t answer right now (${e.message}).`); break; }
+    } while (s.again);
+  })().finally(() => { clearInterval(ti); botBusy.delete(cid); });
+}
+
 const OPS = {
-  hello(me) { return { prefs: prefsOf(me), me: meOf(me), friends: friendList(me.id), convos: convoList(me.id), ice: iceServers(), calls: [...calls.values()].filter(c => isMember(c.cid, me.id)).map(callOut), gif: !!gifKey() }; },
+  hello(me) { try { botsHello(me); } catch (e) { log('bots:', e.message); } return { prefs: prefsOf(me), me: meOf(me), friends: friendList(me.id), convos: convoList(me.id), ice: iceServers(), calls: [...calls.values()].filter(c => isMember(c.cid, me.id)).map(callOut), gif: !!gifKey() }; },
   'user.search'(me, a) { const s = String(a.q || '').trim(); if (s.length < 1) return { users: [] }; return { users: q(`SELECT * FROM users WHERE (username LIKE ? OR display LIKE ?) AND id<>? AND banned=0 LIMIT 20`, s + '%', '%' + s + '%', me.id).filter(u => !blocked(me.id, u.id)).map(publicUser) }; },
   'user.get'(me, a) { const u = userById(+a.id); if (!u) throw new Error('No such user'); return { user: publicUser(u), friend: friendRow(me.id, u.id), blocked: !!q1('SELECT 1 FROM blocks WHERE user_id=? AND blocked=?', me.id, u.id) }; },
   'profile.update'(me, a) {
@@ -779,6 +857,7 @@ const OPS = {
     if (a.replyTo) { const r = q1('SELECT id FROM messages WHERE id=? AND convo_id=?', +a.replyTo, c.id); replyTo = r ? r.id : null; }
     if (a.thread) { const r = q1('SELECT id, thread_root FROM messages WHERE id=? AND convo_id=?', +a.thread, c.id); thread = r ? (r.thread_root || r.id) : null; }
     const msg = addMessage(c.id, me.id, kind, text, meta, { replyTo, thread });
+    if (c.kind === 'dm' && !thread) setImmediate(() => botReply(c.id, me.id));
     if (thread) emitConvo(c.id, { t: 'msg.update', msg: msgOut(q1('SELECT * FROM messages WHERE id=?', thread), me.id) });
     return { msg, clientId: a.clientId };
   },

@@ -157,3 +157,26 @@ export function claudeAsk(body, res) {
   });
   child.stdin.end(prompt);
 }
+
+/** Promise version of claudeAsk for server code (the Messages bots): no tools, nothing saved.
+ *  Resolves to the reply text; rejects with a readable Error. */
+export function claudeText(prompt, { system = '', model = 'sonnet', timeout = 180000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const args = ['-p', '--output-format', 'json', '--tools', '', '--no-session-persistence', '--strict-mcp-config',
+      '--model', /^[\w.\-\[\]]{1,64}$/.test(model) ? model : 'sonnet'];
+    if (system) args.push('--append-system-prompt', String(system).slice(0, 20000));
+    let out = '', err = '', child;
+    try { child = spawn(CLAUDE, args, { cwd: os.homedir(), env: cleanEnv(), stdio: ['pipe', 'pipe', 'pipe'] }); }
+    catch (e) { return reject(e); }
+    const t = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, timeout);
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { err = (err + d).slice(-2000); });
+    child.on('error', e => { clearTimeout(t); reject(new Error(e.code === 'ENOENT' ? 'Claude Code isn’t installed on the server.' : e.message)); });
+    child.on('close', code => {
+      clearTimeout(t);
+      try { const j = JSON.parse(out); if (j.is_error) reject(new Error(j.result || 'Claude error')); else resolve(String(j.result || '')); }
+      catch { reject(new Error((err || out || `Claude exited with code ${code}`).trim().slice(-300))); }
+    });
+    child.stdin.end(String(prompt).slice(0, 200000));
+  });
+}
