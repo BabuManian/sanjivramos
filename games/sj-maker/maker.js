@@ -574,13 +574,36 @@ Game types:
 Rules: every level has exactly one 'P' (player start) and, unless the win setting is "coins", one 'G' (goal flag) reachable from P. All rows in a level have exactly the same length. Width 20–60, height 10–20 (platformer height 12–16). Put coins 'C' along the route and a few hearts 'H'. Make it fun, fair and a little surprising. The first level should have a sign 'N' with a short friendly hint.
 Answer with ONLY JSON — no explanation, no code fences.`;
 const NEW_FORMAT = `{"title":"…","template":"platformer|topdown|3d","settings":{"win":"goal|coins","lives":1|3|5|0,"theme":0-7 (0 sunny,1 sunset,2 night,3 cave,4 space,5 candy,6 forest,7 snow),"speed":1|2|3,"jump":1|2|3,"doubleJump":true|false,"shoot":true|false,"timer":0|30|60|120},"levels":[{"rows":["…","…"],"signs":[{"x":0,"y":0,"text":"…"}]}]}`;
+/* Other AI providers (OpenRouter, Groq… set up in the OpenRouter AI app). Model values look like "ai:<provider>:<model id>". */
+const aiLabel = m => /^ai:/.test(m || '') ? (m.split(':').slice(2).join(':').split('/').pop().replace(/:free$/, '') || 'AI') : 'Claude';
+async function aiModelOptions(pref) {
+  let out = '';
+  try {
+    const pj = await (await fetch(location.origin + '/ai/api/providers', { credentials: 'same-origin' })).json();
+    for (const p of (pj.providers || []).filter(p => p.configured)) {
+      let ms = []; try { const r = await fetch(location.origin + '/ai/api/models?provider=' + encodeURIComponent(p.id), { credentials: 'same-origin' }); if (r.ok) ms = (await r.json()).models || []; } catch {}
+      let fav = ''; try { fav = JSON.parse(localStorage.getItem('air.model.' + p.id) || '""'); } catch {}
+      const pick = ms.filter(m => m.free || m.id === fav).slice(0, 16); if (fav && !pick.find(m => m.id === fav) && ms.find(m => m.id === fav)) pick.unshift(ms.find(m => m.id === fav));
+      if (!pick.length && ms.length) pick.push(...ms.slice(0, 12));
+      if (pick.length) out += `<optgroup label="${p.name.replace(/[<&"]/g, '')}">` + pick.map(m => { const v = `ai:${p.id}:${m.id}`; return `<option value="${v.replace(/"/g, '&quot;')}" ${v === pref ? 'selected' : ''}>${m.name.replace(/[<&]/g, '').replace(/\s*\(free\)\s*$/i, '')}${m.free ? ' · free' : ''}</option>`; }).join('') + '</optgroup>';
+    }
+  } catch {}
+  return out;
+}
 async function askClaude(prompt, system, model) {
+  if (/^ai:/.test(model || '')) {
+    const [, provider, ...rest] = model.split(':');
+    const r = await fetch(location.origin + '/ai/api/chat', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider, model: rest.join(':'), system, max_tokens: 12000, messages: [{ role: 'user', content: prompt }] }) });
+    const j = await r.json().catch(() => ({ error: 'The AI sent back something unexpected.' }));
+    if (!r.ok) throw new Error(j.error || 'That AI isn’t available right now.');
+    return String(j.text || '').replace(/<think>[\s\S]*?<\/think>/g, '');
+  }
   const r = await fetch(location.origin + '/linux-app/claude-ask', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, system, model }) });
   const j = await r.json().catch(() => ({ error: 'Claude sent back something unexpected.' }));
   if (!r.ok) throw new Error(j.error || 'Claude isn’t available right now.');
   return j.text || '';
 }
-function parseJson(text) { const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a < 0 || b <= a) throw new Error('Claude didn’t send a game back. Try describing it differently.'); return JSON.parse(text.slice(a, b + 1)); }
+function parseJson(text) { const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a < 0 || b <= a) throw new Error('The AI didn’t send a game back. Try describing it differently, or pick a smarter model.'); return JSON.parse(text.slice(a, b + 1)); }
 const TILE_OK = new Set(Object.keys(E.TILES));
 /** turn Claude's rows into a valid level (fixes sizes, unknown characters, missing start / goal) */
 function cleanLevel(lv, template, win) {
@@ -612,11 +635,11 @@ function cleanGame(j, forceTemplate) {
 function levelRows(lv) { const rows = []; for (let y = 0; y < lv.h; y++) rows.push(lv.tiles.slice(y * lv.w, (y + 1) * lv.w)); return rows; }
 function claudeDialog(tab = 'new') {
   const pref = (() => { try { return localStorage.getItem('maker.claudeModel') || 'sonnet'; } catch { return 'sonnet'; } })();
-  dialog(`<h2>🤖 Claude — your game-making helper</h2>
+  dialog(`<h2>🤖 AI helper — Claude, OpenRouter &amp; more</h2>
     <div class="seg" id="cTabs">${[['new', '✨ Make a new game'], ['edit', '✏️ Change this level'], ['ideas', '💡 Ideas & help']].map(([k, l]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('')}</div>
     <textarea id="cAsk" rows="4" maxlength="1500" style="width:100%;margin-top:10px;font:inherit;padding:10px;border-radius:10px;box-sizing:border-box" placeholder=""></textarea>
     <div class="row" id="cNewOpts" style="flex-wrap:wrap;gap:8px;margin-top:6px"><label>Type <select id="cType"><option value="">Claude picks</option><option value="platformer">🏃 Side view</option><option value="topdown">🗺️ Top-down</option><option value="3d">🧊 3D</option></select></label><label>Levels <select id="cLv"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
-    <div class="row" style="gap:8px;margin-top:6px"><label>Claude <select id="cModel"><option value="sonnet" ${pref === 'sonnet' ? 'selected' : ''}>Smart (better levels)</option><option value="haiku" ${pref === 'haiku' ? 'selected' : ''}>Fast</option></select></label></div>
+    <div class="row" style="gap:8px;margin-top:6px"><label>AI <select id="cModel"><optgroup label="Claude"><option value="sonnet" ${pref === 'sonnet' ? 'selected' : ''}>Claude · Smart (better levels)</option><option value="haiku" ${pref === 'haiku' ? 'selected' : ''}>Claude · Fast</option></optgroup></select></label></div>
     <div id="cOut" style="white-space:pre-wrap;max-height:40vh;overflow:auto;margin-top:10px;line-height:1.5"></div>
     <div class="row"><span id="cStatus" style="opacity:.8"></span><span class="sp"></span><button id="cX">Close</button><button id="cGo" class="pri">Ask Claude</button></div>`);
   const ask = $('cAsk'), tabs = $('cTabs');
@@ -624,11 +647,12 @@ function claudeDialog(tab = 'new') {
   const setTab = t => { tab = t; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); ask.placeholder = PH[t]; $('cNewOpts').style.display = t === 'new' ? '' : 'none'; $('cGo').textContent = t === 'ideas' ? 'Ask Claude' : t === 'new' ? 'Build it' : 'Change it'; $('cOut').textContent = ''; };
   tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (b) setTab(b.dataset.t); };
   setTab(tab); setTimeout(() => ask.focus(), 50);
+  aiModelOptions(pref).then(h => { const sel = $('cModel'); if (sel && h) { sel.insertAdjacentHTML('beforeend', h); if (/^ai:/.test(pref)) sel.value = pref; } });
   $('cX').onclick = closeDialog;
   $('cGo').onclick = async () => {
     const text = ask.value.trim(); if (!text) { ask.focus(); return; }
     const model = $('cModel').value; try { localStorage.setItem('maker.claudeModel', model); } catch {}
-    $('cGo').disabled = true; $('cStatus').textContent = '🤖 Claude is thinking… (this can take up to a minute)'; $('cOut').textContent = '';
+    $('cGo').disabled = true; $('cStatus').textContent = `🤖 ${aiLabel(model)} is thinking… (this can take up to a minute)`; $('cOut').textContent = '';
     try {
       if (tab === 'ideas') {
         const ctxt = `The user is making a ${game.template === '3d' ? '3D' : game.template === 'topdown' ? 'top-down' : 'side-view'} game called "${game.title}" with ${game.levels.length} level(s). Current level:\n${levelRows(L()).join('\n')}\n\nTheir question: ${text}`;
@@ -639,7 +663,7 @@ function claudeDialog(tab = 'new') {
         const j = parseJson(await askClaude(`Make a complete game: ${text}\nNumber of levels: ${n}.${t ? ` Game type: "${t}".` : ' Pick the best game type.'}\nReply in exactly this JSON shape:\n${NEW_FORMAT}`, CLAUDE_RULES(), model));
         const g = cleanGame(j, t || null);
         draftId = uid(); game = g; li = 0; undo = []; redo = []; persist(); renderEditor();
-        closeDialog(); toast(`🤖 Claude built “${g.title}” — ${g.levels.length} level${g.levels.length > 1 ? 's' : ''}. Press ▶ to play it!`); sfx('power');
+        closeDialog(); toast(`🤖 ${aiLabel(model)} built “${g.title}” — ${g.levels.length} level${g.levels.length > 1 ? 's' : ''}. Press ▶ to play it!`); sfx('power');
       } else {
         const cur = L(), rows = levelRows(cur), signs = Object.entries(cur.signs || {}).map(([i, tx]) => ({ x: i % cur.w, y: Math.floor(i / cur.w), text: tx }));
         const j = parseJson(await askClaude(`This is a "${game.template}" level (win: ${game.settings.win}):\n${JSON.stringify({ rows, signs })}\n\nChange it like this: ${text}\nKeep what already works unless asked. Reply in exactly this JSON shape: {"rows":["…"],"signs":[{"x":0,"y":0,"text":"…"}]}`, CLAUDE_RULES(), model));

@@ -310,7 +310,7 @@ export async function handleSocial(req, res, url) {
 const meOf = u => ({ ...publicUser(u), role: u.role, perms: permsOf(u) });
 /* ---------------- roles + permissions ----------------
    owner ("op", the first account) > admin > user. You can only manage people below you; admins/owner skip permission checks. */
-export const PERMS = { chat: 'Send messages', media: 'Photos, files & voice messages', gifs: 'GIFs & stickers', calls: 'Voice & video calls', groups: 'Create group chats', friends: 'Add friends', invites: 'Send game invites', claude: 'Use the Claude app', youtube: 'Use the YouTube app' };
+export const PERMS = { chat: 'Send messages', media: 'Photos, files & voice messages', gifs: 'GIFs & stickers', calls: 'Voice & video calls', groups: 'Create group chats', friends: 'Add friends', invites: 'Send game invites', claude: 'Use the Claude app', youtube: 'Use the YouTube app', ai: 'Use AI apps (OpenRouter, Groq…)' };
 const RANK = { owner: 3, admin: 2, user: 1 };
 const rankOf = u => RANK[u && u.role] || 1;
 const isAdmin = u => !!u && (u.role === 'admin' || u.role === 'owner');

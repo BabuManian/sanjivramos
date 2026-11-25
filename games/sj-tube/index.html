@@ -401,10 +401,15 @@ function msePlayer(video, tracks, startAt = 0) {
       let gen = seekGen, ahead = t.mime.startsWith('audio') ? 90 : 40, fails = 0;
       while (!dead) {
         const ct = video.currentTime, have = buffered(t.sb, ct), from = have >= 0 ? have : ct;
-        if (from >= ms.duration - 0.1 || from > ct + ahead) { await sleep(300); continue; }
+        // Fast start: until the picture has a few seconds ready, fetch one small piece at a time and keep the
+        // sound from racing far ahead (it would share the connection with the picture the video is waiting for).
+        const vT = T.find(x => !x.mime.startsWith('audio')), vAhead = vT ? Math.max(0, buffered(vT.sb, ct) - ct) : 99;
+        const warm = vAhead >= 8 && video.readyState >= 3, lim = warm ? ahead : (t === vT ? 8 : Math.max(6, vAhead + 4));
+        if (from >= ms.duration - 0.1 || from > ct + lim) { await sleep(warm ? 300 : 80); continue; }
         let i = t.segs.findIndex(s => s.t1 > from + 0.02); if (i < 0) { await sleep(300); continue; }
-        // join small neighbouring pieces into one request (fewer round trips, faster start)
-        let j = i; while (j + 1 < t.segs.length && t.segs[j + 1].b - t.segs[i].a < 1.5e6 && t.segs[j + 1].t0 < from + ahead && j - i < 3) j++;
+        // join small neighbouring pieces into one request (fewer round trips) once playback is going
+        let j = i; if (warm) while (j + 1 < t.segs.length && t.segs[j + 1].b - t.segs[i].a < 1.5e6 && t.segs[j + 1].t0 < from + ahead && j - i < 3) j++;
+        else if (t.segs[i].t1 - t.segs[i].t0 < 1.5 && i + 1 < t.segs.length && t.segs[i + 1].b - t.segs[i].a < 4e5) j++;
         gen = seekGen;
         try {
           const data = await getRange(t.url, t.segs[i].a, t.segs[j].b, ac.signal);

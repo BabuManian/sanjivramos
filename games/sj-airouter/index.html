@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenRouter AI</title>
+<style>
+/* Colours come from SanjivramOS (copied from the desktop's theme at start-up and whenever it changes). */
+:root{color-scheme:dark;--accent:#7c5cff;--accent-rgb:124,92,255;--on-accent:#fff;--text:#f2f0ee;--text-2:#b3ada8;--text-3:#857f7a;
+  --surface:#333130;--surface-2:#2b2928;--surface-3:#43403e;--border:rgba(255,255,255,.08);--hover:rgba(255,255,255,.07);
+  --font:"Fira Sans",Ubuntu,"Noto Sans","Segoe UI",Roboto,sans-serif;--bg:color-mix(in srgb,var(--surface-2) 70%,#000);--r:14px}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 var(--font);display:grid;grid-template-columns:250px 1fr;overflow:hidden}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:rgba(var(--accent-rgb),.7)}
+[hidden]{display:none!important}
+.btn{padding:8px 14px;border-radius:10px;background:var(--surface-3);font-weight:600}
+.btn:hover{filter:brightness(1.12)}
+.btn.pri{background:var(--accent);color:var(--on-accent)}
+.btn.sm{padding:5px 10px;font-size:13px}
+/* sidebar */
+#side{background:var(--surface-2);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.brand{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;font-weight:800;font-size:16px;letter-spacing:-.3px}
+.logo{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:conic-gradient(from 200deg,var(--accent),#22d3ee,var(--accent));color:#fff;font-size:17px}
+#newChat{margin:4px 12px 10px;display:flex;align-items:center;justify-content:center;gap:6px}
+#chats{flex:1;overflow:auto;padding:0 8px}
+.ci{display:flex;align-items:center;gap:6px;width:100%;text-align:left;padding:8px 10px;border-radius:9px;color:var(--text-2)}
+.ci span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci:hover{background:var(--hover)}.ci.on{background:rgba(var(--accent-rgb),.18);color:var(--text)}
+.ci .x{opacity:0;padding:0 4px;color:var(--text-3)}.ci:hover .x{opacity:1}
+#provBtn{margin:10px 12px 14px}
+/* main */
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+#top{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+#menu{display:none;font-size:20px;padding:2px 8px}
+#prov{max-width:150px}
+.mwrap{position:relative;flex:1;min-width:160px;max-width:440px}
+#model{width:100%}
+#mlist{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:340px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;z-index:20;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:4px}
+.mo{display:flex;gap:8px;align-items:center;width:100%;text-align:left;padding:7px 9px;border-radius:8px}
+.mo:hover,.mo.hl{background:var(--hover)}
+.mo small{color:var(--text-3);margin-left:auto;white-space:nowrap}
+.free{font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(34,197,94,.18);color:#4ade80}
+#status{color:var(--text-3);font-size:12px}
+#log{flex:1;overflow:auto;padding:18px 0 8px}
+.msg{max-width:820px;margin:0 auto 14px;padding:0 18px;display:flex;gap:10px}
+.av{flex:0 0 28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;background:var(--surface-3)}
+.msg.ai .av{background:rgba(var(--accent-rgb),.25)}
+.bub{min-width:0;flex:1;overflow-wrap:anywhere}
+.msg.me .bub{background:var(--surface);padding:9px 13px;border-radius:var(--r);white-space:pre-wrap}
+.who{font-size:12px;color:var(--text-3);margin-bottom:2px}
+.bub p{margin:.35em 0}.bub h1,.bub h2,.bub h3{margin:.6em 0 .3em;font-size:1.08em}
+.bub ul,.bub ol{margin:.3em 0;padding-left:1.4em}
+.bub code{background:var(--surface-3);padding:1px 5px;border-radius:5px;font-size:.92em}
+.bub pre{position:relative;background:#111;border:1px solid var(--border);border-radius:10px;padding:10px 12px;overflow:auto}
+.bub pre code{background:none;padding:0;font-size:12.5px}
+.bub pre .cp{position:absolute;top:6px;right:6px;font-size:12px;padding:2px 8px;border-radius:6px;background:var(--surface-3)}
+.err{color:#fca5a5}
+.cursor::after{content:"▍";animation:bl 1s steps(2) infinite;color:var(--accent)}@keyframes bl{50%{opacity:0}}
+.think{color:var(--text-3);font-size:12.5px;border-left:2px solid var(--surface-3);padding-left:8px;margin:.3em 0;white-space:pre-wrap;max-height:160px;overflow:auto}
+#empty{margin:auto;text-align:center;color:var(--text-2);padding:24px;max-width:520px}
+#empty .logo{width:56px;height:56px;font-size:28px;border-radius:16px;margin:0 auto 12px}
+.sugs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.sugs button{padding:7px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text-2)}
+#composer{padding:10px 14px 14px}
+.cbox{max-width:820px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:8px}
+#inp{flex:1;border:none;background:none;resize:none;max-height:200px;padding:6px 6px}
+#send{width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--on-accent);font-size:17px;flex:0 0 auto}
+#send.stop{background:var(--surface-3);color:var(--text)}
+.hintline{max-width:820px;margin:6px auto 0;font-size:11.5px;color:var(--text-3);text-align:center}
+/* providers dialog */
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:50;padding:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;width:min(560px,100%);max-height:90vh;overflow:auto;padding:18px}
+.card h2{margin:0 0 4px;font-size:18px}
+.card .sub{color:var(--text-2);margin:0 0 14px;font-size:13px}
+.pv{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.pv .h{display:flex;align-items:center;gap:8px;font-weight:700}
+.pv .h small{font-weight:400;color:var(--text-3)}
+.ok{margin-left:auto;font-size:12px;font-weight:600;color:#4ade80}.no{margin-left:auto;font-size:12px;color:var(--text-3)}
+.pv .row{display:flex;gap:8px;margin-top:8px}.pv .row input{flex:1;min-width:0}
+.custom{display:grid;gap:8px;margin-top:6px}
+.dmsg{min-height:18px;font-size:13px;margin:6px 0}
+@media (max-width:720px){
+  body{grid-template-columns:1fr}
+  #side{position:fixed;inset:0 auto 0 0;width:260px;z-index:30;transform:translateX(-102%);transition:transform .2s}
+  body.side #side{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+  #menu{display:block}
+  .mwrap{min-width:0;flex-basis:100%;max-width:none;order:3}
+}
+</style>
+</head>
+<body>
+<aside id="side">
+  <div class="brand"><div class="logo">✦</div>OpenRouter AI</div>
+  <button class="btn pri" id="newChat">＋ New chat</button>
+  <div id="chats"></div>
+  <button class="btn" id="provBtn">🔑 Providers &amp; API keys</button>
+</aside>
+<main>
+  <div id="top">
+    <button id="menu" title="Chats">☰</button>
+    <select id="prov" title="AI provider"></select>
+    <div class="mwrap"><input id="model" placeholder="Search models…" autocomplete="off" spellcheck="false"><div id="mlist" hidden></div></div>
+    <span id="status"></span>
+  </div>
+  <div id="log"></div>
+  <div id="composer">
+    <div class="cbox"><textarea id="inp" rows="1" placeholder="Message the AI…"></textarea><button id="send" title="Send (Enter)">➤</button></div>
+    <div class="hintline" id="hint">Enter to send · Shift+Enter for a new line</div>
+  </div>
+</main>
+<div id="dlg" hidden><div class="card" id="dcard"></div></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem('air.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('air.' + k, JSON.stringify(v)); } catch {} } };
+const DEFAULTS = { openrouter: ['nvidia/nemotron-3-ultra-550b-a55b:free', 'google/gemma-4-31b-it:free', 'nvidia/nemotron-3.5-super-vl:free'], groq: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'], openai: ['gpt-4o-mini'] };
+
+/* ---------- theme from SanjivramOS ---------- */
+const THEME_VARS = ['--accent', '--accent-rgb', '--on-accent', '--font', '--text', '--text-2', '--text-3', '--surface', '--surface-2', '--surface-3', '--border', '--hover'];
+function syncTheme() {
+  try {
+    const pd = parent !== window && parent.document.documentElement; if (!pd) return;
+    const cs = getComputedStyle(pd);
+    for (const v of THEME_VARS) { const x = cs.getPropertyValue(v).trim(); if (x) document.documentElement.style.setProperty(v, x); }
+    document.documentElement.style.colorScheme = pd.dataset.theme === 'light' ? 'light' : 'dark';
+  } catch {}
+}
+syncTheme();
+try { if (parent !== window) new parent.MutationObserver(() => syncTheme()).observe(parent.document.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-accent'] }); } catch {}
+
+/* ---------- server ---------- */
+const BASE = new URL('../../', location.href).href;   // /games/sj-airouter/ → site root
+async function api(path, opts = {}) {
+  const r = await fetch(BASE + 'ai/api/' + path, { credentials: 'same-origin', ...opts, headers: { 'content-type': 'application/json', ...(opts.headers || {}) } });
+  const j = await r.json().catch(() => ({ error: `Server said ${r.status}` }));
+  if (!r.ok) throw new Error(j.error || `Server said ${r.status}`);
+  return j;
+}
+
+/* ---------- state ---------- */
+let providers = [], canEdit = false, models = [], busy = null;
+let chats = store.get('chats', []), cur = store.get('cur', null);
+const chat = () => chats.find(c => c.id === cur);
+const saveChats = () => { store.set('chats', chats.slice(0, 80)); store.set('cur', cur); };
+let prov = store.get('prov', 'openrouter'), model = store.get('model.' + prov, '');
+
+/* ---------- markdown (small, safe: everything escaped first) ---------- */
+function md(src) {
+  const blocks = []; let s = String(src || '');
+  s = s.replace(/```([\w+-]*)\n?([\s\S]*?)(```|$)/g, (_, lang, code) => { blocks.push(`<pre><button class="cp">Copy</button><code>${esc(code.replace(/\n$/, ''))}</code></pre>`); return `\u0000${blocks.length - 1}\u0000`; });
+  s = esc(s)
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out = []; let list = null;
+  for (const line of s.split('\n')) {
+    const h = /^(#{1,3})\s+(.*)/.exec(line), ul = /^\s*[-*•]\s+(.*)/.exec(line), ol = /^\s*\d+[.)]\s+(.*)/.exec(line);
+    if (ul || ol) { const t = ul ? 'ul' : 'ol'; if (list !== t) { if (list) out.push(`</${list}>`); out.push(`<${t}>`); list = t; } out.push(`<li>${(ul || ol)[1]}</li>`); continue; }
+    if (list) { out.push(`</${list}>`); list = null; }
+    if (h) out.push(`<h${h[1].length + 1}>${h[2]}</h${h[1].length + 1}>`);
+    else if (/^\u0000\d+\u0000$/.test(line.trim())) out.push(line.trim());
+    else if (line.trim()) out.push(`<p>${line}</p>`);
+  }
+  if (list) out.push(`</${list}>`);
+  return out.join('').replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
+}
+document.addEventListener('click', e => { const b = e.target.closest('.cp'); if (!b) return; navigator.clipboard.writeText(b.nextElementSibling.textContent).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1200); }).catch(() => {}); });
+
+/* ---------- rendering ---------- */
+function drawChats() {
+  $('chats').innerHTML = chats.map(c => `<button class="ci ${c.id === cur ? 'on' : ''}" data-id="${c.id}"><span>${esc(c.title || 'New chat')}</span><b class="x" data-del="${c.id}" title="Delete">✕</b></button>`).join('');
+}
+function msgHtml(m, i) {
+  if (m.role === 'user') return `<div class="msg me"><div class="av">🙂</div><div class="bub">${esc(m.content)}</div></div>`;
+  const who = m.model ? esc(m.model.split('/').pop().replace(/:free$/, '')) : 'AI';
+  const think = m.reasoning ? `<div class="think">${esc(m.reasoning)}</div>` : '';
+  return `<div class="msg ai" data-i="${i}"><div class="av">✦</div><div class="bub"><div class="who">${who}</div>${think}<div class="txt ${m.pending ? 'cursor' : ''}">${m.error ? `<p class="err">${esc(m.error)}</p>` : md(m.content)}</div></div></div>`;
+}
+function drawLog() {
+  const c = chat();
+  if (!c || !c.messages.length) {
+    $('log').innerHTML = `<div id="empty"><div class="logo">✦</div><h2 style="margin:0 0 6px">What can I help with?</h2><div>Chat with hundreds of AI models through ${esc((providers.find(p => p.id === prov) || {}).name || 'OpenRouter')}. Models marked <span class="free">FREE</span> cost nothing.</div>
+      <div class="sugs">${['Explain how black holes form', 'Write a Python script that renames photos by date', 'Give me 5 ideas for a platformer level', 'Help me study for a history test'].map(t => `<button>${esc(t)}</button>`).join('')}</div></div>`;
+    return;
+  }
+  $('log').innerHTML = c.messages.map(msgHtml).join('');
+  $('log').scrollTop = $('log').scrollHeight;
+}
+$('log').addEventListener('click', e => { const b = e.target.closest('.sugs button'); if (b) { $('inp').value = b.textContent; send(); } });
+$('chats').addEventListener('click', e => {
+  const d = e.target.closest('[data-del]');
+  if (d) { e.stopPropagation(); chats = chats.filter(c => c.id !== d.dataset.del); if (cur === d.dataset.del) cur = chats[0] ? chats[0].id : null; saveChats(); drawChats(); drawLog(); return; }
+  const b = e.target.closest('.ci'); if (!b) return; cur = b.dataset.id; saveChats(); drawChats(); drawLog(); document.body.classList.remove('side');
+});
+$('newChat').onclick = () => { cur = null; saveChats(); drawChats(); drawLog(); $('inp').focus(); document.body.classList.remove('side'); };
+$('menu').onclick = () => document.body.classList.toggle('side');
+$('log').addEventListener('pointerdown', () => document.body.classList.remove('side'));
+
+/* ---------- providers + models ---------- */
+async function loadProviders() {
+  try { const j = await api('providers'); providers = j.providers; canEdit = j.canEdit; } catch (e) { providers = []; setStatus(e.message); }
+  const ready = providers.filter(p => p.configured);
+  if (!ready.find(p => p.id === prov)) prov = (ready[0] || { id: 'openrouter' }).id;
+  $('prov').innerHTML = (ready.length ? ready : providers.filter(p => p.id === 'openrouter')).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  $('prov').value = prov;
+  if (!ready.length) { setStatus(canEdit ? 'Add an API key in Providers to start.' : 'No AI provider is set up yet — ask an admin.'); models = []; return; }
+  await loadModels();
+}
+async function loadModels() {
+  setStatus('Loading models…'); models = [];
+  try { models = (await api('models?provider=' + encodeURIComponent(prov))).models; setStatus(''); }
+  catch (e) { setStatus(e.message); }
+  model = store.get('model.' + prov, '');
+  if (!model || (models.length && !models.find(m => m.id === model))) model = (DEFAULTS[prov] || []).find(id => models.find(m => m.id === id)) || (models.find(m => m.free) || models[0] || { id: (DEFAULTS[prov] || [''])[0] }).id;
+  showModel();
+}
+const nice = id => { const m = models.find(x => x.id === id); return m ? m.name.replace(/\s*\(free\)\s*$/i, '') : id; };
+function showModel() { $('model').value = nice(model); $('model').title = model; }
+function setStatus(t) { $('status').textContent = t; }
+$('prov').onchange = () => { prov = $('prov').value; store.set('prov', prov); loadModels().then(drawLog); };
+let hl = -1;
+function drawModels() {
+  const q = $('model').value.trim().toLowerCase(), list = models.filter(m => !q || q === nice(model).toLowerCase() || (m.id + ' ' + m.name).toLowerCase().includes(q)).slice(0, 120);
+  hl = Math.min(hl, list.length - 1);
+  $('mlist').innerHTML = list.length ? list.map((m, i) => `<button class="mo ${i === hl ? 'hl' : ''} " data-id="${esc(m.id)}">${esc(m.name.replace(/\s*\(free\)\s*$/i, ''))}${m.free ? ' <span class="free">FREE</span>' : ''}<small>${m.ctx ? Math.round(m.ctx / 1000) + 'k' : ''}</small></button>`).join('') : '<div style="padding:10px;color:var(--text-3)">No models match.</div>';
+  $('mlist').hidden = false;
+}
+$('model').addEventListener('focus', () => { $('model').select(); hl = -1; drawModels(); });
+$('model').addEventListener('input', () => { hl = 0; drawModels(); });
+$('model').addEventListener('keydown', e => {
+  const items = [...$('mlist').querySelectorAll('.mo')];
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); hl = Math.max(0, Math.min(items.length - 1, hl + (e.key === 'ArrowDown' ? 1 : -1))); drawModels(); const x = $('mlist').querySelectorAll('.mo')[hl]; x && x.scrollIntoView({ block: 'nearest' }); }
+  else if (e.key === 'Enter') { e.preventDefault(); const x = items[Math.max(0, hl)]; if (x) pickModel(x.dataset.id); }
+  else if (e.key === 'Escape') { $('model').blur(); }
+});
+$('model').addEventListener('blur', () => setTimeout(() => { $('mlist').hidden = true; showModel(); }, 150));
+$('mlist').addEventListener('mousedown', e => { const b = e.target.closest('.mo'); if (b) { e.preventDefault(); pickModel(b.dataset.id); } });
+function pickModel(id) { model = id; store.set('model.' + prov, id); $('mlist').hidden = true; $('model').blur(); showModel(); $('inp').focus(); }
+
+/* ---------- chatting ---------- */
+const grow = () => { const t = $('inp'); t.style.height = 'auto'; t.style.height = Math.min(200, t.scrollHeight) + 'px'; };
+$('inp').addEventListener('input', grow);
+$('inp').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+$('send').onclick = () => busy ? busy.abort() : send();
+function setBusy(ac) { busy = ac; $('send').classList.toggle('stop', !!ac); $('send').textContent = ac ? '■' : '➤'; $('send').title = ac ? 'Stop' : 'Send (Enter)'; }
+
+async function send() {
+  const text = $('inp').value.trim(); if (!text || busy) return;
+  if (!model) { setStatus('Pick a model first.'); return; }
+  let c = chat();
+  if (!c) { c = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: text.slice(0, 48), messages: [] }; chats.unshift(c); cur = c.id; }
+  c.messages.push({ role: 'user', content: text });
+  const m = { role: 'assistant', content: '', model, pending: true }; c.messages.push(m);
+  $('inp').value = ''; grow(); saveChats(); drawChats(); drawLog();
+  const ac = new AbortController(); setBusy(ac);
+  const el = () => $('log').querySelector(`.msg.ai[data-i="${c.messages.length - 1}"]`);
+  let raf = 0; const paint = () => { raf = 0; if (cur !== c.id) return; const e = el(); if (!e) return; const stick = $('log').scrollHeight - $('log').scrollTop - $('log').clientHeight < 80; e.outerHTML = msgHtml(m, c.messages.length - 1); if (stick) $('log').scrollTop = $('log').scrollHeight; };
+  try {
+    const r = await fetch(BASE + 'ai/api/chat', { method: 'POST', credentials: 'same-origin', signal: ac.signal, headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: prov, model, stream: true, system: store.get('system', ''), messages: c.messages.filter(x => x !== m && !x.error).map(x => ({ role: x.role, content: x.content })) }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `Server said ${r.status}`); }
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await rd.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let k; while ((k = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1);
+        if (!line.startsWith('data:')) continue;
+        const d = line.slice(5).trim(); if (d === '[DONE]') continue;
+        let j; try { j = JSON.parse(d); } catch { continue; }
+        if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+        const delta = (j.choices && j.choices[0] && j.choices[0].delta) || {};
+        if (delta.content) m.content += delta.content;
+        const rs = delta.reasoning || delta.reasoning_content; if (rs) m.reasoning = (m.reasoning || '') + rs;
+        if (j.model) m.model = j.model;
+        if (!raf) raf = requestAnimationFrame(paint);
+      }
+    }
+    if (!m.content && !m.reasoning) m.error = 'The model sent back an empty answer. Try again or pick another model.';
+  } catch (e) {
+    if (e.name === 'AbortError') { if (!m.content) m.error = 'Stopped.'; }
+    else m.error = /rate.?limit|429/i.test(e.message) ? e.message + ' — free models are busy sometimes; wait a moment or pick another model.' : e.message;
+  }
+  m.pending = false; setBusy(null); saveChats(); if (cur === c.id) drawLog();
+}
+
+/* ---------- providers dialog ---------- */
+function openProviders() {
+  const ro = !canEdit;
+  const pvHtml = p => `<div class="pv" data-id="${esc(p.id)}"><div class="h">${esc(p.name)} ${p.custom ? `<small>${esc(p.base)}</small>` : ''}${p.configured ? `<span class="ok">✓ Key added${p.hint ? ' · ' + esc(p.hint) : ''}</span>` : '<span class="no">No key</span>'}</div>
+    ${ro ? '' : `<div class="row"><input type="password" placeholder="${p.configured ? 'Paste a new key to replace it' : 'Paste API key'}" autocomplete="off"><button class="btn sm pri" data-save>Save</button>${p.configured || p.custom ? `<button class="btn sm" data-rm>${p.custom ? 'Delete' : 'Remove'}</button>` : ''}</div>${p.site ? `<div style="font-size:12px;margin-top:6px;color:var(--text-3)">Get a key: <a href="${esc(p.site)}" target="_blank" rel="noopener">${esc(p.site.replace(/^https:\/\//, ''))}</a></div>` : ''}`}</div>`;
+  $('dcard').innerHTML = `<h2>Providers &amp; API keys</h2><p class="sub">${ro ? 'Only an admin can change these. The keys stay on the server and are never shown to anyone.' : 'Keys are stored on the SanjivramOS server only (not in the browser, not on GitHub). Anyone signed in can chat; only admins see this.'}</p>
+    ${providers.map(pvHtml).join('')}
+    ${ro ? '' : `<details class="pv"><summary style="cursor:pointer;font-weight:700">＋ Add another OpenAI-compatible API</summary><div class="custom">
+      <input id="cName" placeholder="Name (e.g. Together, Mistral, DeepSeek, LM Studio)"><input id="cBase" placeholder="API address, e.g. https://api.together.xyz/v1"><input id="cKey" type="password" placeholder="API key" autocomplete="off"><button class="btn pri" id="cAdd">Add provider</button></div></details>`}
+    <label style="display:block;margin-top:6px;font-weight:600">Custom instructions <small style="font-weight:400;color:var(--text-3)">(sent with every chat, saved on this device)</small></label>
+    <textarea id="sysP" rows="3" style="width:100%;margin-top:6px" placeholder="e.g. Answer briefly. I'm 13 and learning to code.">${esc(store.get('system', ''))}</textarea>
+    <div class="dmsg" id="dmsg"></div><div style="display:flex;justify-content:flex-end"><button class="btn" id="dClose">Done</button></div>`;
+  $('dlg').hidden = false;
+}
+async function saveProv(body) {
+  $('dmsg').textContent = 'Saving…';
+  try { const j = await api('providers', { method: 'POST', body: JSON.stringify(body) }); providers = j.providers; canEdit = j.canEdit; openProviders(); $('dmsg').textContent = 'Saved.'; }
+  catch (e) { $('dmsg').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+$('dcard').addEventListener('click', e => {
+  const pv = e.target.closest('.pv[data-id]'), id = pv && pv.dataset.id, p = providers.find(x => x.id === id);
+  if (e.target.closest('[data-save]')) { const key = pv.querySelector('input').value.trim(); if (!key) return; saveProv(p.custom ? { id, name: p.name, base: p.base, key } : { id, key }); }
+  else if (e.target.closest('[data-rm]')) saveProv(p.custom ? { id, remove: true } : { id, key: '' });
+  else if (e.target.id === 'cAdd') { const name = $('cName').value.trim(), base = $('cBase').value.trim(); if (!name || !base) { $('dmsg').textContent = 'Give it a name and an API address.'; return; } saveProv({ id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'custom', name, base, key: $('cKey').value.trim() }); }
+  else if (e.target.id === 'dClose') { store.set('system', $('sysP').value.trim()); $('dlg').hidden = true; loadProviders().then(drawLog); }
+});
+$('dlg').addEventListener('mousedown', e => { if (e.target.id === 'dlg') { store.set('system', ($('sysP') || { value: '' }).value.trim()); $('dlg').hidden = true; loadProviders().then(drawLog); } });
+$('provBtn').onclick = () => { openProviders(); document.body.classList.remove('side'); };
+
+drawChats(); drawLog(); loadProviders().then(drawLog);
+window.__air = { get state() { return { prov, model, providers, models: models.length, canEdit }; }, send, md };
+</script>
+</body>
+</html>

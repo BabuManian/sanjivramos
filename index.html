@@ -20776,11 +20776,12 @@ const SJ_HTML_APPS = [
   ['sj-hockey', 'Puck Rush', 'emoji:🏒', 'linear-gradient(135deg,#06b6d4,#1e3a8a)', 'Games', 560, 860, 'Fast air hockey: vs a 3-level CPU, 2 players on one screen, or live online against a friend.', 'air hockey puck table sports multiplayer online 2 player'],
   ['sj-doodle', 'Doodle Guess', 'emoji:✏️', 'linear-gradient(135deg,#f59e0b,#ec4899)', 'Games', 1100, 720, 'Party drawing game: one player draws a secret word, everyone races to guess it. Online with 2–8 friends or pass & play.', 'draw guess drawing party pictionary sketch multiplayer online word'],
   ['sj-skybrawl', 'Sky Brawl Ultimate', 'emoji:💥', 'linear-gradient(135deg,#f97316,#7c3aed)', 'Games', 1200, 720, 'Platform fighter for 1–4: rack up damage %, launch rivals off the stage, grab items and break the Nova Core for a super. 8 fighters, 7 stages, Versus, Classic, Endless and Training. Local multiplayer on keyboard, gamepads or touch.', 'smash fighting fighter brawl platform fighter multiplayer local 4 player couch party versus'],
+  ['sj-airouter', 'OpenRouter AI', 'emoji:✦', 'linear-gradient(135deg,#7c5cff,#22d3ee)', 'Productivity', 980, 700, 'Chat with hundreds of AI models (free ones included) through OpenRouter, Groq, OpenAI or any OpenAI-compatible API. Admins add the API keys under Providers; keys stay on the server.', 'ai chat openrouter groq openai llm gpt llama gemma deepseek assistant chatbot models'],
   ['sj-flashcards', 'Flashcards', 'emoji:🗂️', 'linear-gradient(135deg,#0ea5e9,#0369a1)', 'Education', 760, 680, 'Study with flashcards: spaced repetition boxes, quiz mode, your own decks and CSV import/export. Comes with 4 sample decks.', 'study flashcards learn quiz anki revise spaced repetition cards'],
 ];
 SJ_HTML_APPS.forEach(([dir, name, icon, color, cat, width, height, desc, kw = '']) => {
   const id = 'html-' + dir.slice(3);
-  BUILTIN_META[id] = { cat, desc: desc + ' Works offline.' };
+  BUILTIN_META[id] = { cat, desc: desc + (dir === 'sj-airouter' ? '' : ' Works offline.') };
   Apps.register({
     id, name, icon, color, width, height, minWidth: 300, minHeight: 320,
     keywords: `${name} ${cat} html offline ${dir} ${kw}`, aliases: [dir, name.toLowerCase()],

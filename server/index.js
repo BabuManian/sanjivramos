@@ -23,6 +23,7 @@ import { initSocial, handleSocial, socialUpgrade, ipBan, bannedPage, noteVisit, 
 import { playUpgrade, playApi, startLan } from './play.js';
 import { initMaker, makerApi } from './maker.js';
 import { ytApi } from './yt.js';
+import { initAi, aiApi } from './ai.js';
 import https from 'node:https';
 import crypto from 'node:crypto';
 import { ensureCert } from './tls.js';
@@ -40,6 +41,7 @@ const HTTPS_PORT = process.env.SJ_HTTPS === '0' ? 0 : parseInt(process.env.SJ_HT
 const transfers = new Map();
 try { initSocial(DATA); } catch (e) { console.error('[social] off:', e.message); }
 try { initMaker(DATA); } catch (e) { console.error('[maker] off:', e.message); }
+try { initAi(DATA); } catch (e) { console.error('[ai] off:', e.message); }
 // A shell runs any command on this machine, so it's only offered behind a password.
 const SHELL_ON = process.env.SANJIVRAM_SHELL === '1';
 // Who may use the shell, Linux apps and desktop: this phone and any device on your own network (Wi-Fi, LAN, VPNs such
@@ -112,6 +114,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith('/social/')) { handleSocial(req, res, url); return; }
   if (playApi(req, res, url)) return;
   if (url.pathname.startsWith('/maker/api/')) { makerApi(req, res, url); return; }
+  if (url.pathname.startsWith('/ai/api/')) { aiApi(req, res, url).catch(e => { if (!res.headersSent) { res.writeHead(500); res.end(e.message); } }); return; }
   if (url.pathname.startsWith('/yt/')) { ytApi(req, res, url).catch(e => { if (!res.headersSent) { res.writeHead(500); res.end(e.message); } }); return; }
   // Files: the native file manager for this machine (and Linux files as wallpapers).
   if (url.pathname.startsWith('/linux-fs/')) { handleFiles(req, res, url, shellOk(req), readJson); return; }
