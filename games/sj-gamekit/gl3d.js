@@ -9,7 +9,7 @@
   'use strict';
   if (window.GL3D) return;
   /* ---------- matrices ---------- */
-  const I4 = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  const I4 = () => { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; };
   function mul(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; }
   const T = (x, y, z) => { const m = I4(); m[12] = x; m[13] = y; m[14] = z; return m; };
   const S = (x, y, z) => { const m = I4(); m[0] = x; m[5] = y === undefined ? x : y; m[10] = z === undefined ? x : z; return m; };
@@ -19,7 +19,8 @@
   const chain = (...ms) => ms.reduce((a, b) => mul(a, b));
   function persp(fy, asp, n, f) { const t = 1 / Math.tan(fy / 2); return new Float32Array([t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0]); }
   const M = { I4, mul, T, S, RX, RY, RZ, chain, persp };
-  const hex = h => { const n = parseInt(String(h || '#888888').slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+  const HEXC = new Map();   // colours are parsed once (treat the returned arrays as read-only)
+  const hex = h => { let c = HEXC.get(h); if (c) return c; const n = parseInt(String(h || '#888888').slice(1), 16); c = [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; if (HEXC.size < 4096) HEXC.set(h, c); return c; };
   /** forward vector for a yaw/pitch camera: yaw 0 looks down -Z */
   const dirOf = (yaw, pitch = 0) => [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
 
@@ -128,6 +129,7 @@ gl_FragColor=vec4(c,1.);}`;
     let bound = null;
     const mesh = data => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data instanceof Float32Array ? data : new Float32Array(data), gl.STATIC_DRAW); bound = null; return { b, n: data.length / 9 }; };
     const bind = m => { if (bound === m) return; bound = m; gl.bindBuffer(gl.ARRAY_BUFFER, m.b); gl.enableVertexAttribArray(A.p); gl.vertexAttribPointer(A.p, 3, gl.FLOAT, false, 36, 0); gl.enableVertexAttribArray(A.n); gl.vertexAttribPointer(A.n, 3, gl.FLOAT, false, 36, 12); gl.enableVertexAttribArray(A.c); gl.vertexAttribPointer(A.c, 3, gl.FLOAT, false, 36, 24); };
+    const UC = { t0: NaN, t1: NaN, t2: NaN, a: NaN, e: NaN }, BOXM = I4();
     const CUBE = (() => { const a = []; pushBox(a, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, [1, 1, 1]); return mesh(a); })();
     const DISCM = mesh(DISC);
     const ID = I4(), WHITE = [1, 1, 1];
@@ -170,7 +172,7 @@ gl_FragColor=vec4(c,1.);}`;
         gl.uniform3fv(U.uAmb, env.amb ? (typeof env.amb === 'string' ? hex(env.amb) : env.amb) : [0.42, 0.44, 0.5]);
         const LP = new Float32Array(24), LC = new Float32Array(18);
         // nearest lights first
-        const ls = (env.lights || []).slice().sort((a, b) => dist2(a.p, eye) - dist2(b.p, eye)).slice(0, 6);
+        const ls = (env.lights || []).slice().sort((a, b) => dist2(a.p, eye) - dist2(b.p, eye)).slice(0, R.maxLights == null ? 6 : R.maxLights);
         ls.forEach((l, i) => { LP.set([l.p[0], l.p[1], l.p[2], l.r || 8], i * 4); LC.set(typeof l.c === 'string' ? hex(l.c) : l.c, i * 3); });
         gl.uniform4fv(U.uLP, LP); gl.uniform3fv(U.uLC, LC);
         const f = env.flash;
@@ -180,20 +182,28 @@ gl_FragColor=vec4(c,1.);}`;
       },
       draw(m, model = ID, tint = WHITE, alpha = 1, emit = 0) {
         bind(m);
-        gl.uniformMatrix4fv(U.uM, false, model); gl.uniform3fv(U.uT, typeof tint === 'string' ? hex(tint) : tint); gl.uniform1f(U.uA, alpha); gl.uniform1f(U.uE, emit);
+        gl.uniformMatrix4fv(U.uM, false, model);
+        // only send what changed since the last draw (most props share colours/alpha)
+        const tc = typeof tint === 'string' ? hex(tint) : tint;
+        if (tc[0] !== UC.t0 || tc[1] !== UC.t1 || tc[2] !== UC.t2) { gl.uniform3fv(U.uT, tc); UC.t0 = tc[0]; UC.t1 = tc[1]; UC.t2 = tc[2]; }
+        if (alpha !== UC.a) { gl.uniform1f(U.uA, alpha); UC.a = alpha; }
+        if (emit !== UC.e) { gl.uniform1f(U.uE, emit); UC.e = emit; }
         if (alpha < 1) { gl.enable(gl.BLEND); gl.depthMask(false); }
         gl.drawArrays(gl.TRIANGLES, 0, m.n);
         if (alpha < 1) { gl.disable(gl.BLEND); gl.depthMask(true); }
       },
+      /** release a mesh's GPU memory (it can't be drawn afterwards) */
+      free(m) { if (m && m.b) { gl.deleteBuffer(m.b); m.b = null; m.n = 0; bound = null; } },
       cube(model, col, alpha = 1, emit = 0) { R.draw(CUBE, model, col, alpha, emit); },
       /** axis-aligned box by corners (handy for props that move) */
-      box(x0, y0, z0, x1, y1, z1, col, alpha, emit) { R.cube(mul(T((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), S(x1 - x0, y1 - y0, z1 - z0)), col, alpha, emit); },
+      box(x0, y0, z0, x1, y1, z1, col, alpha, emit) { const m = BOXM; m[0] = x1 - x0; m[5] = y1 - y0; m[10] = z1 - z0; m[12] = (x0 + x1) / 2; m[13] = (y0 + y1) / 2; m[14] = (z0 + z1) / 2; R.cube(m, col, alpha, emit); },
       /** a soft glowing sprite at p (drawn in R.end(), added on top) */
       glow(p, size, col, alpha = 1) { if (GLOW && R.quality !== 'off') glows.push([p, size, typeof col === 'string' ? hex(col) : col, alpha]); },
       /** a soft round shadow on the ground at (x, y, z) */
       shadow(x, y, z, r = 0.5, alpha = 0.35) {
         bind(DISCM); gl.enable(gl.BLEND); gl.depthMask(false); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-2, -2);
         for (const [k, a] of [[1, alpha * 0.55], [0.7, alpha * 0.5]]) { gl.uniformMatrix4fv(U.uM, false, mul(T(x, y + 0.02, z), S(r * k, 1, r * k))); gl.uniform3fv(U.uT, [0, 0, 0]); gl.uniform1f(U.uA, a); gl.uniform1f(U.uE, 1); gl.drawArrays(gl.TRIANGLES, 0, DISCM.n); }
+        UC.t0 = UC.a = UC.e = NaN;
         gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.BLEND); gl.depthMask(true);
       },
       /** finish the frame: draws the glow sprites */
