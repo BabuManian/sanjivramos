@@ -192,6 +192,8 @@ function dedupeVideo(list) {
   for (const v of list) { const k = v.height + (v.fps > 30 ? 'p60' : ''); const o = by.get(k); if (!o || (v.bitrate || 0) > (o.bitrate || 0)) by.set(k, v); }
   return [...by.values()].sort((a, b) => b.height - a.height || (b.fps || 0) - (a.fps || 0));
 }
+/* Videos can carry several audio tracks (YouTube auto-dubs into Hindi etc.): original track first, then bitrate. */
+const byAudio = (a, b) => (b.orig || 0) - (a.orig || 0) || b.bitrate - a.bitrate;
 function fromYtdlp(id, j) {
   const S = blank(), vids = [];
   for (const f of j.formats || []) {
@@ -200,10 +202,10 @@ function fromYtdlp(id, j) {
     const short = Math.min(f.width || 1e4, f.height || 1e4);
     if (v && a && f.ext === 'mp4') S.progressive.push({ label: short + 'p', height: short, width: f.width, mime: `video/mp4; codecs="${f.vcodec}, ${f.acodec}"`, url: streamUrl(f.url, 'video/mp4') });
     else if (v && !a && f.ext === 'mp4' && /^avc1/.test(f.vcodec)) vids.push({ label: short + 'p' + (f.fps > 30 ? Math.round(f.fps) : ''), height: short, width: f.width, h: f.height, fps: f.fps, bitrate: f.tbr || 0, mime: `video/mp4; codecs="${f.vcodec}"`, url: streamUrl(f.url, 'video/mp4') });
-    else if (!v && a && f.ext === 'm4a' && !/drc/.test(f.format_id || '')) S.audio.push({ bitrate: (f.abr || 0) * 1000, mime: `audio/mp4; codecs="${f.acodec}"`, url: streamUrl(f.url, 'audio/mp4') });
+    else if (!v && a && f.ext === 'm4a' && !/drc/.test(f.format_id || '')) S.audio.push({ orig: /original/i.test(f.format_note || '') || (f.language_preference || 0) >= 10 ? 2 : /dub/i.test(f.format_note || '') || (f.language_preference || 0) < 0 ? -1 : /default/i.test(f.format_note || '') ? 1 : 0, lang: f.language || '', bitrate: (f.abr || 0) * 1000, mime: `audio/mp4; codecs="${f.acodec}"`, url: streamUrl(f.url, 'audio/mp4') });
   }
   S.video = dedupeVideo(vids);
-  S.audio.sort((a, b) => b.bitrate - a.bitrate);
+  S.audio.sort(byAudio);
   for (const [lang, subs] of Object.entries(j.subtitles || {})) { const v = (subs || []).find(x => x.ext === 'vtt'); if (v && S.captions.length < 30) S.captions.push({ label: (subs[0] && subs[0].name) || lang, lang, url: streamUrl(v.url, 'text/vtt') }); }
   if (!playable(S)) throw new Error('no playable formats');
   return { id, title: j.title, desc: j.description || '', author: j.channel || j.uploader, authorId: j.channel_id, authorThumb: '', subs: j.channel_follower_count ? num(j.channel_follower_count) + ' subscribers' : '', views: j.view_count, likes: j.like_count, published: j.timestamp ? j.timestamp * 1000 : 0, ago: '', len: j.duration, live: !!j.is_live, vertical: (j.height || 0) > (j.width || 0), thumb: thumbOf(id), streams: S, related: [], source: 'yt-dlp' };
@@ -214,9 +216,9 @@ function fromInvidious(id, j, base) {
   for (const f of j.adaptiveFormats || []) {
     const t = f.type || '';
     if (/^video\/mp4/.test(t) && /avc1/.test(t)) { const h = parseInt(f.resolution || f.qualityLabel) || 0; vids.push({ label: f.qualityLabel, height: h, fps: f.fps, bitrate: +f.bitrate || 0, mime: t, url: streamUrl(`${base}/latest_version?id=${id}&itag=${f.itag}&local=true`, 'video/mp4') }); }
-    if (/^audio\/mp4/.test(t)) S.audio.push({ bitrate: +f.bitrate || 0, mime: t, url: streamUrl(`${base}/latest_version?id=${id}&itag=${f.itag}&local=true`, 'audio/mp4') });
+    if (/^audio\/mp4/.test(t)) S.audio.push({ orig: f.audioTrack ? (/original/i.test(f.audioTrack.displayName || '') ? 2 : f.audioTrack.audioIsDefault ? 1 : -1) : 0, bitrate: +f.bitrate || 0, mime: t, url: streamUrl(`${base}/latest_version?id=${id}&itag=${f.itag}&local=true`, 'audio/mp4') });
   }
-  S.video = dedupeVideo(vids); S.audio.sort((a, b) => b.bitrate - a.bitrate);
+  S.video = dedupeVideo(vids); S.audio.sort(byAudio);
   for (const c of j.captions || []) S.captions.push({ label: c.label, lang: c.language_code || c.languageCode, url: streamUrl(base + c.url, 'text/vtt') });
   if (!playable(S)) throw new Error('no playable formats');
   return { id, title: j.title, desc: j.description || '', author: j.author, authorId: j.authorId, authorThumb: https(((j.authorThumbnails || []).slice(-1)[0] || {}).url), subs: j.subCountText || '', views: j.viewCount, likes: j.likeCount, published: j.published * 1000, ago: j.publishedText, len: j.lengthSeconds, live: !!j.liveNow, thumb: thumbOf(id),
@@ -230,8 +232,8 @@ function fromPiped(id, j) {
     if (f.videoOnly) { if (/avc1/.test(f.codec || '')) vids.push({ label: f.quality, height: h, fps: f.fps, bitrate: f.bitrate || 0, mime, url: streamUrl(f.url, f.mimeType) }); }
     else S.progressive.push({ label: f.quality, height: h, mime: f.mimeType, url: streamUrl(f.url, f.mimeType) });
   }
-  for (const f of j.audioStreams || []) if (/mp4|m4a/.test(f.mimeType || '')) S.audio.push({ bitrate: f.bitrate || 0, mime: f.codec ? `audio/mp4; codecs="${f.codec}"` : 'audio/mp4', url: streamUrl(f.url, 'audio/mp4') });
-  S.video = dedupeVideo(vids); S.audio.sort((a, b) => b.bitrate - a.bitrate);
+  for (const f of j.audioStreams || []) if (/mp4|m4a/.test(f.mimeType || '')) S.audio.push({ orig: f.audioTrackType ? (/^ORIGINAL$/i.test(f.audioTrackType) ? 2 : -1) : 0, lang: f.audioTrackLocale || '', bitrate: f.bitrate || 0, mime: f.codec ? `audio/mp4; codecs="${f.codec}"` : 'audio/mp4', url: streamUrl(f.url, 'audio/mp4') });
+  S.video = dedupeVideo(vids); S.audio.sort(byAudio);
   for (const c of j.subtitles || []) S.captions.push({ label: c.name, lang: c.code, url: streamUrl(c.url, 'text/vtt') });
   if (!playable(S)) throw new Error('no playable formats');
   return { id, title: j.title, desc: (j.description || '').replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, ''), author: j.uploader, authorId: pipedChan(j.uploaderUrl), authorThumb: j.uploaderAvatar, subs: j.uploaderSubscriberCount > 0 ? num(j.uploaderSubscriberCount) + ' subscribers' : '', views: j.views, likes: j.likes, published: j.uploadDate ? Date.parse(j.uploadDate) : 0, ago: '', len: j.duration, live: !!j.livestream, thumb: thumbOf(id),
