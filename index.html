@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ichigo Kurosaki</title>
 <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" type="image/png" href="build/icon.png">
 <meta name="theme-color" content="#111010">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -97,6 +98,55 @@ body.wm-busy iframe { pointer-events: none !important; }
 .ci-inline .ci-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
 .ci-inline .ci-emoji { font-size: 1em; line-height: 1; }
 @container (min-width: 1px) { .app-tile.ci-em .ci-emoji { font-size: 62cqw; } }
+/* more icon packs (v25) */
+:root[data-icons="aurora"] .app-tile, .ic-prev[data-icons="aurora"].ic-prev.ic-prev .app-tile { background: linear-gradient(135deg, color-mix(in srgb, var(--tile) 70%, #fff), var(--tile) 45%, color-mix(in srgb, var(--tile) 55%, #000)); border-radius: 28%; box-shadow: 0 4px 12px color-mix(in srgb, var(--tile) 45%, transparent); filter: none; }
+:root[data-icons="aurora"] .app-tile .g, .ic-prev[data-icons="aurora"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+:root[data-icons="aurora"] .app-tile .art, .ic-prev[data-icons="aurora"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="holo"] .app-tile, .ic-prev[data-icons="holo"].ic-prev.ic-prev .app-tile { background: linear-gradient(120deg, #fbcfe8, #bae6fd 35%, #ddd6fe 60%, #fef08a); border-radius: 30%; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.8), 0 3px 10px rgba(0,0,0,.25); filter: none; }
+:root[data-icons="holo"] .app-tile .g, .ic-prev[data-icons="holo"].ic-prev.ic-prev .app-tile .g { display: block; stroke: color-mix(in srgb, var(--tile) 75%, #000); }
+:root[data-icons="holo"] .app-tile .art, .ic-prev[data-icons="holo"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="metal"] .app-tile, .ic-prev[data-icons="metal"].ic-prev.ic-prev .app-tile { background: linear-gradient(180deg, #f1f5f9, #cbd5e1 48%, #94a3b8 52%, #e2e8f0); border-radius: 22%; box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0,0,0,.25), 0 3px 8px rgba(0,0,0,.35); filter: none; }
+:root[data-icons="metal"] .app-tile .g, .ic-prev[data-icons="metal"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #334155; filter: drop-shadow(0 1px 0 rgba(255,255,255,.8)); }
+:root[data-icons="metal"] .app-tile .art, .ic-prev[data-icons="metal"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="wood"] .app-tile, .ic-prev[data-icons="wood"].ic-prev.ic-prev .app-tile { background: repeating-linear-gradient(95deg, #a16207 0 6%, #92400e 6% 9%, #b45309 9% 16%); border-radius: 20%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.25), 0 3px 8px rgba(0,0,0,.35); filter: none; }
+:root[data-icons="wood"] .app-tile .g, .ic-prev[data-icons="wood"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fef3c7; filter: drop-shadow(0 1px 0 rgba(0,0,0,.4)); }
+:root[data-icons="wood"] .app-tile .art, .ic-prev[data-icons="wood"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="chalk"] .app-tile, .ic-prev[data-icons="chalk"].ic-prev.ic-prev .app-tile { background: #1f3a2e; border-radius: 16%; box-shadow: inset 0 0 0 3px #78350f, inset 0 0 12px rgba(255,255,255,.08); filter: none; }
+:root[data-icons="chalk"] .app-tile .g, .ic-prev[data-icons="chalk"].ic-prev.ic-prev .app-tile .g { display: block; stroke: rgba(255,255,255,.88); stroke-dasharray: 3 1.2; stroke-width: 2.2; }
+:root[data-icons="chalk"] .app-tile .art, .ic-prev[data-icons="chalk"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="blueprint"] .app-tile, .ic-prev[data-icons="blueprint"].ic-prev.ic-prev .app-tile { background: #1d4ed8 repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0 1px, transparent 1px 20%), repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 1px, transparent 1px 20%); border-radius: 10%; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); filter: none; }
+:root[data-icons="blueprint"] .app-tile .g, .ic-prev[data-icons="blueprint"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; stroke-width: 1.6; }
+:root[data-icons="blueprint"] .app-tile .art, .ic-prev[data-icons="blueprint"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="comic"] .app-tile, .ic-prev[data-icons="comic"].ic-prev.ic-prev .app-tile { background: var(--tile); border-radius: 24%; box-shadow: inset 0 0 0 3px #111, 4px 4px 0 #111; filter: none; }
+:root[data-icons="comic"] .app-tile .g, .ic-prev[data-icons="comic"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #111; stroke-width: 2.6; }
+:root[data-icons="comic"] .app-tile .art, .ic-prev[data-icons="comic"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="gold"] .app-tile, .ic-prev[data-icons="gold"].ic-prev.ic-prev .app-tile { background: radial-gradient(circle at 30% 25%, #27272a, #09090b); border-radius: 26%; box-shadow: inset 0 0 0 1.5px #d4a017, 0 3px 10px rgba(0,0,0,.5); filter: none; }
+:root[data-icons="gold"] .app-tile .g, .ic-prev[data-icons="gold"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #facc15; filter: drop-shadow(0 0 2px rgba(250,204,21,.5)); }
+:root[data-icons="gold"] .app-tile .art, .ic-prev[data-icons="gold"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="terminal"] .app-tile, .ic-prev[data-icons="terminal"].ic-prev.ic-prev .app-tile { background: #030712 repeating-linear-gradient(0deg, rgba(34,197,94,.07) 0 2px, transparent 2px 4px); border-radius: 8%; box-shadow: inset 0 0 0 1.5px #16a34a, 0 0 10px rgba(34,197,94,.3); filter: none; }
+:root[data-icons="terminal"] .app-tile .g, .ic-prev[data-icons="terminal"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #4ade80; filter: drop-shadow(0 0 3px #22c55e); }
+:root[data-icons="terminal"] .app-tile .art, .ic-prev[data-icons="terminal"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="bubble"] .app-tile, .ic-prev[data-icons="bubble"].ic-prev.ic-prev .app-tile { background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--tile) 35%, #fff) 0 18%, var(--tile) 55%, color-mix(in srgb, var(--tile) 70%, #000)); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,.3), inset 0 -3px 6px rgba(0,0,0,.2); filter: none; }
+:root[data-icons="bubble"] .app-tile .g, .ic-prev[data-icons="bubble"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+:root[data-icons="bubble"] .app-tile .art, .ic-prev[data-icons="bubble"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="frost"] .app-tile, .ic-prev[data-icons="frost"].ic-prev.ic-prev .app-tile { background: rgba(15,23,42,.45); backdrop-filter: blur(8px); border-radius: 30%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), inset 0 10px 14px -8px rgba(255,255,255,.25), 0 4px 12px rgba(0,0,0,.3); filter: none; }
+:root[data-icons="frost"] .app-tile .g, .ic-prev[data-icons="frost"].ic-prev.ic-prev .app-tile .g { display: block; stroke: color-mix(in srgb, var(--tile) 55%, #fff); }
+:root[data-icons="frost"] .app-tile .art, .ic-prev[data-icons="frost"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="pixel"] .app-tile, .ic-prev[data-icons="pixel"].ic-prev.ic-prev .app-tile { background: var(--tile); border-radius: 0; box-shadow: inset -4px -4px 0 rgba(0,0,0,.3), inset 4px 4px 0 rgba(255,255,255,.3), 0 0 0 2px #111; filter: none; }
+:root[data-icons="pixel"] .app-tile .g, .ic-prev[data-icons="pixel"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; stroke-width: 3; stroke-linecap: square; stroke-linejoin: miter; }
+:root[data-icons="pixel"] .app-tile .art, .ic-prev[data-icons="pixel"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="candy"] .app-tile, .ic-prev[data-icons="candy"].ic-prev.ic-prev .app-tile { background: repeating-linear-gradient(135deg, var(--tile) 0 14%, color-mix(in srgb, var(--tile) 55%, #fff) 14% 24%); border-radius: 34%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6), 0 3px 8px rgba(0,0,0,.25); filter: none; }
+:root[data-icons="candy"] .app-tile .g, .ic-prev[data-icons="candy"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; stroke-width: 2.4; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+:root[data-icons="candy"] .app-tile .art, .ic-prev[data-icons="candy"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="emboss"] .app-tile, .ic-prev[data-icons="emboss"].ic-prev.ic-prev .app-tile { background: color-mix(in srgb, var(--tile) 18%, #e5e7eb); border-radius: 28%; box-shadow: 4px 4px 8px rgba(0,0,0,.25), -3px -3px 7px rgba(255,255,255,.7); filter: none; }
+:root[data-icons="emboss"] .app-tile .g, .ic-prev[data-icons="emboss"].ic-prev.ic-prev .app-tile .g { display: block; stroke: var(--tile); stroke-width: 2.3; }
+:root[data-icons="emboss"] .app-tile .art, .ic-prev[data-icons="emboss"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="floating"] .app-tile, .ic-prev[data-icons="floating"].ic-prev.ic-prev .app-tile { background: none; box-shadow: none; filter: none; }
+:root[data-icons="floating"] .app-tile .g, .ic-prev[data-icons="floating"].ic-prev.ic-prev .app-tile .g { display: block; stroke: var(--tile); stroke-width: 2.4; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+:root[data-icons="floating"] .app-tile .art, .ic-prev[data-icons="floating"].ic-prev.ic-prev .app-tile .art { display: none; }
+:root[data-icons="sunset"] .app-tile, .ic-prev[data-icons="sunset"].ic-prev.ic-prev .app-tile { background: linear-gradient(160deg, #fb7185, #f97316 55%, #facc15); border-radius: 26%; box-shadow: 0 3px 10px rgba(249,115,22,.35); filter: none; }
+:root[data-icons="sunset"] .app-tile .g, .ic-prev[data-icons="sunset"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; filter: drop-shadow(0 1px 1px rgba(124,45,18,.5)); }
+:root[data-icons="sunset"] .app-tile .art, .ic-prev[data-icons="sunset"].ic-prev.ic-prev .app-tile .art { display: none; }
 :root[data-icons="pop"] .app-tile, .ic-prev[data-icons="pop"].ic-prev.ic-prev .app-tile { background: var(--tile); border-radius: 26%; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), inset 0 2px 0 rgba(255,255,255,.28), 0 3px 8px rgba(0,0,0,.28); }
 :root[data-icons="pop"] .app-tile .g, .ic-prev[data-icons="pop"].ic-prev.ic-prev .app-tile .g { display: block; stroke: #fff; filter: drop-shadow(0 1.5px 1px rgba(0,0,0,.28)); }
 :root[data-icons="pop"] .app-tile .art, .ic-prev[data-icons="pop"].ic-prev.ic-prev .app-tile .art { display: none; }
@@ -202,7 +252,7 @@ body.wm-busy iframe { pointer-events: none !important; }
   padding: 11vh 20px 7vh; cursor: pointer;
   transition: opacity .5s ease, transform .6s var(--ease), visibility 0s 0s;
 }
-#lock::before { content: ""; position: absolute; inset: -40px; background: var(--wp); background-size: cover; background-position: center; filter: blur(22px) brightness(.72); z-index: -1; }
+#lock::before { content: ""; position: absolute; inset: -40px; background: var(--lockwp, var(--wp)); background-size: cover; background-position: center; filter: blur(22px) brightness(.72); z-index: -1; }
 #lock.hidden { opacity: 0; transform: translateY(-40px); visibility: hidden; pointer-events: none; transition: opacity .5s ease, transform .6s var(--ease), visibility 0s .6s; }
 .lock-top { text-align: center; text-shadow: 0 2px 20px rgba(0, 0, 0, .3); }
 #lock-time { font-size: clamp(64px, 14vw, 120px); font-weight: 600; line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
@@ -245,6 +295,29 @@ body.wm-busy iframe { pointer-events: none !important; }
 #pin-in { width: 220px; height: 40px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .15); color: #fff; text-align: center; font: 600 18px var(--font); letter-spacing: 6px; outline: none; backdrop-filter: blur(10px); }
 #pin-in::placeholder { letter-spacing: 0; font-weight: 400; font-size: 14px; color: rgba(255, 255, 255, .7); }
 #pin-msg { min-height: 18px; font-size: 13px; color: #ffd3d3; }
+/* account sign-in on the lock screen */
+.su-tabs { display: flex; gap: 6px; justify-content: center; margin: 4px 0 14px; flex-wrap: wrap; }
+.su-tabs button { border: none; background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); padding: 8px 14px; border-radius: 999px; cursor: pointer; font: 600 13px var(--font); }
+.su-tabs button.on { background: var(--accent); color: #fff; }
+.su-form { max-width: 380px; margin: 0 auto; }
+.su-msg { min-height: 20px; text-align: center; color: #f87171; font-size: 13px; margin-top: 6px; }
+.su-link { border: none; background: none; color: var(--accent); cursor: pointer; font: inherit; padding: 4px 0; }
+.su-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.su-pack { border: none; cursor: pointer; text-align: left; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--fg) 6%, transparent); color: var(--fg); font: 600 13px var(--font); box-shadow: inset 0 0 0 2px transparent; }
+.su-pack.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.su-pack .sw { display: flex; height: 34px; border-radius: 9px; overflow: hidden; margin-bottom: 8px; }
+.su-pack .sw i { flex: 1; }
+#lock-acct, #lock-pass { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#lock-acct[hidden], #lock-pass[hidden] { display: none; }
+.lock-in { width: 240px; height: 40px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .15); color: #fff; text-align: center; font: 500 15px var(--font); outline: none; backdrop-filter: blur(10px); }
+.lock-in::placeholder { color: rgba(255, 255, 255, .7); }
+.lock-in:focus { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, .2); }
+.lock-msg2 { min-height: 18px; font-size: 13px; color: #ffd3d3; text-align: center; max-width: 280px; }
+.lock-links { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 13px; }
+.lock-links button { border: none; background: none; color: rgba(255, 255, 255, .85); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 3px; padding: 2px; }
+.lock-links button:hover { color: #fff; }
+#lock-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.lock-badge { font-size: 12px; opacity: .8; margin-top: -4px; }
 .shake { animation: shake .4s; }
 @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
 #desk-clock { position: absolute; top: 28px; right: 34px; z-index: 0; text-align: right; color: #fff; pointer-events: none; text-shadow: 0 2px 16px rgba(0, 0, 0, .35); }
@@ -2336,6 +2409,19 @@ body.file-drag .drop-hint { display: grid; }
 :root[data-lock-clock="small"] #lock-time { font-size: 48px; }
 :root[data-lock-clock="hidden"] #lock-time, :root[data-lock-clock="hidden"] #lock-date { display: none; }
 :root[data-lock-blur="off"] #lock::before { filter: brightness(.8); inset: 0; }
+/* lock screen styles */
+:root[data-lock-style="center"] #lock { justify-content: center; gap: 6vh; }
+:root[data-lock-style="center"] #lock-time { font-size: clamp(72px, 14vw, 150px); }
+:root[data-lock-style="minimal"] #lock::before { filter: brightness(.35) saturate(.6); }
+:root[data-lock-style="minimal"] #lock-date, :root[data-lock-style="minimal"] .lock-hint { opacity: .55; }
+:root[data-lock-style="minimal"] #lock-time { font-weight: 200; letter-spacing: 4px; }
+:root[data-lock-style="split"] #lock { align-items: flex-start; padding-left: 8vw; }
+:root[data-lock-style="split"] .lock-top { text-align: left; }
+:root[data-lock-style="split"] .lock-user { align-self: flex-end; margin-right: 8vw; }
+:root[data-lock-style="photo"] #lock::before { filter: none; inset: 0; }
+:root[data-lock-style="photo"] #lock-time, :root[data-lock-style="photo"] #lock-date { text-shadow: 0 2px 18px rgba(0,0,0,.6); }
+:root[data-lock-style="photo"] .lock-user { background: rgba(0,0,0,.35); padding: 18px 26px; border-radius: 22px; backdrop-filter: blur(12px); }
+#sm-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 :root[data-boot-style="minimal"] .boot-name, :root[data-boot-style="minimal"] .boot-track, :root[data-boot-style="minimal"] #boot-status { display: none; }
 :root[data-boot-style="minimal"] #boot-logo { animation: bootPulse 1.2s ease-in-out infinite; }
 @keyframes bootPulse { 50% { opacity: .35; } }
@@ -4262,6 +4348,15 @@ body { letter-spacing: var(--tw-letter, normal); }
     <div id="lock-name">User</div>
     <button class="lock-btn" id="lock-btn">Sign in →</button>
     <div id="lock-pin" hidden><input id="pin-in" type="password" inputmode="numeric" maxlength="8" placeholder="Enter PIN" autocomplete="off" aria-label="PIN"><div id="pin-msg"></div></div>
+    <div id="lock-pass" hidden><input id="lp-in" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password"><div class="lock-msg2" id="lp-msg"></div><div class="lock-links"><button id="lp-pin" hidden>Use PIN</button><button id="lp-out">Not you? Sign out</button></div></div>
+    <form id="lock-acct" hidden autocomplete="on">
+      <input id="la-user" class="lock-in" placeholder="Username" autocomplete="username" aria-label="Username" maxlength="24" spellcheck="false" autocapitalize="off">
+      <input id="la-pass" class="lock-in" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
+      <input id="la-name" class="lock-in" placeholder="Your name (optional)" aria-label="Your name" maxlength="40" hidden>
+      <button class="lock-btn" id="la-go" type="submit">Sign in →</button>
+      <div class="lock-msg2" id="la-msg"></div>
+      <div class="lock-links"><button type="button" id="la-mode">Create an account</button><button type="button" id="la-local">Use without an account</button></div>
+    </form>
   </div>
   <div class="lock-hint">Click anywhere or press Enter to sign in</div>
 </div>
@@ -4554,6 +4649,29 @@ function pickFiles(accept = '', multiple = false) {
 }
 
 /** localStorage wrapper. Every key is namespaced with "webos." and all access is guarded. */
+/* Broken pictures anywhere in the OS (offline website icons, deleted thumbnails, dead links) become a tidy placeholder
+   with the item's first letter instead of the browser's broken-image box. */
+const ImgFallback = {
+  svg(label, w) {
+    const ch = (String(label || '').trim().match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase(), hue = [...String(label || '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+    const big = w > 96;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(big
+      ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120"><rect width="160" height="120" rx="10" fill="hsl(${hue} 30% 22%)"/><path d="M38 86l26-30 18 20 12-12 28 22z" fill="hsl(${hue} 40% 55%)"/><circle cx="104" cy="42" r="10" fill="hsl(${hue} 50% 70%)"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="hsl(${hue} 55% 45%)"/><text x="32" y="43" font-family="system-ui,sans-serif" font-size="32" font-weight="700" text-anchor="middle" fill="#fff">${ch.replace(/[<&>]/g, '')}</text></svg>`);
+  },
+  init() {
+    document.addEventListener('error', e => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || img.dataset.fb || img.closest('.no-fb')) return;
+      img.dataset.fb = '1';
+      const holder = img.closest('[title],[aria-label],[data-label]');
+      const label = img.getAttribute('alt') || img.title || (holder && (holder.getAttribute('title') || holder.getAttribute('aria-label') || holder.dataset.label)) || (img.parentElement && img.parentElement.textContent) || '';
+      img.src = this.svg(label, img.width || img.clientWidth || 32);
+    }, true);
+  },
+};
+ImgFallback.init();
+
 const Store = {
   prefix: 'webos.',
   get(key, fallback) {
@@ -4991,7 +5109,7 @@ const PERSONAL_DEFAULTS = {
   blur: true, scrollbars: 'auto', customScheme: null, autoDark: false, darkFrom: '19:00', darkTo: '07:00', nightAuto: false, nightFrom: '21:00', nightTo: '06:00',
   liveWallpaper: 'off', liveOverlay: true, wpAnimate: 'auto', wpBlur: 0, wpDim: 0, wpSat: 100, wpFit: 'cover', widgetStyle: 'glass',
   soundTheme: 'soft', startupSound: true, windowSounds: false, clickSounds: false, toastPos: 'auto', toastTime: 'normal',
-  clickRipple: false, cursorTrail: false, customKeys: [], osName: 'SanjivramOS', bootStyle: 'pop', lockMessage: '', lockClock: 'large', lockBlur: true
+  clickRipple: false, cursorTrail: false, customKeys: [], osName: 'SanjivramOS', bootStyle: 'pop', lockMessage: '', lockClock: 'large', lockBlur: true, lockStyle: 'classic', lockWall: '', userPhoto: ''
 };
 /** UI Studio defaults (v12). */
 const STUDIO_DEFAULTS = {
@@ -5332,7 +5450,23 @@ const ICON_STYLES = [
   { id: 'sticker', name: 'Sticker', desc: 'White-bordered stickers', isNew: true },
   { id: 'vivid', name: 'Vivid', desc: 'Extra-saturated colours', isNew: true },
   { id: 'vintage', name: 'Vintage', desc: 'Pop artwork in warm sepia', isNew: true },
-  { id: 'ink', name: 'Ink', desc: 'Pop artwork in black & white', isNew: true }
+  { id: 'ink', name: 'Ink', desc: 'Pop artwork in black & white', isNew: true },
+  { id: 'aurora', name: 'Aurora', desc: 'Glowing diagonal gradients', isNew: true },
+  { id: 'holo', name: 'Holographic', desc: 'Shimmering rainbow foil', isNew: true },
+  { id: 'metal', name: 'Brushed Metal', desc: 'Silver plates, engraved symbols', isNew: true },
+  { id: 'wood', name: 'Woodland', desc: 'Carved wooden blocks', isNew: true },
+  { id: 'chalk', name: 'Chalkboard', desc: 'Hand-drawn chalk on slate', isNew: true },
+  { id: 'blueprint', name: 'Blueprint', desc: 'Technical drawings on grid paper', isNew: true },
+  { id: 'comic', name: 'Comic', desc: 'Bold outlines and pop shadows', isNew: true },
+  { id: 'gold', name: 'Gold Luxe', desc: 'Black tiles with gold trim', isNew: true },
+  { id: 'terminal', name: 'Terminal', desc: 'Green phosphor on black', isNew: true },
+  { id: 'bubble', name: 'Bubble', desc: 'Shiny round bubbles', isNew: true },
+  { id: 'frost', name: 'Frost', desc: 'Frosted dark glass', isNew: true },
+  { id: 'pixel', name: 'Pixel', desc: 'Chunky 8-bit squares', isNew: true },
+  { id: 'candy', name: 'Candy', desc: 'Sweet striped tiles', isNew: true },
+  { id: 'emboss', name: 'Emboss', desc: 'Soft pressed-in neumorphism', isNew: true },
+  { id: 'floating', name: 'Floating', desc: 'Just the symbol, no tile', isNew: true },
+  { id: 'sunset', name: 'Sunset', desc: 'Everything in warm sunset tones', isNew: true }
 ];
 
 const Theme = {
@@ -6858,17 +6992,17 @@ const Shell = {
 
 /** First-run setup assistant (also available from Settings → Reset & Recovery). */
 const Setup = {
-  STEPS: ['welcome', 'you', 'layout', 'look', 'apps', 'done'],
-  STARTER: ['mcclassic', 'tetris', 'g2048', 'pacman', 'bloxd', 'skribbl', 'excalidraw', 'photopea', 'desmos', 'wikipedia', 'beepbox', 'weather', 'sudoku', 'stackblitz', 'lofi', 'maps'],
-  step: 0, picks: null,
+  STEPS: ['start', 'look'],
+  PACKS: ['neon', 'nordic', 'oled', 'sunset', 'vapor', 'coder', 'retro', 'matrix'],
+  ICONS: ['pop', 'circle', 'glass', 'clay', 'neon', 'material', 'sticker', 'paper'],
+  step: 0, tab: 'in', picks: null,
   show() {
     Session.state = 'setup';
     StartMenu.hide(); Panel.closePops(); Overview.hide(); ContextMenu.hide();
     $('#lock').classList.add('hidden');
-    this.step = 0;
-    this.picks = { name: Settings.get('username') === 'User' ? '' : Settings.get('username'), pin: '', apps: new Set() };
-    const el = $('#setup');
-    el.hidden = false;
+    this.step = 0; this.tab = Social.unavailable || location.protocol === 'file:' ? 'local' : 'new';
+    this.picks = { name: Settings.get('username') === 'User' ? '' : Settings.get('username'), pin: '' };
+    const el = $('#setup'); el.hidden = false;
     if (!el._wired) { el._wired = true; this.wire(el); }
     this.render();
   },
@@ -6877,79 +7011,65 @@ const Setup = {
       const pick = sel => { const x = e.target.closest(sel); return x && el.contains(x) ? x : null; };
       let b;
       if (pick('.su-next')) return this.next();
-      if (pick('.su-back')) { this.step = Math.max(0, this.step - 1); return this.render(); }
-      if (pick('.su-skip')) return this.finish(true);
-      if ((b = pick('[data-pick-layout]'))) { Theme.setLayout(b.dataset.pickLayout); return this.render(); }
-      if ((b = pick('[data-pick-scheme]'))) { Theme.setScheme(b.dataset.pickScheme); return this.render(); }
+      if (pick('.su-back')) { this.step = 0; return this.render(); }
+      if ((b = pick('[data-su-tab]'))) { this.tab = b.dataset.suTab; return this.render(); }
+      if ((b = pick('[data-su-pack]'))) { const t = THEME_PACKS.find(x => x.id === b.dataset.suPack); if (t) { Themes.remember(); Themes.apply(t.s, t.name); this.picks.pack = t.id; } return this.render(); }
       if ((b = pick('[data-pick-icons]'))) { Settings.set('iconStyle', b.dataset.pickIcons); return this.render(); }
-      if ((b = pick('[data-app-pick]'))) { const id = b.dataset.appPick; if (this.picks.apps.has(id)) this.picks.apps.delete(id); else this.picks.apps.add(id); b.classList.toggle('on'); return; }
-      if ((b = pick('[data-su-toggle]'))) { const k = b.dataset.suToggle; Settings.set(k, !Settings.get(k)); b.classList.toggle('on', !!Settings.get(k)); }
+      if (pick('.su-pin-toggle')) { $('.su-pinbox', el).hidden = !$('.su-pinbox', el).hidden; }
     });
     el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.next(); } });
-    el.addEventListener('input', e => {
-      if (e.target.classList.contains('su-name')) this.picks.name = e.target.value;
-      if (e.target.classList.contains('su-pin')) this.picks.pin = e.target.value;
-    });
   },
-  next() {
-    const id = this.STEPS[this.step];
-    if (id === 'you') {
-      const pin = $('.su-pin', $('#setup')).value, pin2 = $('.su-pin2', $('#setup')).value;
-      if (pin || pin2) {
-        if (!/^\d{4,8}$/.test(pin)) { Toast.show('PIN must be 4–8 digits', 'Or leave both PIN boxes empty.', 'lock'); return; }
-        if (pin !== pin2) { Toast.show('PINs don’t match', '', 'lock'); return; }
-      }
-      this.picks.pin = pin;
-      Settings.set('username', (this.picks.name || '').trim() || 'User');
+  val: c => { const x = $(c, $('#setup')); return x ? x.value : ''; },
+  async next() {
+    const el = $('#setup'), msg = $('.su-msg', el);
+    if (this.step === 1) return this.finish();
+    if (this.tab === 'local') {
+      const pin = this.val('.su-pin');
+      if (pin && !/^\d{4,8}$/.test(pin)) { msg.textContent = 'A PIN is 4–8 digits (or leave it empty).'; return; }
+      Settings.set('username', this.val('.su-name').trim() || 'User'); Settings.set('localOnly', true); if (pin) Settings.set('lockPin', pin);
+      this.step = 1; return this.render();
     }
-    if (id === 'done') return this.finish();
-    this.step++;
-    this.render();
-  },
-  finish(skipped) {
-    if (!skipped) {
-      if (this.picks.pin) Settings.set('lockPin', this.picks.pin);
-      this.picks.apps.forEach(id => { const e = AppStore.get(id); if (e && !AppStore.isInstalled(e)) AppStore.install(e, { quiet: true }); });
-    }
+    const u = this.val('.su-user').trim(), pw = this.val('.su-pass'), name = this.val('.su-name').trim();
+    if (!u || !pw) { msg.textContent = 'Type a username and a password.'; return; }
+    const btn = $('.su-next', el); btn.disabled = true; msg.textContent = this.tab === 'in' ? 'Signing in…' : 'Creating your account…';
+    try { await Social.auth(this.tab === 'in' ? 'login' : 'signup', u, pw, name || u); }
+    catch (err) { msg.textContent = err.message; btn.disabled = false; return; }
+    Settings.set('username', (Social.me && Social.me.display) || name || u);
+    // signing in on a new device: your saved desktop comes straight back
     Settings.set('setupDone', true);
-    Settings.set('firstLogin', true);
+    if (await Account.afterSignIn()) return;
+    Settings.set('setupDone', false);
+    btn.disabled = false; this.step = 1; this.render();
+  },
+  finish() {
+    Settings.set('setupDone', true); Settings.set('firstLogin', true);
     $('#setup').hidden = true;
     Session.state = 'lock';
     Session.login(true);
+    if (Social.me) Account.push(true);
   },
   render() {
-    const id = this.STEPS[this.step], el = $('#setup');
+    const el = $('#setup'), id = this.STEPS[this.step], noAcct = Social.unavailable || location.protocol === 'file:';
     const sample = ['explorer', 'terminal', 'settings', 'store'].map(i => { const a = Apps.reg.get(i); return a ? tile(a.icon, a.color) : ''; }).join('');
-    const body = {
-      welcome: `<div class="setup-hero">${LOGO}<h1>Welcome to SanjivramOS</h1><p class="lead">Let’s set up your desktop. It takes about a minute, and you can change everything later in Settings.</p></div>`,
-      you: `<h1>About you</h1><p class="lead">Your name appears on the lock screen and in the Terminal. A PIN is optional.</p>
-        <div class="setup-field"><label>Your name</label><input class="input su-name" maxlength="24" placeholder="e.g. Alex" spellcheck="false" value="${esc(this.picks.name)}"></div>
-        <div class="setup-field"><label>Lock screen PIN <span class="set-desc">(optional, 4–8 digits)</span></label>
-          <div style="display:flex;gap:8px"><input class="input su-pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" value="${esc(this.picks.pin)}"><input class="input su-pin2" type="password" inputmode="numeric" maxlength="8" placeholder="Confirm PIN" value="${esc(this.picks.pin)}"></div></div>`,
-      layout: `<h1>Choose a layout</h1><p class="lead">Pick the desktop style you’re most comfortable with. It changes live behind this window.</p>
-        <div class="layout-grid">${LAYOUTS.map(l => `<button class="layout-card${Settings.get('layout') === l.id ? ' on' : ''}" data-pick-layout="${l.id}">${layoutPreview(l.id)}<b>${l.name}${l.id === 'pop' ? ' <span class="st-badge">Default</span>' : ''}</b><small>${l.desc}</small></button>`).join('')}</div>`,
-      look: `<h1>Make it yours</h1><p class="lead">Choose a colour scheme and an icon style.</p>
-        <div class="scheme-grid">${SCHEMES.map(x => `<button class="scheme${Settings.get('scheme') === x.id ? ' on' : ''}" data-pick-scheme="${x.id}"><span class="sc-prev" style="--a:${x.p.bg0};--b:${x.p.bg2};--c:${x.p.bg1};--f:${x.p.fg};--x:${x.accent}"><i></i><i></i><i></i></span><span class="sc-name">${esc(x.name)}</span></button>`).join('')}</div>
-        <div class="icon-grid">${ICON_STYLES.map(x => `<button class="icon-style${document.documentElement.dataset.icons === x.id ? ' on' : ''}" data-pick-icons="${x.id}"><div class="ic-prev" data-icons="${x.id}">${sample}</div><b>${x.name}</b></button>`).join('')}</div>`,
-      apps: `<h1>Get some apps</h1><p class="lead">Pick a few to install now — there are 200 more in the App Store.</p>
-        <div class="setup-apps">${this.STARTER.map(i => AppStore.get(i)).filter(Boolean).map(e => `<button class="setup-app${this.picks.apps.has(e.id) || AppStore.isInstalled(e) ? ' on' : ''}" data-app-pick="${e.id}">${tile(e.icon, e.color)}<span><b>${esc(e.name)}</b><small>${esc(e.cat)}</small></span></button>`).join('')}</div>
-        <div class="set-card set-stack" style="margin-top:16px">
-          <div class="set-row"><div class="set-text"><div class="set-label">Desktop clock</div><div class="set-desc">A big clock and date on the desktop.</div></div><button class="switch${Settings.get('deskClock') ? ' on' : ''}" data-su-toggle="deskClock"></button></div>
-          <div class="set-row"><div class="set-text"><div class="set-label">Auto-tile windows</div><div class="set-desc">Arrange windows automatically, Pop Shell style.</div></div><button class="switch${Settings.get('tiling') ? ' on' : ''}" data-su-toggle="tiling"></button></div>
-          <div class="set-row"><div class="set-text"><div class="set-label">Hot corner</div><div class="set-desc">Top-left corner opens Workspaces.</div></div><button class="switch${Settings.get('hotCorner') ? ' on' : ''}" data-su-toggle="hotCorner"></button></div>
-        </div>`,
-      done: `<div class="setup-hero"><div class="setup-check">${svg('check')}</div><h1>You’re all set${this.picks.name ? ', ' + esc(this.picks.name.trim()) : ''}!</h1>
-        <p class="lead">Layout: <b>${esc((LAYOUTS.find(l => l.id === Settings.get('layout')) || LAYOUTS[0]).name)}</b> · Colours: <b>${esc(schemeOf(Settings.get('scheme')).name)}</b> · ${this.picks.apps.size} new app${this.picks.apps.size === 1 ? '' : 's'}${this.picks.pin ? ' · PIN on' : ''}</p>
-        <p class="lead">Tip: press <b>Ctrl+/</b> any time to see keyboard shortcuts.</p></div>`
-    }[id];
-    el.innerHTML = `<div class="setup-card">
-      <div class="setup-steps">${this.STEPS.map((_, i) => `<i class="${i <= this.step ? 'on' : ''}"></i>`).join('')}</div>
+    const tabs = noAcct ? '' : `<div class="su-tabs">${[['new', 'Create account'], ['in', 'Sign in'], ['local', 'No account']].map(([k, l]) => `<button data-su-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const form = this.tab === 'local'
+      ? `<div class="setup-field"><label>Your name</label><input class="input su-name" maxlength="24" placeholder="e.g. Alex" spellcheck="false" value="${esc(this.picks.name)}"></div>
+         <button class="su-link su-pin-toggle">+ Add a lock screen PIN (optional)</button><div class="setup-field su-pinbox" hidden><input class="input su-pin" type="password" inputmode="numeric" maxlength="8" placeholder="4–8 digits"></div>
+         <p class="set-desc">Everything stays in this browser only.${noAcct ? '' : ' You can sign in later in Settings → Account.'}</p>`
+      : `${this.tab === 'new' ? `<div class="setup-field"><label>Your name</label><input class="input su-name" maxlength="40" placeholder="e.g. Alex" spellcheck="false" value="${esc(this.picks.name)}"></div>` : ''}
+         <div class="setup-field"><label>Username</label><input class="input su-user" maxlength="24" autocomplete="username" spellcheck="false" autocapitalize="off" placeholder="letters and numbers"></div>
+         <div class="setup-field"><label>Password</label><input class="input su-pass" type="password" autocomplete="${this.tab === 'new' ? 'new-password' : 'current-password'}" placeholder="${this.tab === 'new' ? '6 or more characters' : ''}"></div>
+         <p class="set-desc">${this.tab === 'new' ? 'One account for SanjivramOS and Messages. Your desktop, settings and apps are saved to it, so they follow you to any device.' : 'Your saved desktop loads automatically.'}</p>`;
+    const body = id === 'start'
+      ? `<div class="setup-hero" style="padding-top:6px">${LOGO}<h1>Welcome to SanjivramOS</h1></div>${tabs}<div class="su-form">${form}</div><div class="su-msg"></div>`
+      : `<h1>Pick a look</h1><p class="lead">Tap one to try it — you can change everything later in Settings.</p>
+         <div class="su-packs">${this.PACKS.map(i => THEME_PACKS.find(t => t.id === i)).filter(Boolean).map(t => `<button class="su-pack${this.picks.pack === t.id ? ' on' : ''}" data-su-pack="${t.id}"><span class="sw">${(t.sw || []).map(c => `<i style="background:${c}"></i>`).join('')}</span><b>${esc(t.name)}</b></button>`).join('')}</div>
+         <h3 style="margin:14px 0 6px">Icons</h3><div class="icon-grid su-icons">${this.ICONS.map(i => ICON_STYLES.find(x => x.id === i)).filter(Boolean).map(x => `<button class="icon-style${document.documentElement.dataset.icons === x.id ? ' on' : ''}" data-pick-icons="${x.id}"><div class="ic-prev" data-icons="${x.id}">${sample}</div><b>${x.name}</b></button>`).join('')}</div>`;
+    el.innerHTML = `<div class="setup-card"><div class="setup-steps">${this.STEPS.map((_, i) => `<i class="${i <= this.step ? 'on' : ''}"></i>`).join('')}</div>
       <div class="setup-body">${body}</div>
-      <div class="setup-foot">
-        <div>${this.step > 0 ? `<button class="btn su-back">${svg('back')}Back</button>` : '<button class="btn su-skip">Skip setup</button>'}</div>
-        <button class="btn primary su-next">${id === 'welcome' ? 'Get started' : id === 'done' ? 'Start using SanjivramOS' : 'Continue'}${svg('forward')}</button>
-      </div></div>`;
-    const f = $('.su-name', el); if (f) setTimeout(() => f.focus(), 30);
+      <div class="setup-foot"><div>${this.step > 0 ? `<button class="btn su-back">${svg('back')}Back</button>` : ''}</div>
+        <button class="btn primary su-next">${id === 'look' ? 'Start using SanjivramOS' : this.tab === 'in' ? 'Sign in' : this.tab === 'new' ? 'Create account' : 'Continue'}${svg('forward')}</button></div></div>`;
+    const f = $('.su-name', el) || $('.su-user', el); if (f) setTimeout(() => f.focus(), 30);
   }
 };
 
@@ -7248,7 +7368,8 @@ const Session = {
   init() {
     $('#boot-logo').innerHTML = LOGO;
     $('#power-on').innerHTML = svg('power');
-    $('#lock').addEventListener('click', e => { if (!e.target.closest('#lock-pin')) this.login(); });
+    $('#lock').addEventListener('click', e => { if (!e.target.closest('#lock-pin, #lock-acct, #lock-pass')) this.login(); });
+    Account.wireLock();
     $('#pin-in').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); this.checkPin(); }
       else if (e.key === 'Escape') { e.stopPropagation(); $('#lock-pin').hidden = true; $('#lock-btn').hidden = false; }
@@ -7264,9 +7385,10 @@ const Session = {
     this.syncUser();
   },
   syncUser() {
-    const name = Settings.get('username') || 'User', initial = name.trim().charAt(0).toUpperCase() || 'U';
+    const me = typeof Social !== 'undefined' && Social.me, name = (me && me.display) || Settings.get('username') || 'User', initial = name.trim().charAt(0).toUpperCase() || 'U';
     $('#lock-name').textContent = name; $('#sm-name').textContent = name;
-    $('#lock-avatar').textContent = initial; $('#sm-avatar').textContent = initial;
+    const photo = (me && me.avatar) || Settings.get('userPhoto');
+    for (const id of ['#lock-avatar', '#sm-avatar']) { const el = $(id); if (!el) continue; if (photo) el.innerHTML = `<img src="${esc(photo)}" alt="">`; else el.textContent = initial; }
   },
   boot() {
     if (PAGE_MODE !== 'main' && !this._booted) { this._booted = true; $('#boot').classList.add('hidden'); this.state = 'lock'; Settings.data.setupDone = true; this.login(true); return; }
@@ -7297,7 +7419,11 @@ const Session = {
     StartMenu.hide(); ContextMenu.hide(); AltTab.cancel(); Overview.hide(); Panel.closePops();
     this.syncUser();
     $('#lock-pin').hidden = true; $('#lock-btn').hidden = false; $('#pin-in').value = ''; $('#pin-msg').textContent = '';
+    $('#lock-acct').hidden = true; $('#lock-pass').hidden = true;
     $('#lock').classList.remove('hidden');
+    // after signing in on another screen (the page reloads with your desktop), go straight in
+    try { if (sessionStorage.getItem('sj.autologin')) { sessionStorage.removeItem('sj.autologin'); setTimeout(() => this.login(true), 60); return; } } catch {}
+    Account.prepareLock();
   },
   /** With a PIN set, the first click/Enter on the lock screen asks for it. */
   askPin() {
@@ -7326,10 +7452,14 @@ const Session = {
   lastActive: Date.now(),
   login(force) {
     if (this.state !== 'lock') return;
+    // don't decide "no account" before we've asked the server whether you're signed in
+    if (!force && !Social.checked && !Social.unavailable && PAGE_MODE === 'main' && location.protocol !== 'file:') { if (!this._waitAcct) { this._waitAcct = Date.now(); const tick = () => { if (Social.checked || Social.unavailable || Date.now() - this._waitAcct > 4000) { this._waitAcct = 0; this.login(); } else setTimeout(tick, 100); }; tick(); } return; }
+    if (!force) { const m = Account.mode(); if (m === 'signin') { Account.showSignIn(); return; } if (m === 'account') { if (Settings.get('lockPin')) { this.askPin(); return; } Account.showPassword(); return; } }
     if (Settings.get('lockPin') && !force) { this.askPin(); return; }
     this.state = 'desktop';
     $('#lock').classList.add('hidden');
-    const name = Settings.get('username') || 'User';
+    if (Social.me && PAGE_MODE === 'main') { Account.start(); Account.pull().then(r => { if (r === 'applied') Account.reloadIn(); }); }
+    const name = (Social.me && Social.me.display) || Settings.get('username') || 'User';
     if (PAGE_MODE !== 'main') { $('#lock').classList.add('hidden'); Desk.afterLogin(); return; }
     if (Settings.get('firstLogin')) {
       Toast.show(`Welcome, ${name}!`, 'Open apps from the dock or Applications in the top panel. Right-click an app to add it to your desktop.', 'user', 5500);
@@ -7340,7 +7470,7 @@ const Session = {
     if (Settings.get('startupSound')) Sound.ui('startup');
     setTimeout(() => SessionApps.onLogin(), 400);
   },
-  lock() { if (this.state === 'desktop') { this.showLock(); if (Settings.get('startupSound')) Sound.ui('lock'); } },
+  lock() { if (this.state === 'desktop') { Account.push(); this.showLock(); if (Settings.get('startupSound')) Sound.ui('lock'); } },
   powerSeq(text, then) {
     this.state = 'power';
     StartMenu.hide(); ContextMenu.hide(); AltTab.cancel(); Overview.hide(); Panel.closePops();
@@ -11270,6 +11400,8 @@ Apps.register({
           <div class="set-row" style="margin-top:10px;flex-wrap:nowrap"><input class="input lock-msg-in" style="flex:1" maxlength="120" placeholder="e.g. If found, call me 🙂"><button class="btn primary lock-msg-save">Save</button></div>
         </div>
         ${stack(
+          row('Style', 'How the lock screen is laid out.', seg('lockStyle', [['classic', 'Classic'], ['center', 'Big clock'], ['minimal', 'Minimal'], ['split', 'Split'], ['photo', 'Photo']])),
+          row('Wallpaper', 'A different picture just for the lock screen.', `<select class="input" data-set-select-str="lockWall">${[['', 'Same as the desktop']].concat(WALLPAPERS.filter(w => !/^g-/.test(w.id)).slice(0, 120).map(w => [w.id, esc(w.name || w.id)])).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`),
           row('Clock size', '', seg('lockClock', [['large', 'Large'], ['small', 'Small'], ['hidden', 'Hidden']])),
           row('Blur the wallpaper', '', sw('lockBlur')),
           row('Preview', '', `<button class="btn lock-now">${svg('lock')}Lock now</button>`))}`,
@@ -11422,6 +11554,10 @@ Apps.register({
           row('Clear clipboard history', '', `<button class="btn clip-clear">${svg('trash')}Clear</button>`))}`,
       account: () => `<h2>Account</h2>
         <div class="set-card acct"><div class="avatar lg acct-av"></div><div><div class="set-label big acct-name"></div><div class="set-desc">Local account · signed in since ${new Date(BOOT_TIME).toLocaleTimeString()}</div></div></div>
+        <div class="set-card">
+          <div class="set-label">Profile picture</div><div class="set-desc">Shown on the lock screen and in the Start menu.${Social.me ? ' When you’re signed in, your Messages photo is used — change it in Messages → Settings.' : ''}</div>
+          <div class="set-row" style="margin-top:10px;gap:8px"><button class="btn primary photo-pick">${svg('image')}Choose a picture…</button><button class="btn photo-clear">Remove</button></div>
+        </div>
         <div class="set-card">
           <div class="set-label">Display name</div><div class="set-desc">Shown on the lock screen, App Library and Terminal prompt.</div>
           <div class="set-row" style="margin-top:10px;flex-wrap:nowrap"><input class="input un" style="flex:1" maxlength="24" spellcheck="false"><button class="btn primary un-save">Save</button></div>
@@ -11649,6 +11785,7 @@ ${cat}`;
       $$('[data-str]', main).forEach(x => { x.value = Settings.get(x.dataset.str) || ''; });
       if (section === 'desktopapp' && Desk.ok) renderDesktopApp();
       if (section === 'offline') Offline.renderCard(main);
+      if (section === 'account') Account.renderCard(main);
       if (section === 'themes') { const pq = $('.pack-q', main); if (pq) pq.value = Themes._q || ''; Themes.filterPacks(main); }
       const lmi = $('.lock-msg-in', main); if (lmi) lmi.value = Settings.get('lockMessage') || '';
       const wu = $('.wp-url', main);
@@ -11695,6 +11832,8 @@ ${cat}`;
         if (f) { try { Theme.setCustomWallpaper(await imageToDataUri(f)); } catch { Toast.show('Could not read image', f.name, 'info'); } }
         return;
       }
+      if (pick('.photo-pick')) { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { const url = await new Promise((res, rej) => { const u = URL.createObjectURL(f), img = new Image(); img.onload = () => { const c = document.createElement('canvas'), k = 160; c.width = c.height = k; const g = c.getContext('2d'), m = Math.min(img.width, img.height); g.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, k, k); URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg', 0.85)); }; img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Not a picture')); }; img.src = u; }); Settings.set('userPhoto', url); Session.syncUser(); Toast.show('Profile picture updated', '', 'user'); } catch (err) { Toast.show('Couldn’t use that picture', err.message, 'image'); } }; inp.click(); return; }
+      if (pick('.photo-clear')) { Settings.set('userPhoto', ''); Session.syncUser(); return; }
       if (pick('.un-save')) {
         const v = $('.un', main).value.trim();
         if (!v) { Toast.show('Name required', 'Please enter a display name.', 'info'); return; }
@@ -16050,7 +16189,9 @@ const Personal = {
     document.title = name;
     const bn = $('.boot-name'); if (bn) bn.innerHTML = name === 'SanjivramOS' ? 'sanjivram<span>!</span>_os' : esc(name);
     opt('bootStyle', g('bootStyle'), 'pop');
-    opt('lockClock', g('lockClock'), 'large'); opt('lockBlur', g('lockBlur') ? null : 'off');
+    opt('lockClock', g('lockClock'), 'large'); opt('lockBlur', g('lockBlur') ? null : 'off'); opt('lockStyle', g('lockStyle'), 'classic');
+    if (g('lockWall')) document.documentElement.style.setProperty('--lockwp', Theme.wallpaperCss(g('lockWall'))); else document.documentElement.style.removeProperty('--lockwp');
+    if (typeof Session !== 'undefined') Session.syncUser();
     const lm = $('#lock-msg'); if (lm) { lm.textContent = g('lockMessage') || ''; lm.hidden = !g('lockMessage'); }
     Studio.apply();
   }
@@ -21717,6 +21858,145 @@ const SeraphGames = {
 };
 SeraphGames.init();
 Social.init();
+
+/* ---------------- Account: one login for SanjivramOS and Messages; your desktop is saved to your account ----------------
+   The lock screen signs in with your Messages account (password checked by the server). Everything SanjivramOS keeps in
+   this browser (settings, layout, dock, desktop icons, notes, apps…, the localStorage "webos." keys) is saved to the account
+   and loaded on any device you sign in on. "Use without an account" keeps the old local-only behaviour. */
+const Account = {
+  META: 'sj.acct',     // device-only: { user, updated } — not synced
+  meta() { try { return JSON.parse(localStorage.getItem(this.META)) || {}; } catch { return {}; } },
+  setMeta(m) { try { localStorage.setItem(this.META, JSON.stringify(m)); } catch {} },
+  /** 'account' (signed in), 'signin' (accounts available, not signed in), 'local' (no accounts / chose local) */
+  mode() {
+    if (PAGE_MODE !== 'main' || location.protocol === 'file:' || Social.unavailable) return 'local';
+    if (Social.me) return 'account';
+    if (!Social.checked) return 'local';
+    return Settings.get('localOnly') ? 'local' : 'signin';
+  },
+  synced: k => k.startsWith('webos.') && !/^webos\.(offline|cache)/.test(k),
+  snapshot() {
+    const o = {}; let n = 0;
+    for (const k of Object.keys(localStorage)) if (this.synced(k)) { const v = localStorage.getItem(k); o[k] = v; n += k.length + v.length; }
+    // a huge uploaded wallpaper would make every save slow: keep it on this device only
+    if (n > 3e6 && o['webos.settings']) { try { const st = JSON.parse(o['webos.settings']); if (isDataUri(st.customWallpaper)) { st.customWallpaper = ''; o['webos.settings'] = JSON.stringify(st); } } catch {} }
+    return o;
+  },
+  hash(o) { let h = 0; const str = JSON.stringify(o); for (let i = 0; i < str.length; i += 7) h = (h * 31 + str.charCodeAt(i)) | 0; return h + ':' + str.length; },
+  last: '', pushing: false,
+  async push(force) {
+    if (!Social.me || Settings.get('acctSync') === false || this.pushing) return false;
+    const snap = this.snapshot(), h = this.hash(snap);
+    if (!force && h === this.last) return true;
+    this.pushing = true;
+    try {
+      const r = await fetch('social/api/os', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: snap }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { this.last = h; this.setMeta({ user: Social.me.id, updated: j.updated }); this.syncedAt = Date.now(); return true; }
+      this.err = j.error || 'Couldn’t save'; return false;
+    } catch (e) { this.err = 'Offline'; return false; } finally { this.pushing = false; }
+  },
+  /** load the account's desktop. Returns 'applied' (page must reload), 'same', 'empty' or 'none'. */
+  async pull() {
+    if (!Social.me) return 'none';
+    let j; try { const r = await fetch('social/api/os', { credentials: 'same-origin', cache: 'no-store' }); if (!r.ok) return 'none'; j = await r.json(); } catch { return 'none'; }
+    const m = this.meta();
+    if (!j.data) { await this.push(true); return 'empty'; }
+    if (m.user === Social.me.id && (m.updated || 0) >= j.updated) return 'same';
+    for (const k of Object.keys(localStorage)) if (this.synced(k)) localStorage.removeItem(k);
+    for (const [k, v] of Object.entries(j.data)) try { localStorage.setItem(k, v); } catch {}
+    this.setMeta({ user: Social.me.id, updated: j.updated });
+    return 'applied';
+  },
+  reloadIn() { try { sessionStorage.setItem('sj.autologin', '1'); } catch {} Store.gen = (Store.gen || 0) + 1; location.reload(); },
+  /** after a successful sign-in anywhere (lock screen, setup): load the saved desktop or save this one */
+  async afterSignIn() {
+    Settings.set('localOnly', false);
+    const res = await this.pull();
+    if (res === 'applied') { Toast.show('Welcome back!', 'Loading your desktop from your account…', 'user', 2500); setTimeout(() => this.reloadIn(), 400); return true; }
+    if (Settings.get('username') === 'User' && Social.me) Settings.set('username', Social.me.display);
+    this.start(); return false;
+  },
+  started: false,
+  start() {
+    if (this.started) return; this.started = true;
+    setInterval(() => { if (Session.state === 'desktop') this.push(); }, 20000);
+    let t = null; Bus.on('settings', () => { clearTimeout(t); t = setTimeout(() => this.push(), 4000); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.push(); });
+  },
+  async signOut() {
+    const ok = await Dialog.confirm('Sign out of this device?', 'Your desktop is saved to your account. This device goes back to a fresh desktop, and signing in again brings everything back.', { okText: 'Sign out', cancelText: 'Cancel' });
+    if (!ok) return;
+    await this.push(true);
+    await Social.logout();
+    for (const k of Object.keys(localStorage)) if (this.synced(k)) localStorage.removeItem(k);
+    localStorage.removeItem(this.META);
+    try { localStorage.setItem('webos.settings', JSON.stringify({ setupDone: true, version: DEFAULT_SETTINGS.version })); } catch {}
+    Store.gen = (Store.gen || 0) + 1; location.reload();
+  },
+  /* ----- lock screen ----- */
+  creating: false,
+  wireLock() {
+    const form = $('#lock-acct');
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const u = $('#la-user').value.trim(), pw = $('#la-pass').value, msg = $('#la-msg');
+      if (!u || !pw) { msg.textContent = 'Type your username and password.'; return; }
+      msg.textContent = this.creating ? 'Creating your account…' : 'Signing in…'; $('#la-go').disabled = true;
+      try { await Social.auth(this.creating ? 'signup' : 'login', u, pw, $('#la-name').value.trim() || u); }
+      catch (err) { msg.textContent = err.message; $('#la-go').disabled = false; return; }
+      $('#la-go').disabled = false; $('#la-pass').value = ''; msg.textContent = '';
+      if (await this.afterSignIn()) return;
+      Session.syncUser(); Session.login(true);
+    });
+    $('#la-mode').onclick = () => { this.creating = !this.creating; this.renderSignIn(); };
+    $('#la-local').onclick = () => { Settings.set('localOnly', true); $('#lock-acct').hidden = true; Session.login(); };
+    const lp = $('#lp-in');
+    lp.addEventListener('keydown', async e => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') { if (e.key === 'Escape') { $('#lock-pass').hidden = true; $('#lock-btn').hidden = false; } return; }
+      e.preventDefault(); const pw = lp.value; if (!pw) return;
+      $('#lp-msg').textContent = '';
+      try {
+        const r = await fetch('social/api/verify', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+        if (r.ok) { lp.value = ''; this.start(); Session.login(true); this.pull().then(x => { if (x === 'applied') this.reloadIn(); }); return; }
+        const j = await r.json().catch(() => ({}));
+        if (r.status === 404) { lp.value = ''; Session.login(true); return; }   // old server: can't check, let them in (they're already signed in)
+        $('#lp-msg').textContent = j.error || 'Wrong password.'; lp.value = ''; const b = $('#lock-pass'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+      } catch { $('#lp-msg').textContent = 'Can’t reach the server.'; }
+    });
+    $('#lp-out').onclick = () => this.signOut();
+    $('#lp-pin').onclick = () => { $('#lock-pass').hidden = true; Session.askPin(); };
+    form.addEventListener('keydown', e => e.stopPropagation());
+  },
+  renderSignIn() {
+    $('#la-name').hidden = !this.creating;
+    $('#la-pass').autocomplete = this.creating ? 'new-password' : 'current-password';
+    $('#la-go').textContent = this.creating ? 'Create account →' : 'Sign in →';
+    $('#la-mode').textContent = this.creating ? 'I already have an account' : 'Create an account';
+    $('#la-msg').textContent = this.creating ? 'Same account as Messages: 3–24 letters/numbers, a password of 6+ characters.' : '';
+  },
+  prepareLock() { Session.syncUser(); const m = this.mode(); $('.lock-hint').textContent = m === 'signin' ? 'Click to sign in to your account' : m === 'account' ? 'Click or press Enter, then type your password' : 'Click anywhere or press Enter to sign in'; },
+  showSignIn() { $('#lock-btn').hidden = true; $('#lock-pass').hidden = true; $('#lock-acct').hidden = false; this.renderSignIn(); setTimeout(() => $('#la-user').focus(), 40); },
+  showPassword() { $('#lock-btn').hidden = true; $('#lock-acct').hidden = true; $('#lock-pass').hidden = false; $('#lp-pin').hidden = !Settings.get('lockPin'); $('#lp-msg').textContent = ''; setTimeout(() => $('#lp-in').focus(), 40); },
+  /* ----- Settings → Account ----- */
+  renderCard(main) {
+    const box = document.createElement('div'); main.appendChild(box);
+    const draw = () => {
+      const me = Social.me, m = this.meta();
+      if (!me) { box.innerHTML = `<h3 class="cust-h">Your account</h3><div class="set-card"><div class="set-label">Sign in to save your desktop</div><div class="set-desc">${Social.unavailable ? 'Accounts need the SanjivramOS server (run sanjivramos restart).' : 'Use the same account as Messages. Your layout, settings, dock, notes and apps follow you to every device.'}</div><div class="set-row" style="margin-top:10px"><button class="btn primary acct-in">Sign in or create an account</button></div></div>`; const b = $('.acct-in', box); if (b) b.onclick = () => { Settings.set('localOnly', false); Session.lock(); setTimeout(() => this.showSignIn(), 50); }; return; }
+      box.innerHTML = `<h3 class="cust-h">Your account</h3><div class="set-card"><div class="set-label">Signed in as ${esc(me.display)} <span class="set-desc">@${esc(me.username)}</span></div>
+        <div class="set-desc">Your password is your Messages password. ${Settings.get('acctSync') === false ? 'Desktop sync is off.' : `Desktop saved to your account ${this.syncedAt ? 'at ' + new Date(this.syncedAt).toLocaleTimeString() : m.updated ? 'on ' + new Date(m.updated).toLocaleString() : '— not yet'}.`}${this.err ? ' ⚠ ' + esc(this.err) : ''}</div>
+        <div class="set-row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn primary acct-sync">Save now</button><button class="btn acct-load">Load from account</button><label class="set-desc" style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="acct-auto" ${Settings.get('acctSync') === false ? '' : 'checked'}> Save automatically</label><span style="flex:1"></span><button class="btn danger acct-out">Sign out</button></div></div>`;
+      $('.acct-sync', box).onclick = async () => { const ok = await this.push(true); Toast.show(ok ? 'Saved to your account' : 'Couldn’t save', ok ? 'Your desktop will be the same on any device you sign in on.' : (this.err || ''), 'user'); draw(); };
+      $('.acct-load', box).onclick = async () => { this.setMeta({}); const r = await this.pull(); if (r === 'applied') this.reloadIn(); else Toast.show('Nothing newer on your account', '', 'user'); };
+      $('.acct-auto', box).onchange = e => { Settings.set('acctSync', e.target.checked); draw(); };
+      $('.acct-out', box).onclick = () => this.signOut();
+    };
+    draw();
+  },
+};
+Bus.on('social', d => { if (d && d.t === 'auth' && Social.me && Session.state === 'desktop') Account.start(); if (Session.state === 'lock') Account.prepareLock(); });
 
 /* Sakthula: on screen, every "game"/"games" reads "Sakthula". Leaves typed text, terminals, code, files and the Claude chat alone. */
 const Sakthula = {

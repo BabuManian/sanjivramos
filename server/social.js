@@ -62,6 +62,8 @@ const MIGRATIONS = [
   `CREATE TABLE devices(id TEXT PRIMARY KEY, first INTEGER, last INTEGER, hits INTEGER DEFAULT 0, agent TEXT, ip TEXT, via TEXT);
    CREATE TABLE device_users(device TEXT, user_id INTEGER, last INTEGER, PRIMARY KEY(device, user_id));
    CREATE TABLE device_bans(device TEXT PRIMARY KEY, user_id INTEGER, username TEXT, reason TEXT, by_id INTEGER, created INTEGER, ip TEXT, agent TEXT);`,
+  // v8: each account's SanjivramOS desktop (settings, layout, dock, desktop icons…) so it follows you to any device
+  `CREATE TABLE os_profiles(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL, bytes INTEGER DEFAULT 0);`,
 ];
 export function initSocial(dataDir) {
   DIR = path.join(dataDir, '.social'); FILES = path.join(DIR, 'files');
@@ -237,6 +239,27 @@ export async function handleSocial(req, res, url) {
     const me = userFromReq(req);
     if (p === '/social/api/me') return send(res, me ? 200 : 401, me ? { me: meOf(me) } : { error: 'Not signed in' });
     if (!me) return send(res, 401, { error: 'Not signed in' });
+    // the account's saved desktop
+    if (p === '/social/api/os' && req.method === 'GET') {
+      const row = q1('SELECT data, updated FROM os_profiles WHERE user_id=?', me.id);
+      return send(res, 200, row ? { data: JSON.parse(row.data), updated: row.updated } : { data: null, updated: 0 });
+    }
+    if (p === '/social/api/os' && req.method === 'POST') {
+      if (limited(attempts, 'os' + me.id, 60, 60e3)) return send(res, 429, { error: 'Saving too often — slow down.' });
+      let b; try { b = JSON.parse((await body(req, 4 * 1024 * 1024)).toString() || '{}'); } catch { return send(res, 413, { error: 'Your desktop is too big to save (4 MB max).' }); }
+      if (!b.data || typeof b.data !== 'object' || Array.isArray(b.data)) return send(res, 400, { error: 'Nothing to save.' });
+      const data = {}; for (const [k, v] of Object.entries(b.data)) if (typeof k === 'string' && k.length < 200 && typeof v === 'string') data[k] = v;
+      const json = JSON.stringify(data), updated = Date.now();
+      run('INSERT INTO os_profiles(user_id, data, updated, bytes) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated=excluded.updated, bytes=excluded.bytes', me.id, json, updated, json.length);
+      return send(res, 200, { ok: true, updated });
+    }
+    // the lock screen checks your account password without making a new session
+    if (p === '/social/api/verify' && req.method === 'POST') {
+      const key = 'vf' + me.id; if (limited(attempts, key, 12, 60e3)) return send(res, 429, { error: 'Too many tries. Wait a minute.' });
+      const b = JSON.parse((await body(req)).toString() || '{}');
+      const ok = crypto.timingSafeEqual(Buffer.from(hashPw(b.password || '', me.salt), 'hex'), Buffer.from(me.hash, 'hex'));
+      return send(res, ok ? 200 : 401, ok ? { ok: true } : { error: 'Wrong password.' });
+    }
     if (p === '/social/api/look' && req.method === 'POST') {
       if (limited(attempts, 'lk' + me.id, 30, 60e3)) return send(res, 429, { error: 'Slow down a little.' });
       const b = JSON.parse((await body(req)).toString() || '{}');
@@ -959,6 +982,7 @@ function deleteAccount(u) {
   const touched = new Set(), gone = [];
   db.exec('BEGIN');
   try {
+    run('DELETE FROM os_profiles WHERE user_id=?', u.id);
     for (const { convo_id } of q('SELECT convo_id FROM members WHERE user_id=?', u.id)) {
       const c = q1('SELECT * FROM convos WHERE id=?', convo_id); if (!c) continue;
       if (c.kind === 'dm' || memberIds(c.id).length <= 1) {
