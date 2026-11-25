@@ -1,0 +1,1220 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Lantern Woods</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#05070d;color:#e5e7eb;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;pointer-events:none;z-index:2}
+#bars{left:12px;top:12px;display:flex;flex-direction:column;gap:5px;width:180px}
+.bar{height:12px;border-radius:999px;background:rgba(0,0,0,.45);overflow:hidden;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.bar i{display:block;height:100%;border-radius:999px;transition:width .2s}
+.bar span{position:absolute;left:8px;top:-1px;font-size:10px;font-weight:700;text-shadow:0 1px 2px #000}
+#clock{left:50%;top:10px;transform:translateX(-50%);text-align:center;font-weight:700;text-shadow:0 2px 6px #000}
+#clock b{display:block;font-size:20px}#clock small{opacity:.8;font-weight:500}
+#inv{right:12px;top:12px;display:grid;grid-template-columns:repeat(2,auto);gap:3px 12px;background:rgba(0,0,0,.35);padding:8px 12px;border-radius:12px;font-size:13px;font-weight:600}
+#prompt{left:50%;bottom:22%;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(0,0,0,.55);font-weight:600;white-space:nowrap}
+#prompt:empty{display:none}
+#log{left:12px;bottom:12px;display:flex;flex-direction:column;gap:4px;max-width:min(420px,60vw)}
+#log div{background:rgba(0,0,0,.5);padding:5px 10px;border-radius:10px;font-size:13px;animation:fi .3s}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}}
+#cross{left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:rgba(255,255,255,.7);box-shadow:0 0 0 2px rgba(0,0,0,.35)}
+#camp{left:50%;top:58px;transform:translateX(-50%);font-size:13px;font-weight:700;text-shadow:0 1px 3px #000;padding:3px 12px;border-radius:999px;background:rgba(0,0,0,.35)}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:1;box-shadow:inset 0 0 160px rgba(0,0,0,.75);transition:box-shadow .4s}
+#hurt{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(circle,transparent 40%,rgba(220,38,38,.5));opacity:0;transition:opacity .25s}
+.panel{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(3,5,12,.78);backdrop-filter:blur(6px)}
+.panel[hidden]{display:none}
+.card{width:min(760px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:linear-gradient(180deg,#141b2d,#0c1120);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+h1{margin:0;font:800 40px/1.05 Georgia,serif;letter-spacing:1px;color:#fde68a;text-shadow:0 0 24px rgba(251,191,36,.45)}
+h2{margin:0 0 8px;font:700 22px Georgia,serif;color:#fde68a}
+.sub{opacity:.75;margin:6px 0 16px;line-height:1.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{padding:10px 18px;border-radius:12px;background:rgba(255,255,255,.08);font-weight:700}
+.btn.pri{background:linear-gradient(135deg,#f59e0b,#b45309);color:#fff;box-shadow:0 6px 20px rgba(245,158,11,.3)}
+.btn:disabled{opacity:.4}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+#me{width:150px;height:200px;border-radius:14px;background:radial-gradient(circle at 50% 35%,#3b2a12,#0b0f1a)}
+.recipes{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.rec{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);text-align:left}
+.rec b{display:block}.rec small{opacity:.7;display:block;margin:2px 0 6px}.rec .cost{font-size:12px}
+.rec.no{opacity:.45}.rec.done{outline:1px solid #4ade80}
+.page{font:16px/1.6 Georgia,serif;background:#e8dcc0;color:#3b2f1e;border-radius:6px;padding:18px 20px;box-shadow:inset 0 0 40px rgba(120,80,20,.35)}
+.page h3{margin:0 0 8px;font-size:18px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.07)}.tabs button.on{background:#b45309}
+#map{width:100%;max-width:440px;aspect-ratio:1;border-radius:12px;background:#0d1a12;display:block}
+.plist{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+.plist button{text-align:left;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}
+#hotbar{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:3;display:flex;gap:6px;padding:6px;border-radius:16px;background:rgba(0,0,0,.4);backdrop-filter:blur(6px)}
+#hotbar button{position:relative;width:54px;height:54px;border-radius:12px;background:rgba(255,255,255,.08);font-size:24px;line-height:1;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08);transition:transform .1s}
+#hotbar button.on{background:rgba(245,158,11,.35);box-shadow:inset 0 0 0 2px #fbbf24;transform:translateY(-4px)}
+#hotbar button i{position:absolute;left:5px;top:3px;font:700 10px system-ui;font-style:normal;opacity:.7}
+#hotbar button b{position:absolute;right:4px;bottom:2px;font:800 11px system-ui;text-shadow:0 1px 2px #000}
+#hotbar button small{position:absolute;left:0;right:0;bottom:-15px;font:600 10px system-ui;opacity:0;white-space:nowrap}
+#hotbar button.on small{opacity:.9}
+#fishgame{position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:4;background:rgba(0,0,0,.65);padding:10px 14px;border-radius:14px;text-align:center;font-weight:700;pointer-events:none}
+.fg-bar{position:relative;width:280px;height:22px;margin-top:8px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+.fg-zone{position:absolute;top:0;bottom:0;background:rgba(34,197,94,.6)}.fg-m{position:absolute;top:-2px;bottom:-2px;width:6px;margin-left:-3px;background:#fde047;border-radius:3px;box-shadow:0 0 8px #fde047}
+#sackbar{position:fixed;left:50%;bottom:82px;transform:translateX(-50%);z-index:3;pointer-events:none;font:700 12px system-ui;text-shadow:0 1px 3px #000;opacity:.85}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin:10px 0}
+.slot{aspect-ratio:1;border-radius:12px;background:rgba(255,255,255,.06);display:grid;place-items:center;font-size:28px;position:relative;box-shadow:inset 0 0 0 2px rgba(255,255,255,.06)}
+.slot.sel{box-shadow:inset 0 0 0 2px #fbbf24;background:rgba(245,158,11,.2)}
+.slot small{position:absolute;bottom:3px;left:0;right:0;text-align:center;font:600 9px system-ui;opacity:.75}
+.slot.empty{opacity:.35;font-size:14px}
+.cap{height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.cap i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,#ef4444)}
+#touch{position:fixed;right:10px;bottom:80px;z-index:3;display:none;grid-template-columns:repeat(3,62px);gap:8px}
+#touch.on{display:grid}
+#touch button{height:58px;border-radius:16px;background:rgba(255,255,255,.14);font-weight:700;font-size:12px;touch-action:none}
+#touch button.on{background:rgba(245,158,11,.55)}
+#stick{position:fixed;left:24px;bottom:24px;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);z-index:2;pointer-events:none;display:none}
+#stick.on{display:block}
+.keys{columns:2;font-size:13px;line-height:1.7;opacity:.85}.keys b{display:inline-block;min-width:70px;color:#fde68a}
+#story{font:18px/1.6 Georgia,serif;max-width:620px;text-align:center}
+</style></head>
+<body>
+<canvas id="gl"></canvas>
+<div id="vig"></div><div id="hurt"></div>
+<div class="hud" id="bars"></div>
+<div class="hud" id="clock"></div>
+<div class="hud" id="camp"></div>
+<div class="hud" id="inv"></div>
+<div class="hud" id="cross"></div>
+<div class="hud" id="prompt"></div>
+<div class="hud" id="log"></div>
+<div id="stick"></div>
+<div id="touch"><button data-btn="act">👆 Use item</button><button data-btn="use">✋ Interact</button><button data-btn="jump">⤒ Jump</button><button data-btn="sack">🎒 Sack</button><button data-btn="light">🔦 Light</button><button data-btn="craft">🛠 Craft</button><button data-btn="journal">📖 Book</button><button data-btn="eat">🍓 Eat</button><button data-btn="run">🏃 Run</button><button data-btn="reload">🔄 Reload</button><button data-btn="aim">🎯 Aim</button></div>
+<div id="fishgame" hidden><div class="fg-t">🎣 Something's biting! Click / Space when the marker is in the green</div><div class="fg-bar"><i class="fg-zone"></i><b class="fg-m"></b></div></div>
+<div id="hotbar" hidden></div><div id="sackbar" hidden></div>
+
+<div class="panel" id="menu"><div class="card">
+  <div class="row"><div style="flex:1;min-width:260px">
+    <h1>LANTERN WOODS</h1>
+    <p class="sub">Grandpa Odell kept the lantern at Hollowpine for forty years. Last night it went out — and so did he.<br>When the sun sets, the <b>Gloam</b> comes out of the trees. Keep the campfire burning, find his journal, and bring the four <b>Sunstones</b> home to wake the Beacon.</p>
+    <div class="btns"><button class="btn pri" id="bStory">▶ New story</button><button class="btn" id="bCont" hidden>⏵ Continue</button><button class="btn" id="bEndless">♾ Endless nights</button></div>
+    <div class="btns"><button class="btn" id="bKeys">⌨ Controls</button><button class="btn" id="bLook">🧍 Edit my character</button><label class="btn" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="lowq"> Faster graphics</label></div>
+  </div><div style="text-align:center"><canvas id="me" width="300" height="400"></canvas><div style="font-size:12px;opacity:.7;margin-top:4px">This is you — change it in Character Creator</div></div></div>
+  <div id="keys" hidden style="margin-top:12px"><div class="keys"><div><b>WASD</b> move</div><div><b>Shift</b> run</div><div><b>Mouse</b> look (click to lock)</div><div><b>Space</b> jump</div><div><b>Click / J</b> hit · chop · mine</div><div><b>E</b> use · pick up · add wood</div><div><b>Q</b> eat</div><div><b>F</b> flashlight</div><div><b>L</b> lantern</div><div><b>C</b> craft (at the workbench)</div><div><b>G</b> place a light post</div><div><b>1–0</b> hotbar</div><div><b>Right-click</b> aim</div><div><b>R</b> reload</div><div><b>Click / J</b> use the held item</div><div><b>Tab</b> open the sack</div><div><b>M</b> journal &amp; map</div><div><b>Esc</b> pause</div></div><p style="opacity:.7;font-size:13px">Phone: left side of the screen = walk, right side = look, buttons on the right. A game controller works too.</p></div>
+</div></div>
+<div class="panel" id="pause" hidden><div class="card" style="max-width:420px;text-align:center"><h2>Paused</h2><div class="btns" style="justify-content:center"><button class="btn pri" id="bResume">Resume</button><button class="btn" id="bSave">Save &amp; quit</button></div></div></div>
+<div class="panel" id="craft" hidden><div class="card"><h2>🛠 Workbench</h2><div class="recipes" id="recipes"></div><div class="btns"><button class="btn" data-close>Close (C)</button></div></div></div>
+<div class="panel" id="sackp" hidden><div class="card"><h2 id="sackTitle">🎒 Sack</h2><div class="cap"><i id="sackCap"></i></div><div class="slots" id="slots"></div><div id="sackInfo" style="min-height:20px;opacity:.85"></div><div class="btns"><button class="btn" id="sDrop">Drop</button><button class="btn" id="sEat">Eat</button><button class="btn" id="sDropAll">Drop everything</button><button class="btn" data-close>Close (Tab)</button></div><p style="opacity:.65;font-size:13px">Unload logs, stone, food and batteries at the <b>camp pile</b>. Junk (bolts, pipes, tires, radios) goes in the <b>Scrap Grinder</b>.</p></div></div>
+<div class="panel" id="grinder" hidden><div class="card"><h2>⚙️ Scrap Grinder</h2><p class="sub" id="grindInfo" style="margin:0 0 10px"></p><div class="recipes" id="grecipes"></div><div class="btns"><button class="btn" data-close>Close</button></div></div></div>
+<div class="panel" id="journal" hidden><div class="card"><div class="tabs"><button data-t="pages" class="on">📖 Journal</button><button data-t="map">🗺 Map</button><button data-t="goals">⭐ Goals</button></div><div id="jbody"></div><div class="btns"><button class="btn" data-close>Close (Tab)</button></div></div></div>
+<div class="panel" id="reader" hidden><div class="card" style="max-width:560px"><div class="page" id="ptext"></div><div class="btns"><button class="btn pri" data-close>Close</button></div></div></div>
+<div class="panel" id="over" hidden><div class="card" style="text-align:center"><div id="story"></div><div class="btns" style="justify-content:center" id="overBtns"></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/look.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('lantern', { title: 'Lantern Woods', vs: false, trophies: [
+  { id: 'night1', name: 'First Night', desc: 'Survive a night', icon: '🌙' },
+  { id: 'night5', name: 'Five Dark Nights', desc: 'Survive 5 nights in one game', icon: '🌘' },
+  { id: 'night10', name: 'Old Hand', desc: 'Survive 10 nights in one game', icon: '🌑' },
+  { id: 'page', name: 'Grandpa’s Words', desc: 'Find a journal page', icon: '📜' },
+  { id: 'allpages', name: 'The Whole Story', desc: 'Find all 8 journal pages', icon: '📖' },
+  { id: 'stone', name: 'Warm Light', desc: 'Find a Sunstone', icon: '🔆' },
+  { id: 'warden', name: 'Not Tonight', desc: 'Drive away the Pale Warden', icon: '🕯️' },
+  { id: 'crafter', name: 'Handy', desc: 'Craft every tool', icon: '🛠️' },
+  { id: 'lumber', name: 'Lumberjack', desc: 'Chop 40 trees', icon: '🪓' },
+  { id: 'beacon', name: 'Keeper of the Light', desc: 'Wake the Beacon and finish the story', icon: '🏮' },
+  { id: 'endless15', name: 'Endless Ember', desc: 'Survive 15 nights in Endless', icon: '🔥' },
+  { id: 'wolf', name: 'Wolfbane', desc: 'Beat a wolf', icon: '🐺' },
+  { id: 'pack', name: 'Pack Leader', desc: 'Beat 15 wolves', icon: '🌕' },
+  { id: 'alpha', name: 'Top Dog', desc: 'Beat an alpha wolf', icon: '👑' },
+  { id: 'bear', name: 'Bear Necessities', desc: 'Beat the bear', icon: '🐻' },
+  { id: 'armed', name: 'Locked and Loaded', desc: 'Find the revolver', icon: '🔫' },
+  { id: 'cook', name: 'Camp Cook', desc: 'Cook 10 pieces of meat', icon: '🍖' },
+  { id: 'farmer', name: 'Green Thumb', desc: 'Harvest a crop', icon: '🥕' },
+  { id: 'angler', name: 'Gone Fishing', desc: 'Catch a fish', icon: '🎣' },
+  { id: 'golden', name: 'Golden Catch', desc: 'Catch the golden fish', icon: '✨' },
+  { id: 'trapper', name: 'Snap!', desc: 'Catch something in a trap', icon: '🪤' },
+  { id: 'raid', name: 'Hold the Line', desc: 'Drive off a raid', icon: '🛡️' },
+  { id: 'storm', name: 'Weathered', desc: 'Survive a thunderstorm night', icon: '⛈️' },
+] }) : null;
+const G3 = window.GL3D, { M, hex, dirOf, pushBox, pushCone, pushTerrain } = G3;
+const $ = id => document.getElementById(id);
+const TEST = /[?&]nogl\b/.test(location.search);
+const cv = $('gl');
+let R = null;
+if (!TEST) { try { R = G3.create(cv, { maxDpr: 1.5 }); } catch (e) { console.warn(e); } }
+if (!R && !TEST) { $('menu').querySelector('.sub').innerHTML = 'This browser can’t run WebGL, so the 3D woods can’t be drawn here. Try Chrome or Firefox with hardware acceleration on.'; }
+const IN = G3.Input(cv);
+IN.bindButtons($('touch'));
+const sfx = n => kit && kit.sfx(n);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+/* =================== WORLD =================== */
+const HALF = 100, SEED = 7741, rnd = G3.rng(SEED), N1 = G3.noise2(SEED), N2 = G3.noise2(SEED + 9);
+const LAKE = [60, 50, 15];
+const LM = {   // landmarks
+  camp: { x: 0, z: 0, name: 'Camp' },
+  cabin: { x: 42, z: -30, name: 'Ranger cabin' },
+  stones: { x: -55, z: -45, name: 'Standing stones' },
+  dock: { x: 60, z: 50, name: 'Lake dock' },
+  tower: { x: -60, z: 55, name: 'Fire watchtower' },
+  cave: { x: 4, z: 60, name: 'Hollow cave' },
+  mill: { x: -82, z: 2, name: 'Old mill' },
+  oldcamp: { x: 78, z: -72, name: 'Abandoned camp' },
+};
+const inCaveRock = (x, z) => Math.abs(x - LM.cave.x) < 9.5 && z > LM.cave.z - 1.5 && z < LM.cave.z + 24.5;
+function rawH(x, z) {
+  let h = (N1(x * 0.035 + 50, z * 0.035 + 50) - 0.5) * 7 + (N2(x * 0.11 + 9, z * 0.11 + 9) - 0.5) * 1.6;
+  h *= smooth(9, 22, Math.hypot(x, z));
+  for (const k in LM) if (k !== 'camp' && k !== 'dock') { const l = LM[k], d = Math.hypot(x - l.x, z - l.z); h = lerp(h, 0.3, 1 - smooth(7, 15, d)); }
+  const dl = Math.hypot(x - LAKE[0], z - LAKE[1]); if (dl < LAKE[2]) h -= (1 - dl / LAKE[2]) ** 1.5 * 5;
+  h += smooth(80, 100, Math.max(Math.abs(x), Math.abs(z))) * 6;   // hills at the edge of the map
+  if (inCaveRock(x, z)) h = Math.min(h, 0);   // the cave's rock covers this
+  return h;
+}
+// ground = exactly the triangles we draw (step 2.5)
+const STEP = 2.5, GN = HALF * 2 / STEP + 1, HG = new Float32Array(GN * GN);
+for (let i = 0; i < GN; i++) for (let j = 0; j < GN; j++) HG[i * GN + j] = rawH(-HALF + i * STEP, -HALF + j * STEP);
+function groundH(x, z) {
+  const fx = (clamp(x, -HALF, HALF - 0.001) + HALF) / STEP, fz = (clamp(z, -HALF, HALF - 0.001) + HALF) / STEP, i = fx | 0, j = fz | 0, u = fx - i, v = fz - j;
+  const a = HG[i * GN + j], b = HG[(i + 1) * GN + j], c = HG[(i + 1) * GN + j + 1], d = HG[i * GN + j + 1];
+  return u >= v ? a + (b - a) * u + (c - b) * v : a + (c - d) * u + (d - a) * v;
+}
+const WATER_Y = -1.4;
+const onPath = (x, z) => { let best = 99; for (const k in LM) { if (k === 'camp') continue; const l = LM[k], L2 = l.x * l.x + l.z * l.z, t = clamp((x * l.x + z * l.z) / L2, 0, 1); best = Math.min(best, Math.hypot(x - l.x * t, z - l.z * t)); } return best; };
+function groundCol(x, z, h) {
+  if (h < WATER_Y + 0.4) return '#8a7d5a';
+  const p = onPath(x, z); if (p < 1.6) return '#6b5a3c';
+  const n = N2(x * 0.2, z * 0.2), d = Math.hypot(x, z);
+  if (d < 9) return n > 0.5 ? '#5c6b38' : '#56633a';
+  return n > 0.66 ? '#3f6b2e' : n > 0.33 ? '#365f29' : '#2f5524';
+}
+
+// --- static things: trees, rocks, bushes, scrap (grouped in chunks so chopping a tree rebuilds only its chunk)
+const CH = 25, NCH = HALF * 2 / CH;
+const trees = [], rocks = [], bushes = [], scraps = [];
+const nearLM = (x, z, r) => { for (const k in LM) if (Math.hypot(x - LM[k].x, z - LM[k].z) < r) return true; return false; };
+for (let i = 0; i < 1100 && trees.length < 760; i++) {
+  const x = (rnd() * 2 - 1) * (HALF - 3), z = (rnd() * 2 - 1) * (HALF - 3);
+  if (Math.hypot(x, z) < 12 || nearLM(x, z, 10) || inCaveRock(x, z) || Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2] + 1 || onPath(x, z) < 2.2) continue;
+  trees.push({ id: trees.length, x, z, s: 0.8 + rnd() * 0.7, kind: rnd() < 0.78 ? 0 : 1, hp: 0, alive: true, y: groundH(x, z) });
+}
+for (let i = 0; i < 160; i++) { const x = (rnd() * 2 - 1) * 95, z = (rnd() * 2 - 1) * 95; if (Math.hypot(x, z) < 11 || nearLM(x, z, 8) || inCaveRock(x, z) || onPath(x, z) < 2) continue; rocks.push({ id: rocks.length, x, z, s: 0.6 + rnd() * 0.9, left: 3, y: groundH(x, z) }); }
+for (let i = 0; i < 120; i++) { const x = (rnd() * 2 - 1) * 92, z = (rnd() * 2 - 1) * 92; if (Math.hypot(x, z) < 10 || nearLM(x, z, 7) || inCaveRock(x, z) || onPath(x, z) < 2) continue; bushes.push({ id: bushes.length, x, z, berries: 3, regrow: 0, y: groundH(x, z) }); }
+for (const k of ['cabin', 'stones', 'tower', 'cave', 'mill', 'oldcamp', 'dock']) for (let i = 0; i < 3; i++) { const l = LM[k], a = rnd() * 6.28, r = 4 + rnd() * 4; scraps.push({ id: scraps.length, x: l.x + Math.cos(a) * r, z: l.z + Math.sin(a) * r, taken: false, battery: i === 0 }); }
+const chunkOf = (x, z) => clamp(Math.floor((x + HALF) / CH), 0, NCH - 1) * NCH + clamp(Math.floor((z + HALF) / CH), 0, NCH - 1);
+const chunks = Array.from({ length: NCH * NCH }, (_, i) => ({ i, cx: -HALF + Math.floor(i / NCH) * CH + CH / 2, cz: -HALF + (i % NCH) * CH + CH / 2, mesh: null, dirty: true, boxes: [] }));
+function buildChunk(c) {
+  const a = []; c.boxes = [];
+  for (const t of trees) if (chunkOf(t.x, t.z) === c.i) {
+    const y = t.y, s = t.s;
+    if (!t.alive) { pushBox(a, t.x - 0.3 * s, y - 0.2, t.z - 0.3 * s, t.x + 0.3 * s, y + 0.35, t.z + 0.3 * s, '#6b4a2b'); continue; }
+    pushBox(a, t.x - 0.25 * s, y - 0.3, t.z - 0.25 * s, t.x + 0.25 * s, y + 2.2 * s, t.z + 0.25 * s, '#4a3220');
+    if (t.kind === 0) { pushCone(a, t.x, y + 1.3 * s, t.z, 1.9 * s, 2.6 * s, '#1f4d2b', 7); pushCone(a, t.x, y + 2.6 * s, t.z, 1.5 * s, 2.3 * s, '#22573a', 7); pushCone(a, t.x, y + 3.8 * s, t.z, 1.0 * s, 2.0 * s, '#2a6343', 6); }
+    else { pushBox(a, t.x - 1.3 * s, y + 2 * s, t.z - 1.3 * s, t.x + 1.3 * s, y + 4.2 * s, t.z + 1.3 * s, '#3c6b2a'); pushBox(a, t.x - 0.9 * s, y + 4.2 * s, t.z - 0.9 * s, t.x + 0.9 * s, y + 5 * s, t.z + 0.9 * s, '#47793a'); }
+    c.boxes.push([t.x - 0.3 * s, y - 1, t.z - 0.3 * s, t.x + 0.3 * s, y + 5, t.z + 0.3 * s]);
+  }
+  for (const r of rocks) if (chunkOf(r.x, r.z) === c.i && r.left > 0) {
+    const s = r.s * (0.5 + r.left / 6); pushBox(a, r.x - s, r.y - 0.3, r.z - s * 0.8, r.x + s, r.y + s * 1.1, r.z + s * 0.8, '#7c818c'); pushBox(a, r.x - s * 0.6, r.y + s * 1.1 - 0.01, r.z - s * 0.5, r.x + s * 0.5, r.y + s * 1.5, r.z + s * 0.4, '#8f949e');
+    c.boxes.push([r.x - s, r.y - 1, r.z - s * 0.8, r.x + s, r.y + s * 1.5, r.z + s * 0.8]);
+  }
+  for (const b of bushes) if (chunkOf(b.x, b.z) === c.i) {
+    pushCone(a, b.x, b.y - 0.1, b.z, 0.9, 1.2, '#2f6b33', 6);
+    for (let k = 0; k < b.berries; k++) { const an = k * 2.1 + b.id; pushBox(a, b.x + Math.cos(an) * 0.45 - 0.08, b.y + 0.4 + k * 0.12, b.z + Math.sin(an) * 0.45 - 0.08, b.x + Math.cos(an) * 0.45 + 0.08, b.y + 0.56 + k * 0.12, b.z + Math.sin(an) * 0.45 + 0.08, '#dc2626'); }
+  }
+  if (R) c.mesh = a.length ? R.mesh(a) : null;
+  c.dirty = false;
+}
+const dirtyAt = (x, z) => { chunks[chunkOf(x, z)].dirty = true; };
+
+// --- buildings (static mesh + collision boxes)
+const solid = [];   // [x0,y0,z0,x1,y1,z1]
+let staticMesh = null, terrainMesh = null, waterMesh = null;
+function wall(a, x0, y0, z0, x1, y1, z1, col, collide = true) { pushBox(a, x0, y0, z0, x1, y1, z1, col); if (collide) solid.push([x0, y0, z0, x1, y1, z1]); }
+const SPOTS = {};   // interactable fixed spots (filled while building)
+function buildWorld() {
+  const a = [];
+  // camp: fire ring, beacon, workbench, tent, logs to sit on
+  for (let i = 0; i < 10; i++) { const an = i / 10 * 6.283; pushBox(a, Math.cos(an) * 1.3 - 0.25, 0, Math.sin(an) * 1.3 - 0.25, Math.cos(an) * 1.3 + 0.25, 0.35, Math.sin(an) * 1.3 + 0.25, '#6b7280'); }
+  wall(a, -6.6, 0, -3.6, -5.4, 2.2, -2.4, '#9ca3af'); wall(a, -6.9, 2.2, -3.9, -5.1, 2.6, -2.1, '#57534e');   // beacon pillar + brazier
+  SPOTS.beacon = [-6, 2.8, -3];
+  wall(a, 4.2, 0, -4.6, 6.6, 0.9, -3.4, '#8b5a2b'); pushBox(a, 4.3, 0.9, -4.5, 4.9, 1.2, -4.0, '#9ca3af'); pushBox(a, 5.6, 0.9, -4.3, 6.4, 1.0, -3.6, '#a16207'); SPOTS.bench = [5.4, 0.9, -4];
+  pushCone(a, 5, 0, 5, 2.4, 2.6, '#b45309', 4); SPOTS.tent = [5, 0, 5];
+  // the Scrap Grinder: a rusty box with a hopper on top
+  wall(a, 7.2, 0, -0.9, 8.8, 1.1, 0.7, '#57534e'); pushBox(a, 7.0, 1.1, -1.1, 9.0, 1.7, 0.9, '#78716c'); pushBox(a, 7.3, 1.7, -0.8, 8.7, 1.8, 0.6, '#292524'); pushBox(a, 8.8, 0.3, -0.4, 9.2, 0.7, 0.2, '#b45309'); SPOTS.grinder = [8, 0, -0.1];
+  // the camp pile: a wooden pallet next to the workbench
+  pushBox(a, 0.2, 0, -7.0, 2.4, 0.18, -5.2, '#6b4a2b'); SPOTS.pile = [1.3, 0, -6.1];
+  for (const [x, z, r] of [[-2.8, 1.8, 0.6], [2.6, 2.4, -0.5], [0.2, -3.1, 0.1]]) { pushBox(a, x - 1.1, 0, z - 0.3, x + 1.1, 0.5, z + 0.3, '#5b3a22'); }
+  // ranger cabin (door on the -z side)
+  { const { x, z } = LM.cabin, w = 4, d = 3.5, h = 3; const c = '#7c5a3a';
+    wall(a, x - w, 0, z + d - 0.3, x + w, h, z + d, c); wall(a, x - w, 0, z - d, x - w + 0.3, h, z + d, c); wall(a, x + w - 0.3, 0, z - d, x + w, h, z + d, c);
+    wall(a, x - w, 0, z - d, x - 1, h, z - d + 0.3, c); wall(a, x + 1, 0, z - d, x + w, h, z - d + 0.3, c); wall(a, x - 1, 2.3, z - d, x + 1, h, z - d + 0.3, c, false);
+    pushBox(a, x - w - 0.5, h, z - d - 0.5, x + w + 0.5, h + 0.4, z + d + 0.5, '#44403c'); pushBox(a, x - w + 0.5, h + 0.4, z - d + 0.5, x + w - 0.5, h + 1.3, z + d - 0.5, '#57534e');
+    wall(a, x + 2, 0, z + 1.5, x + 3.6, 0.8, z + 3, '#6b4a2b'); SPOTS.cabinDesk = [x + 2.8, 0.9, z + 2.2]; }
+  // standing stones
+  { const { x, z } = LM.stones; for (let i = 0; i < 7; i++) { const an = i / 7 * 6.283, px = x + Math.cos(an) * 6, pz = z + Math.sin(an) * 6; wall(a, px - 0.6, -0.2, pz - 0.4, px + 0.6, 3.6 + (i % 3) * 0.6, pz + 0.4, '#6b7280'); }
+    wall(a, x - 1.2, 0, z - 0.8, x + 1.2, 0.9, z + 0.8, '#78716c'); SPOTS.altar = [x, 1.3, z]; }
+  // lake dock
+  { const [lx, lz] = LAKE; pushBox(a, lx - 22, WATER_Y - 0.05, lz - 0.9, lx - 4, WATER_Y + 0.55, lz + 0.9, '#8b6b45'); solid.push([lx - 22, -9, lz - 0.9, lx - 4, WATER_Y + 0.55, lz + 0.9]);
+    for (let i = 0; i < 6; i++) pushBox(a, lx - 21 + i * 3.4, WATER_Y - 3, lz + 0.8, lx - 20.7 + i * 3.4, WATER_Y + 0.6, lz + 1.1, '#5b3a22');
+    SPOTS.dockEnd = [lx - 5, WATER_Y + 0.6, lz]; }
+  // fire watchtower with stairs
+  { const { x, z } = LM.tower, H = 6;
+    for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) wall(a, x + dx - 0.2, 0, z + dz - 0.2, x + dx + 0.2, H, z + dz + 0.2, '#6b4a2b');
+    wall(a, x - 2.4, H, z - 2.4, x + 2.4, H + 0.3, z + 2.4, '#8b6b45');
+    for (const [x0, z0, x1, z1] of [[-2.4, -2.4, 2.4, -2.2], [-2.4, 2.2, 2.4, 2.4], [-2.4, -2.4, -2.2, 2.4]]) wall(a, x + x0, H + 0.3, z + z0, x + x1, H + 1.3, z + z1, '#6b4a2b');
+    pushBox(a, x - 2.6, H + 2.6, z - 2.6, x + 2.6, H + 2.9, z + 2.6, '#44403c'); for (const [dx, dz] of [[-2.3, -2.3], [2.3, -2.3], [-2.3, 2.3], [2.3, 2.3]]) pushBox(a, x + dx - 0.1, H + 0.3, z + dz - 0.1, x + dx + 0.1, H + 2.6, z + dz + 0.1, '#6b4a2b');
+    for (let i = 0; i < 40; i++) { const sx = x + 2.4 + i * 0.62, top = H + 0.3 - i * 0.42, g = Math.min(groundH(sx, z - 1), groundH(sx + 0.62, z + 1), groundH(sx + 0.31, z)); if (top <= g + 0.05) break; wall(a, sx, g - 1, z - 1, sx + 0.62, top, z + 1, '#7c5a3a'); }
+    SPOTS.towerTop = [x, H + 0.3, z]; }
+  // hollow cave: a tunnel of rock you walk into, dark inside
+  { const { x, z } = LM.cave, len = 18;
+    pushBox(a, x - 9, -0.5, z - 1, x + 9, 7, z + len + 6, '#57534e'); solid.push([x - 9, -0.5, z - 1, x - 2, 7, z + len + 6], [x + 2, -0.5, z - 1, x + 9, 7, z + len + 6], [x - 2, 3.4, z - 1, x + 2, 7, z + len + 6], [x - 2, -0.5, z + len, x + 2, 7, z + len + 6]);
+    // carve: draw the inside as darker boxes facing in (floor + walls)
+    pushBox(a, x - 2, -0.02, z - 1.05, x + 2, 0.02, z + len, '#292524');
+    pushBox(a, x - 2.02, 0, z - 1.05, x - 1.98, 3.4, z + len, '#3f3a36'); pushBox(a, x + 1.98, 0, z - 1.05, x + 2.02, 3.4, z + len, '#3f3a36'); pushBox(a, x - 2, 3.38, z - 1.05, x + 2, 3.42, z + len, '#33302d');
+    pushBox(a, x - 2.5, 3.4, z - 1.2, x + 2.5, 4.2, z - 0.9, '#44403c');
+    SPOTS.caveEnd = [x, 0.4, z + len - 1.5]; }
+  // old mill + water wheel axle
+  { const { x, z } = LM.mill, c = '#8b6b45';
+    wall(a, x - 3.5, 0, z - 3, x - 3.2, 4, z + 3, c); wall(a, x + 3.2, 0, z - 3, x + 3.5, 4, z + 3, c); wall(a, x - 3.5, 0, z + 2.7, x + 3.5, 4, z + 3, c); wall(a, x - 3.5, 0, z - 3, x - 1, 4, z - 2.7, c); wall(a, x + 1, 0, z - 3, x + 3.5, 4, z - 2.7, c);
+    pushCone(a, x, 4, z, 5.2, 3, '#7f1d1d', 4); SPOTS.mill = [x, 0, z]; SPOTS.wheel = [x + 4.2, 2.5, z]; wall(a, x - 1, 0, z - 1, x + 1, 1.2, z + 1, '#a8a29e'); }
+  // abandoned camp: collapsed tents and a cold fire
+  { const { x, z } = LM.oldcamp; pushCone(a, x - 4, 0, z + 2, 2, 1.6, '#475569', 4); pushCone(a, x + 3.5, 0, z - 2.5, 2.2, 1.4, '#7c2d12', 4); for (let i = 0; i < 8; i++) { const an = i / 8 * 6.283; pushBox(a, x + Math.cos(an) - 0.2, 0, z + Math.sin(an) - 0.2, x + Math.cos(an) + 0.2, 0.3, z + Math.sin(an) + 0.2, '#57534e'); } wall(a, x + 1, 0, z + 4, x + 3.5, 1.1, z + 5.2, '#475569'); SPOTS.oldcamp = [x, 0, z]; }
+  // map-edge fence
+  for (let i = -HALF; i < HALF; i += 4) for (const [x0, z0, x1, z1] of [[i, -HALF, i + 0.3, -HALF + 0.3], [i, HALF - 0.3, i + 0.3, HALF], [-HALF, i, -HALF + 0.3, i + 0.3], [HALF - 0.3, i, HALF, i + 0.3]]) pushBox(a, x0, groundH(x0, z0) - 0.3, z0, x1, groundH(x0, z0) + 1.2, z1, '#3f2a1a');
+  solid.push([-HALF - 5, -20, -HALF - 5, -HALF + 0.5, 40, HALF + 5], [HALF - 0.5, -20, -HALF - 5, HALF + 5, 40, HALF + 5], [-HALF - 5, -20, -HALF - 5, HALF + 5, 40, -HALF + 0.5], [-HALF - 5, -20, HALF - 0.5, HALF + 5, 40, HALF + 5]);
+  if (R) {
+    staticMesh = R.mesh(a);
+    const t = []; pushTerrain(t, -HALF, -HALF, HALF, HALF, STEP, (x, z) => HG[Math.round((x + HALF) / STEP) * GN + Math.round((z + HALF) / STEP)], groundCol); terrainMesh = R.mesh(t);
+    const w = []; pushBox(w, LAKE[0] - LAKE[2] - 2, WATER_Y - 0.1, LAKE[1] - LAKE[2] - 2, LAKE[0] + LAKE[2] + 2, WATER_Y, LAKE[1] + LAKE[2] + 2, '#1e3a5f'); waterMesh = R.mesh(w);
+  }
+}
+buildWorld();
+const solidGrid = new Map();   // static boxes by 10-unit cell for fast lookups
+for (const b of solid) for (let x = Math.floor(b[0] / 10); x <= Math.floor(b[3] / 10); x++) for (let z = Math.floor(b[2] / 10); z <= Math.floor(b[5] / 10); z++) { const k = x + ',' + z; if (!solidGrid.has(k)) solidGrid.set(k, []); solidGrid.get(k).push(b); }
+function boxesNear(x, z) {
+  const out = [], seen = new Set();
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (const b of solidGrid.get((Math.floor(x / 10) + dx) + ',' + (Math.floor(z / 10) + dz)) || []) if (!seen.has(b)) { seen.add(b); out.push(b); }
+  const ci = Math.floor((x + HALF) / CH), cj = Math.floor((z + HALF) / CH);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const a = ci + dx, b = cj + dz; if (a < 0 || b < 0 || a >= NCH || b >= NCH) continue; const c = chunks[a * NCH + b]; if (c.dirty) buildChunk(c); for (const k of c.boxes) if (Math.abs(k[0] - x) < 6 && Math.abs(k[2] - z) < 6) out.push(k); }
+  for (const p of S.posts) out.push([p.x - 0.2, p.y, p.z - 0.2, p.x + 0.2, p.y + 2, p.z + 0.2]);
+  return out;
+}
+
+/* =================== STORY =================== */
+const PAGES = [
+  { at: 'camp', title: 'Page 1 — To whoever finds this', text: 'If you are reading this by the fire, good. Keep it fed. The Gloam does not like warm light; it will pace the edge of it all night and never step in. Wood from the pines burns longest. Do not let it go out.' },
+  { at: 'cabin', title: 'Page 2 — The ranger’s cabin', text: 'Forty years I have kept the lantern. My father kept it before me. We never knew what the Gloam was, only that it came when the Beacon was dim. This spring the Beacon flickered. I think the Sunstones are tired.' },
+  { at: 'stones', title: 'Page 3 — The stones', text: 'The first Sunstone sits on the altar in the ring, where it was set when Hollowpine was young. The stones hum when it is near. At night the Gloam gathers here thickest — go by daylight.' },
+  { at: 'dock', title: 'Page 4 — The lake', text: 'I hid the second stone at the end of the dock, under the lantern hook, after the flood. The water keeps the Gloam back a little; they hate their own reflection. Mind your step on the old boards.' },
+  { at: 'tower', title: 'Page 5 — The watchtower', text: 'From the top of the tower you can see every fire in the valley. There used to be eleven. Now there is only ours. The third stone is up there; I carried it to see further. It did not help.' },
+  { at: 'mill', title: 'Page 6 — The mill', text: 'Something tall walks the woods on the fifth night. Pale, with a cold blue lamp of its own. It drinks light. Do not run from it — shine your torch in its face and hold steady. It hates to be seen.' },
+  { at: 'oldcamp', title: 'Page 7 — The other campers', text: 'These were good folks. They let their fire go out on a windy night. I found their tents in the morning and nothing else. I keep their names in the back of this book. Please — never let the fire go out.' },
+  { at: 'cave', title: 'Page 8 — The hollow', text: 'The last stone is deep in the hollow, where the sun never reaches. I am going in to fetch it. If I do not come out, bring all four home to the Beacon and light it. I will see the light, wherever I am. — Odell' },
+];
+const STONES = ['altar', 'dockEnd', 'towerTop', 'caveEnd'];
+const STONE_NAMES = { altar: 'the standing stones', dockEnd: 'the lake dock', towerTop: 'the watchtower', caveEnd: 'the hollow cave' };
+const RECIPES = [
+  { id: 'axe', name: 'Stone axe', desc: 'Chop trees in 2 hits. Better weapon.', cost: { wood: 3, stone: 2 }, tool: true },
+  { id: 'spear', name: 'Spear', desc: 'Long reach, hits hard.', cost: { wood: 4, stone: 2, scrap: 1 }, tool: true },
+  { id: 'lantern', name: 'Lantern', desc: 'Carry a little warm light (L). The Gloam keeps its distance.', cost: { wood: 2, scrap: 2 }, tool: true },
+  { id: 'wrap', name: 'Herbal wrap', desc: 'Heals 35 health (used straight away).', cost: { berries: 3, wood: 1 } },
+  { id: 'ring', name: 'Stone fire ring', desc: 'The campfire burns slower and wider.', cost: { stone: 10, wood: 6 }, once: true },
+  { id: 'bow', name: 'Bow', desc: 'Shoots arrows in an arc. Quiet, and you can pick the arrows back up.', cost: { wood: 5, stone: 1 }, tool: true },
+  { id: 'arrows', name: '8 arrows', desc: 'Ammo for the bow.', cost: { wood: 2, stone: 1 }, ammo: 'arrows', n: 8 },
+  { id: 'plot', name: 'Farm plot', desc: 'Plant carrot seeds (you sometimes find them in berry bushes). Rain makes crops grow faster.', cost: { wood: 6, stone: 2 }, plot: true },
+  { id: 'rod', name: 'Fishing rod', desc: 'Fish in the lake: wait for a bite, then hit the green.', cost: { wood: 3, scrap: 2 }, tool: true },
+  { id: 'vest', name: 'Pelt vest', desc: 'Armor: take 25% less damage.', cost: { pelts: 3 }, armor: 0.25, once: true },
+  { id: 'coat', name: 'Bear coat', desc: 'Armor: take 45% less damage.', cost: { bearpelts: 1, pelts: 2 }, armor: 0.45, once: true },
+];
+/* the Scrap Grinder builds from scrap (junk ground down) + wood from the camp pile */
+const GRINDER = [
+  { id: 'bed', name: 'Bed', desc: 'Every bed makes the nights 12% shorter (up to 5). Sleep in one at night to pass time faster.', cost: { wood: 6, scrap: 4 }, bed: true },
+  { id: 'sack10', name: 'Good Sack', desc: 'Carry 10 things.', cost: { scrap: 6, wood: 2 }, sack: 10 },
+  { id: 'sack15', name: 'Big Sack', desc: 'Carry 15 things.', cost: { scrap: 14, wood: 4 }, sack: 15 },
+  { id: 'sack22', name: 'Giant Sack', desc: 'Carry 22 things.', cost: { scrap: 28, wood: 6 }, sack: 22 },
+  { id: 'post', name: 'Light post', desc: 'A hotbar item: place it to make light for two nights.', cost: { wood: 4, scrap: 2 }, item: 'posts' },
+  { id: 'battery', name: 'Battery', desc: 'Refills the flashlight. Goes into the camp pile.', cost: { scrap: 3 }, item: 'batteries' },
+  { id: 'trap', name: 'Snap trap', desc: 'A hotbar item: set it on the ground. Catches wolves, raiders and even the bear.', cost: { scrap: 6, wood: 2 }, item: 'traps' },
+  { id: 'strongaxe', name: 'Strong axe', desc: 'Fells a tree in one hit and hits hard (50).', cost: { scrap: 12, wood: 4 }, tool: true },
+  { id: 'bullets', name: '12 bullets', desc: 'Revolver ammo.', cost: { scrap: 6 }, ammo: 'bullets', n: 12 },
+  { id: 'shells', name: '6 shotgun shells', desc: 'Shotgun ammo.', cost: { scrap: 8 }, ammo: 'shells', n: 6 },
+];
+const ITEMS = {
+  log: { i: '🪵', n: 'Log', col: '#7c4a1e', pile: 'wood' }, stone: { i: '🪨', n: 'Stone', col: '#8b8f99', pile: 'stone' },
+  berry: { i: '🍓', n: 'Berries', col: '#dc2626', pile: 'berries', food: 12 }, can: { i: '🥫', n: 'Can of beans', col: '#b45309', pile: 'cans', food: 40 },
+  battery: { i: '🔋', n: 'Battery', col: '#facc15', pile: 'batteries' },
+  meat: { i: '🥩', n: 'Raw meat', col: '#b91c1c', food: 6, raw: true, pile: 'meat' }, cooked: { i: '🍖', n: 'Cooked meat', col: '#92400e', food: 40, pile: 'cooked' },
+  pelt: { i: '🐺', n: 'Wolf pelt', col: '#9ca3af', pile: 'pelts' }, bearpelt: { i: '🐻', n: 'Bear pelt', col: '#78350f', pile: 'bearpelts' },
+  revolver: { i: '🔫', n: 'Revolver', col: '#1f2937', tool: 'revolver' }, shotgun: { i: '💥', n: 'Shotgun', col: '#3f2a1a', tool: 'shotgun' },
+  bullets: { i: '📦', n: 'Box of bullets', col: '#a16207', ammo: 'bullets', amt: 12 }, shells: { i: '🧨', n: 'Shotgun shells', col: '#b91c1c', ammo: 'shells', amt: 6 }, arrow: { i: '➶', n: 'Arrow', col: '#d6a756', ammo: 'arrows', amt: 1 },
+  seed: { i: '🌱', n: 'Carrot seeds', col: '#65a30d', pile: 'seeds' }, carrot: { i: '🥕', n: 'Carrot', col: '#f97316', food: 18, pile: 'carrots' },
+  fish: { i: '🐟', n: 'Fish', col: '#60a5fa', food: 5, raw: true, pile: 'fish' }, bigfish: { i: '🐠', n: 'Big fish', col: '#2563eb', food: 8, raw: true, pile: 'bigfish' },
+  cookedfish: { i: '🍣', n: 'Cooked fish', col: '#fdba74', food: 30, pile: 'cookedfish' }, cookedbig: { i: '🍱', n: 'Cooked big fish', col: '#fb923c', food: 55, pile: 'cookedbig' },
+  goldfish: { i: '✨', n: 'Golden fish', col: '#facc15', scrap: 12 },
+  bolts: { i: '🔩', n: 'Bolts', col: '#94a3b8', scrap: 1 }, pipe: { i: '🔧', n: 'Old pipe', col: '#64748b', scrap: 2 }, tire: { i: '🛞', n: 'Tire', col: '#27272a', scrap: 3 }, radio: { i: '📻', n: 'Broken radio', col: '#57534e', scrap: 4 },
+};
+const SACKS = { 5: 'Old Sack', 10: 'Good Sack', 15: 'Big Sack', 22: 'Giant Sack' };
+const JUNK = ['bolts', 'bolts', 'pipe', 'pipe', 'tire', 'radio'];
+const BEDSPOTS = [[-4.5, 5.6], [-6.6, 3.9], [-2.4, 7.1], [-7.8, 1.2], [-0.2, 8.2]];
+
+/* =================== STATE =================== */
+const DAY = 260, NIGHT = 100;   // seconds (beds shorten the night)
+const nightLen = () => NIGHT * (1 - 0.12 * Math.min(5, (S && S.beds) || 0));
+let S = null, P = null, mode = 'story', running = false, paused = false, enemies = [], fx = [], logT = 0, warden = null, endT = 0;
+function fresh(m) {
+  mode = m;
+  S = { mode: m, night: 0, t: 25, isNight: false, fire: 70, hp: 100, food: 80, stam: 100, inv: { wood: 2, stone: 0, scrap: 0, berries: 3, cans: 1, batteries: 1, posts: 0 }, cap: 20, tools: { axe: false, spear: false, lantern: false, ring: false },
+    weather: 'clear', wxK: 0, plots: [], traps: [], raidsWon: 0, held: 'hands', ammo: { arrows: 0, bullets: 0, shells: 0 }, mag: { revolver: 0, shotgun: 0 }, chests: [], armor: 0, wolves: 0, cooked: 0, sack: [], sackCap: 5, drops: [], dropN: 0, beds: 0, junkTaken: [], flash: 100, flashOn: false, lanternOn: false, pages: [], stones: [], placed: 0, chopped: [], rocksUsed: {}, berriesT: {}, scrapsTaken: [], posts: [], kills: 0, chops: 0, deaths: 0, beaconLit: false, finalNight: false, wardenGone: 0 };
+  { const jr = G3.rng(SEED + 77); for (let i = 0; i < 60; i++) { const x = (jr() * 2 - 1) * 90, z = (jr() * 2 - 1) * 90; if (Math.hypot(x, z) < 15 || inCaveRock(x, z) || Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2]) continue; const id = jr() < 0.12 ? 'battery' : jr() < 0.12 ? 'can' : JUNK[(jr() * JUNK.length) | 0]; S.drops.push({ u: ++S.dropN, id, x, z, y: groundH(x, z) }); } }
+  P = Object.assign(G3.Body(1.5, 0, 6), { yaw: Math.PI, face: Math.PI, walk: 0, swing: 0, swingT: 0, hurtT: 0, inv: 0 });
+  camYaw = Math.PI * 0.85; camPitch = -0.25;
+}
+function applyWorldState() {
+  for (const id of S.chopped) { const t = trees[id]; if (t) { t.alive = false; dirtyAt(t.x, t.z); } }
+  for (const [id, left] of Object.entries(S.rocksUsed)) { const r = rocks[id]; if (r) { r.left = left; dirtyAt(r.x, r.z); } }
+  for (const [id, n] of Object.entries(S.berriesT)) { const b = bushes[id]; if (b) { b.berries = n; dirtyAt(b.x, b.z); } }
+  for (const id of S.scrapsTaken) if (scraps[id]) scraps[id].taken = true;
+}
+const SAVE = 'sj-lantern-save';
+function save() { if (!S || S.mode !== 'story' || S.over) return; try { localStorage.setItem(SAVE, JSON.stringify({ S, P: { x: P.x, y: P.y, z: P.z, yaw: P.yaw } })); } catch {} }
+function loadSave() { try { const d = JSON.parse(localStorage.getItem(SAVE)); if (!d || !d.S) return false; fresh('story'); S = Object.assign(S, d.S); Object.assign(P, d.P); applyWorldState(); return true; } catch { return false; } }
+
+/* =================== HELPERS =================== */
+function log(t) { const d = document.createElement('div'); d.textContent = t; $('log').appendChild(d); while ($('log').children.length > 5) $('log').firstChild.remove(); setTimeout(() => d.remove(), 6000); }
+const fireR = () => S.fire <= 0 ? 0 : (S.tools.ring ? 6 : 4) + S.fire * (S.tools.ring ? 0.17 : 0.13);
+function lightAt(x, z) {   // how protected a spot is: 0 = dark, ≥1 = inside a light
+  let v = 0; const df = Math.hypot(x, z); if (fireR()) v = Math.max(v, fireR() / Math.max(df, 0.1));
+  for (const p of S.posts) if (p.fuel > 0) v = Math.max(v, 7 / Math.max(0.1, Math.hypot(x - p.x, z - p.z)));
+  if (S.beaconLit) v = Math.max(v, 30 / Math.max(0.1, Math.hypot(x + 6, z + 3)));
+  return v;
+}
+const darkness = () => { const t = S.t; if (!S.isNight) return t > DAY - 15 ? smooth(DAY - 15, DAY, t) * 0.85 : t < 10 ? (1 - smooth(0, 10, t)) * 0.85 : 0; return 0.85 + 0.15 * smooth(0, 10, t) * (1 - smooth(nightLen() - 12, nightLen(), t)); };
+/* ---------- the sack: every carried thing takes one slot; full sack → it stays on the ground ---------- */
+const sackRoom = () => S.sackCap - S.sack.length;
+const sackCount = id => S.sack.filter(x => x === id).length;
+let fullT = 0;
+function sackFull() { if (performance.now() - fullT > 1500) { fullT = performance.now(); log(`🎒 Inventory full (${S.sack.length}/${S.sackCap}) — unload at the camp pile or build a bigger sack.`); G3.tone(200, 0.12, 'square', 0.04); } }
+/** put an item on the ground (it never vanishes) */
+function dropItem(id, x, z, spread = 0.8) { const a = Math.random() * 6.283, r = Math.random() * spread; const dx = x + Math.cos(a) * r, dz = z + Math.sin(a) * r; S.drops.push({ u: ++S.dropN, id, x: dx, z: dz, y: groundAt(dx, dz) }); }
+const groundAt = (x, z) => (Math.abs(x - LM.cave.x) < 2 && z > LM.cave.z - 1 && z < LM.cave.z + 18) ? 0 : groundH(x, z);
+/** into the sack, or onto the ground if it's full; returns true if it went in */
+function give(id, x, z) { if (sackRoom() > 0) { S.sack.push(id); return true; } dropItem(id, x == null ? P.x : x, z == null ? P.z : z, 0.6); sackFull(); return false; }
+function pickUp(d) {
+  const it = ITEMS[d.id];
+  if (it.tool || it.ammo) {
+    S.drops.splice(S.drops.indexOf(d), 1);
+    if (it.tool) { S.tools[it.tool] = true; S.held = it.tool; S.mag[it.tool] = WEAP[it.tool].mag; log(`${it.i} You found the ${it.n.toLowerCase()}! Click to shoot · R reloads · right-click aims`); if (it.tool === 'revolver') kit && kit.unlock('armed'); sfx('power'); }
+    else { S.ammo[it.ammo] += it.amt; log(`${it.i} +${it.amt} ${it.ammo}`); G3.tone(880, 0.05, 'square', 0.04); }
+    fx.push({ k: 'fly', x: d.x, y: d.y + 0.3, z: d.z, t: 0.3, col: it.col }); return true;
+  }
+  if (sackRoom() <= 0) { sackFull(); return false; }
+  S.drops.splice(S.drops.indexOf(d), 1); S.sack.push(d.id);
+  fx.push({ k: 'fly', x: d.x, y: d.y + 0.3, z: d.z, t: 0.3, col: ITEMS[d.id].col });
+  G3.tone(660 + Math.random() * 120, 0.05, 'triangle', 0.035, 990); return true;
+}
+function collectAround(r = 3.8) { const near = S.drops.filter(d => Math.hypot(d.x - P.x, d.z - P.z) < r && Math.abs(d.y - P.y) < 2.5).sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z)); let n = 0; for (const d of near) { if (!pickUp(d)) break; n++; } if (!near.length) log('🎒 Nothing here to pick up — chop trees, mine rocks, open crates.'); return n; }
+function unloadSack() { let n = 0; for (let i = S.sack.length - 1; i >= 0; i--) { const it = ITEMS[S.sack[i]]; if (it.pile) { S.inv[it.pile] = (S.inv[it.pile] || 0) + 1; S.sack.splice(i, 1); n++; } } log(n ? `🏕 Unloaded ${n} thing${n === 1 ? '' : 's'} into the camp pile` : 'Nothing to unload (junk goes in the Scrap Grinder).'); if (n) G3.noise(0.25, 0.05, 600); return n; }
+function grind() { let pts = 0, n = 0; for (let i = S.sack.length - 1; i >= 0; i--) { const it = ITEMS[S.sack[i]]; if (it.scrap) { pts += it.scrap; n++; S.sack.splice(i, 1); } } if (n) { S.inv.scrap += pts; S.grindT = 1.2; log(`⚙️ Ground ${n} junk into ${pts} scrap`); G3.noise(1.1, 0.08, 400); G3.tone(90, 1, 'sawtooth', 0.04, 140); } return pts; }
+/* ---------- the hotbar ---------- */
+const WEAP = {
+  hands: { dmg: 12, reach: 2.3, cd: 0.42, chop: 18 }, axe: { dmg: 30, reach: 2.3, cd: 0.42, chop: 50 }, strongaxe: { dmg: 50, reach: 2.5, cd: 0.42, chop: 100 }, spear: { dmg: 45, reach: 3.2, cd: 0.5, chop: 25 },
+  bow: { gun: 'arrow', dmg: 42, cd: 0.75, ammo: 'arrows' }, revolver: { gun: 'hit', dmg: 45, cd: 0.32, ammo: 'bullets', mag: 6, reload: 1.4, range: 55, spread: 0.008 }, shotgun: { gun: 'hit', dmg: 16, pellets: 7, cd: 0.9, ammo: 'shells', mag: 2, reload: 1.8, range: 22, spread: 0.09 },
+};
+const HB = { rod: ['🎣', 'Fishing rod'], trap: ['🪤', 'Snap trap'], strongaxe: ['🪓', 'Strong axe'], bow: ['🏹', 'Bow'], revolver: ['🔫', 'Revolver'], shotgun: ['💥', 'Shotgun'], hands: ['✊', 'Hands'], axe: ['🪓', 'Axe'], spear: ['🔱', 'Spear'], flash: ['🔦', 'Flashlight'], lantern: ['🏮', 'Lantern'], sack: ['🎒', 'Sack'], food: ['🍓', 'Food'], post: ['🕯', 'Light post'] };
+const hotbar = () => [S.tools.strongaxe ? 'strongaxe' : S.tools.axe ? 'axe' : 'hands', S.tools.spear && 'spear', S.tools.bow && 'bow', S.tools.revolver && 'revolver', S.tools.shotgun && 'shotgun', 'flash', S.tools.lantern && 'lantern', S.tools.rod && 'rod', 'sack', 'food', S.inv.posts > 0 && 'post', (S.inv.traps || 0) > 0 && 'trap'].filter(Boolean);
+const foodCount = () => S.sack.filter(x => ITEMS[x].food).length;
+function useHeld() {
+  const h = S.held;
+  if (WEAP[h] && WEAP[h].gun) fire();
+  else if (WEAP[h]) attack();
+  else if (h === 'flash') toggleFlash();
+  else if (h === 'lantern') { S.lanternOn = !S.lanternOn; G3.tone(700, 0.04, 'square', 0.04); }
+  else if (h === 'sack') collectAround();
+  else if (h === 'food') eat();
+  else if (h === 'post') placePost();
+  else if (h === 'rod') useRod();
+  else if (h === 'trap') placeTrap();
+}
+function toggleFlash() { S.flashOn = !S.flashOn && S.flash > 0; if (!S.flashOn && S.flash <= 0) log('No battery — carry one in your sack.'); G3.tone(900, 0.03, 'square', 0.04); }
+const toolNames = ['Hands', 'Axe', 'Spear'];
+
+/* =================== ACTIONS =================== */
+function facing(x, z, maxD, cone = 0.35) {
+  const f = dirOf(camYaw), dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz);
+  if (d > maxD) return false; if (d < 0.9) return true;
+  return (dx * f[0] + dz * f[2]) / d > cone;
+}
+function attack() {
+  if (P.swingT > 0) return;
+  const Wp = WEAP[S.held] && !WEAP[S.held].gun ? WEAP[S.held] : WEAP.hands, tool = S.held === 'spear' ? 2 : S.held === 'axe' || S.held === 'strongaxe' ? 1 : 0, dmg = Wp.dmg, reach = Wp.reach;
+  P.swingT = Wp.cd; P.swing = 0.001;
+  setTimeout(() => {
+    let hit = false;
+    for (const e of enemies) if (e.hp > 0 && facing(e.x, e.z, reach + 0.4, 0.2)) { e.hp -= dmg; e.stun = 0.35; e.vx = e.x - P.x; e.vz = e.z - P.z; hit = true; G3.tone(160, 0.12, 'square', 0.07, 80); if (e.hp <= 0) killEnemy(e); }
+    for (const a of animals) if (a.hp > 0 && facing(a.x, a.z, reach + AN[a.kind].r, 0.2)) { hurtAnimal(a, dmg); hit = true; }
+    for (const r of raiders) if (facing(r.x, r.z, reach + 0.5, 0.2)) { hurtRaider(r, dmg); hit = true; }
+    if (warden && warden.hp > 0 && facing(warden.x, warden.z, reach + 0.6, 0.2)) { warden.hp -= dmg * 0.5; warden.fear += 0.6; hit = true; G3.tone(120, 0.18, 'sawtooth', 0.06, 60); }
+    if (hit) return;
+    // chop
+    let best = null, bd = 9;
+    for (const t of treesNear(P.x, P.z, 3)) if (t.alive && facing(t.x, t.z, 2.3, 0.3)) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd) { bd = d; best = t; } }
+    if (best) { best.hp += Wp.chop; G3.noise(0.08, 0.06, 1200); fx.push({ k: 'chip', x: best.x, y: P.y + 1.2, z: best.z, t: 0.5 });
+      if (best.hp >= 100) { best.alive = false; S.chopped.push(best.id); dirtyAt(best.x, best.z); const n = tool === 1 ? 4 : 3; for (let k = 0; k < n; k++) dropItem('log', best.x, best.z, 1.6); log(`🪵 The tree drops ${n} logs — pick them up (E, or hold the sack 🎒)`); S.chops++; if (S.chops >= 40) kit && kit.unlock('lumber'); G3.tone(90, 0.3, 'triangle', 0.08, 50); }
+      return; }
+    for (const r of rocks) if (r.left > 0 && Math.abs(r.x - P.x) < 3 && Math.abs(r.z - P.z) < 3 && facing(r.x, r.z, 2.6, 0.3)) { r.left--; S.rocksUsed[r.id] = r.left; dirtyAt(r.x, r.z); const n = 1 + (tool === 1 ? 1 : 0); for (let k = 0; k < n; k++) dropItem('stone', P.x + (r.x - P.x) * 0.5, P.z + (r.z - P.z) * 0.5, 0.7); log(`🪨 ${n} stone${n > 1 ? 's' : ''} broke off`); G3.tone(400, 0.06, 'square', 0.05, 200); return; }
+  }, 160);
+}
+function treesNear(x, z, r) { const c = chunks[chunkOf(x, z)], out = []; for (const t of trees) if (Math.abs(t.x - x) < r && Math.abs(t.z - z) < r) out.push(t); return out; }
+function killEnemy(e) { e.hp = 0; S.kills++; for (let i = 0; i < 10; i++) fx.push({ k: 'puff', x: e.x + (Math.random() - .5), y: e.y + 1 + Math.random(), z: e.z + (Math.random() - .5), t: 0.7 }); G3.tone(300, 0.25, 'sine', 0.06, 60); }
+/** the thing E would use right now: {label, run} */
+function usable() {
+  const out = [];
+  const near = (p, r) => Math.hypot(P.x - p[0], P.z - p[2]) < r && Math.abs(P.y - p[1]) < 3;
+  { const close = S.drops.filter(d => Math.hypot(d.x - P.x, d.z - P.z) < 1.6 && Math.abs(d.y - P.y) < 2.5).sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z))[0];
+    if (close) out.push({ label: `Pick up ${ITEMS[close.id].i} ${ITEMS[close.id].n} (${S.sack.length}/${S.sackCap})`, run: () => pickUp(close) }); }
+  if (Math.hypot(P.x, P.z) < 3.2) { const logs = sackCount('log');
+    out.push(logs ? { label: `Burn ${logs} log${logs > 1 ? 's' : ''} from your sack (fire ${Math.round(S.fire)}%)`, run: () => { if (S.fire >= 100) return log('The fire is roaring already.'); let n = 0; while (sackCount('log') && S.fire < 100) { S.sack.splice(S.sack.indexOf('log'), 1); S.fire = Math.min(100, S.fire + 12); n++; } log(`🔥 Fed the fire (${n} log${n > 1 ? 's' : ''})`); G3.noise(0.4, 0.05, 300); } }
+      : S.inv.wood ? { label: `Add wood from the camp pile (${S.inv.wood}) — fire ${Math.round(S.fire)}%`, run: () => { const n = Math.min(S.inv.wood, Math.ceil((100 - S.fire) / 12)) || 1; if (S.fire >= 100) return log('The fire is roaring already.'); S.inv.wood -= n; S.fire = Math.min(100, S.fire + n * 12); log(`🔥 Fed the fire (${n} wood)`); G3.noise(0.4, 0.05, 300); } }
+      : { label: `Fire: ${Math.round(S.fire)}% — bring logs`, run: () => log('Chop trees and carry the logs back in your sack.') }); }
+  for (const c of CHESTS) { if (S.chests.includes(c.id)) continue; const p = c.at(); if (Math.hypot(P.x - p[0], P.z - p[2]) < 2 && Math.abs(P.y - p[1]) < 2.5) { out.push({ top: true, label: 'Open the chest', run: () => openChest(c) }); break; } }
+  { const COOK = { meat: 'cooked', fish: 'cookedfish', bigfish: 'cookedbig' }, raw = S.sack.filter(x => COOK[x]).length;
+    if (Math.hypot(P.x, P.z) < 3.2 && raw && S.fire > 0) out.unshift({ label: `Cook ${raw} raw food over the fire`, run: () => { let n = 0; S.sack = S.sack.map(x => COOK[x] ? (n++, COOK[x]) : x); S.cooked += n; log(`🍖 Cooked ${n} thing${n > 1 ? 's' : ''}`); G3.noise(0.8, 0.05, 2500); if (S.cooked >= 10) kit && kit.unlock('cook'); } }); }
+  // farm plots and traps
+  S.plots.forEach((pl, i) => { const [x, z] = FARMSPOTS[i]; if (Math.hypot(P.x - x, P.z - z) > 1.9) return;
+    if (!pl.crop) out.push(sackCount('seed') || (S.inv.seeds || 0) > 0 ? { label: 'Plant carrot seeds', run: () => { if (sackCount('seed')) S.sack.splice(S.sack.indexOf('seed'), 1); else S.inv.seeds--; pl.crop = 'carrot'; pl.g = 0; log('🌱 Planted. Crops grow over a day — faster in the rain.'); G3.noise(0.2, 0.04, 800); } } : { label: 'Empty farm plot — you need carrot seeds', run: () => log('Seeds turn up when you pick berries, and in some chests.') });
+    else if (pl.g >= 1) out.push({ top: true, label: 'Harvest the carrots', run: () => { const n = 3 + (Math.random() < 0.4 ? 1 : 0); for (let k = 0; k < n; k++) give('carrot', x, z); give('seed', x, z); if (Math.random() < 0.5) give('seed', x, z); pl.crop = null; pl.g = 0; log(`🥕 Harvested ${n} carrots (+ seeds)`); kit && kit.unlock('farmer'); sfx('coin'); } });
+    else out.push({ label: `Carrots growing… ${Math.round(pl.g * 100)}%`, run: () => {} }); });
+  for (const t of S.traps) if (Math.hypot(P.x - t.x, P.z - t.z) < 1.6) { out.push(t.armed ? { label: 'Pick up the snap trap', run: () => { S.traps.splice(S.traps.indexOf(t), 1); S.inv.traps = (S.inv.traps || 0) + 1; } } : { label: 'Reset the snap trap', run: () => { t.armed = true; t.caught = null; G3.tone(500, 0.05, 'square', 0.04); } }); break; }
+  if (near(SPOTS.pile, 2.4)) out.push({ label: `Unload your sack into the camp pile (🪵${S.inv.wood} 🪨${S.inv.stone} 🍓${S.inv.berries})`, run: unloadSack });
+  if (near(SPOTS.grinder, 2.4)) out.push({ label: S.sack.some(x => ITEMS[x].scrap) ? 'Grind your junk into scrap' : 'Use the Scrap Grinder', run: () => { grind(); openPanel('grinder'); } });
+  if (S.isNight && fireR() > 6) for (let b = 0; b < S.beds; b++) { const p = BEDSPOTS[b]; if (Math.hypot(P.x - p[0], P.z - p[1]) < 1.8) { out.push({ label: S.resting ? 'Get up' : 'Sleep in the bed (the night passes faster)', run: () => { S.resting = !S.resting; log(S.resting ? '😴 Sleeping…' : 'You get up.'); } }); break; } }
+  if (near(SPOTS.beacon, 3)) out.push(S.stones.length > S.placed ? { label: `Set the Sunstone${S.stones.length - S.placed > 1 ? 's' : ''} in the Beacon (${S.placed}/4)`, run: placeStones } : { label: `The Beacon: ${S.placed}/4 Sunstones`, run: () => log(S.placed < 4 ? 'Find the Sunstones: ' + STONES.filter(s => !S.stones.includes(s)).map(s => STONE_NAMES[s]).join(', ') : 'The Beacon is lit.') });
+  if (near(SPOTS.bench, 2.6)) out.push({ label: 'Craft at the workbench (C)', run: () => openPanel('craft') });
+  if (near(SPOTS.tent, 3) && S.isNight && fireR() > 7) out.push({ label: 'Rest in the tent (heal while the fire burns)', run: () => { S.resting = !S.resting; log(S.resting ? '😴 Resting…' : 'You get up.'); } });
+  PAGES.forEach((pg, i) => { if (S.pages.includes(i)) return; const p = pagePos(i); if (Math.hypot(P.x - p[0], P.z - p[2]) < 2.2 && Math.abs(P.y - p[1]) < 2.5) out.push({ top: true, label: 'Read the journal page', run: () => takePage(i) }); });
+  for (const k of STONES) { if (S.stones.includes(k)) continue; const p = SPOTS[k]; if (Math.hypot(P.x - p[0], P.z - p[2]) < 2.2 && Math.abs(P.y - p[1]) < 2.5) out.push({ top: true, label: 'Take the Sunstone', run: () => { S.stones.push(k); log(`🔆 You found a Sunstone at ${STONE_NAMES[k]}! (${S.stones.length}/4)`); kit && kit.unlock('stone'); sfx('power'); save(); } }); }
+  for (const b of bushes) if (b.berries > 0 && Math.abs(b.x - P.x) < 2 && Math.abs(b.z - P.z) < 2) { out.push({ label: `Pick berries (${b.berries})`, run: () => { let n = 0; while (b.berries > 0) { b.berries--; if (give('berry', b.x, b.z)) n++; } S.berriesT[b.id] = 0; dirtyAt(b.x, b.z); if (Math.random() < 0.35) { give('seed', b.x, b.z); log('🌱 You found carrot seeds in the bush!'); } if (n) log(`🍓 +${n} berries in your sack`); sfx('pop'); } }); break; }
+  for (const s of scraps) if (!s.taken && Math.hypot(s.x - P.x, s.z - P.z) < 2) { out.push({ label: s.battery ? 'Open the old crate' : 'Search the junk pile', run: () => { s.taken = true; S.scrapsTaken.push(s.id); const got = [JUNK[Math.random() * JUNK.length | 0], JUNK[Math.random() * JUNK.length | 0]]; if (s.battery) got.push('battery', 'can', JUNK[Math.random() * JUNK.length | 0]); for (const g of got) dropItem(g, s.x, s.z, 1.3); log('📦 Things spill out: ' + got.map(g => ITEMS[g].i).join(' ') + ' — pick them up'); sfx('coin'); } }); break; }
+  return out.find(o => o.top) || out[0] || null;
+}
+function pagePos(i) {
+  const l = LM[PAGES[i].at];
+  if (PAGES[i].at === 'camp') return [SPOTS.bench[0] - 1, 0.95, SPOTS.bench[2]];
+  if (PAGES[i].at === 'cabin') return SPOTS.cabinDesk;
+  if (PAGES[i].at === 'tower') return [l.x + 1.4, 6.4, l.z + 1.4];
+  if (PAGES[i].at === 'cave') return [l.x + 1, 0.4, l.z + 10];
+  if (PAGES[i].at === 'dock') return [LAKE[0] - LAKE[2] - 6, groundH(LAKE[0] - LAKE[2] - 6, LAKE[1] + 3) + 0.4, LAKE[1] + 3];
+  return [l.x + 2, groundH(l.x + 2, l.z + 2) + 0.5, l.z + 2];
+}
+function takePage(i) {
+  S.pages.push(i); kit && kit.unlock('page'); if (S.pages.length >= 8) kit && kit.unlock('allpages');
+  $('ptext').innerHTML = `<h3>${PAGES[i].title}</h3>${PAGES[i].text}`; openPanel('reader'); sfx('coin'); save();
+}
+function placeStones() {
+  const n = S.stones.length - S.placed; S.placed = S.stones.length; log(`🏮 The Beacon holds ${S.placed}/4 Sunstones`); sfx('power');
+  if (S.placed >= 4 && !S.beaconLit) {
+    S.beaconLit = true; S.finalNight = true;
+    story('The Beacon wakes', 'Four stones, warm as bread from the oven. The Beacon coughs, sputters — and catches. Light pours over the clearing.<br><br>The woods go very quiet. Then, far off, something answers with a cold blue glow.<br><br><b>Survive the Long Night.</b>', [['Keep going', () => closePanels()]]);
+    if (!S.isNight) S.t = Math.max(S.t, DAY - 20);
+  }
+  save();
+}
+const builtOut = r => (r.plot && S.plots.length >= FARMSPOTS.length) || (r.armor && S.tools[r.id]) || (r.tool && S.tools[r.id]) || (r.once && S.tools[r.id]) || (r.sack && S.sackCap >= r.sack) || (r.bed && S.beds >= 5);
+function craft(r) {
+  if (builtOut(r)) return;
+  for (const [k, v] of Object.entries(r.cost)) if ((S.inv[k] || 0) < v) return;
+  for (const [k, v] of Object.entries(r.cost)) S.inv[k] -= v;
+  if (r.tool) { S.tools[r.id] = true; if (r.id === 'axe' || r.id === 'spear') S.held = r.id; if (r.id === 'lantern') S.lanternOn = true; }
+  if (r.item) S.inv[r.item]++;
+  if (r.id === 'wrap') S.hp = Math.min(100, S.hp + 35);
+  if (r.id === 'ring') S.tools.ring = true;
+  if (r.plot) { S.plots.push({ crop: null, g: 0 }); log(`🌱 Farm plot ${S.plots.length} is ready at camp`); }
+  if (r.id === 'rod') S.held = 'rod';
+  if (r.ammo) { S.ammo[r.ammo] += r.n; log(`🏹 +${r.n} ${r.ammo}`); }
+  if (r.armor) { S.tools[r.id] = true; S.armor = Math.max(S.armor, r.armor); }
+  if (r.tool && ['bow', 'strongaxe'].includes(r.id)) S.held = r.id;
+  if (r.bed) { S.beds++; log(`🛏 Bed built (${S.beds}) — nights are now ${Math.round(nightLen())}s`); }
+  if (r.sack) { S.sackCap = Math.max(S.sackCap, r.sack); S.held = 'sack'; }
+  if (S.tools.axe && S.tools.spear && S.tools.lantern) kit && kit.unlock('crafter');
+  log('🛠 Made: ' + r.name); sfx('power'); renderCraft(); renderGrinder();
+}
+function placePost() { if (S.inv.posts <= 0) return log('Build a light post at the Scrap Grinder first.'); S.inv.posts--; const f = dirOf(P.face); const x = P.x + f[0] * 1.2, z = P.z + f[2] * 1.2; S.posts.push({ x, z, y: groundH(x, z), fuel: 2 }); log('🕯 Light post placed (burns two nights)'); sfx('click'); }
+function eat() {
+  const atCamp = Math.hypot(P.x, P.z) < 12;
+  const order = S.food < 60 ? ['cookedbig', 'cooked', 'cookedfish', 'can', 'carrot', 'berry', 'meat', 'bigfish', 'fish'] : ['berry', 'carrot', 'cookedfish', 'cooked', 'can', 'cookedbig', 'meat', 'fish', 'bigfish'];
+  for (const id of order) {
+    const it = ITEMS[id]; let ok = false;
+    if (sackCount(id)) { S.sack.splice(S.sack.indexOf(id), 1); ok = true; } else if (atCamp && (S.inv[it.pile] || 0) > 0) { S.inv[it.pile]--; ok = true; }
+    if (!ok) continue;
+    S.food = Math.min(100, S.food + it.food); if (id.startsWith('cooked')) S.hp = Math.min(100, S.hp + 6);
+    if (it.raw && Math.random() < 0.4) { S.hp -= 6; log(`🤢 Raw ${it.n.toLowerCase()}… your stomach hurts. Cook it at the fire next time.`); } else log(`${it.i} Ate ${it.n.toLowerCase()} (+${it.food})`);
+    G3.tone(500, 0.08, 'sine', 0.05, 700); return;
+  }
+  log(atCamp ? 'Nothing to eat — pick berries, hunt or fish.' : 'No food in your sack.');
+}
+
+/* =================== GUNS & BOWS =================== */
+let shotCd = 0, aimEye = null, arrows = [];
+const aimDir = () => dirOf(camYaw, camPitch + 0.06);
+function fire() {
+  const w = WEAP[S.held]; if (!w || shotCd > 0 || S.reloadT > 0) return;
+  if (w.mag && S.mag[S.held] <= 0) { reload(); return; }
+  if (!w.mag && S.ammo[w.ammo] <= 0) { log('🏹 No arrows — craft some at the workbench.'); G3.tone(200, 0.05, 'square', 0.03); shotCd = 0.4; return; }
+  shotCd = w.cd;
+  const f = aimDir(), eye = aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist];
+  if (w.gun === 'arrow') {
+    S.ammo.arrows--; const o = [P.x + f[0] * 0.6, P.y + 1.5, P.z + f[2] * 0.6];
+    arrows.push({ x: o[0], y: o[1], z: o[2], vx: f[0] * 34, vy: f[1] * 34 + 1.5, vz: f[2] * 34, t: 0 });
+    G3.tone(320, 0.12, 'triangle', 0.06, 160); P.swingT = 0.3;
+  } else {
+    S.mag[S.held]--;
+    for (let k = 0; k < (w.pellets || 1); k++) {
+      const d = [f[0] + (Math.random() - 0.5) * w.spread * 2, f[1] + (Math.random() - 0.5) * w.spread * 2, f[2] + (Math.random() - 0.5) * w.spread * 2], l = Math.hypot(...d); d[0] /= l; d[1] /= l; d[2] /= l;
+      const hit = rayTarget(eye, d, w.range + camDist);
+      const end = hit ? hit.p : [eye[0] + d[0] * w.range, eye[1] + d[1] * w.range, eye[2] + d[2] * w.range];
+      fx.push({ k: 'tracer', a: [P.x + f[0] * 0.7, P.y + 1.45, P.z + f[2] * 0.7], b: end, t: 0.06 });
+      if (hit && hit.t) damageTarget(hit.t, w.dmg, d);
+    }
+    fx.push({ k: 'muzzle', x: P.x + f[0] * 0.8, y: P.y + 1.45, z: P.z + f[2] * 0.8, t: 0.07 });
+    G3.noise(S.held === 'shotgun' ? 0.35 : 0.22, S.held === 'shotgun' ? 0.16 : 0.12, 300); G3.tone(S.held === 'shotgun' ? 70 : 120, 0.15, 'sawtooth', 0.06, 40);
+    camPitch += S.held === 'shotgun' ? 0.06 : 0.03;   // recoil
+    hearShot(S.held === 'shotgun' ? 45 : 35);
+    if (S.mag[S.held] <= 0 && S.ammo[w.ammo] > 0) setTimeout(reload, 250);
+  }
+  P.face = camYaw;
+}
+function reload() {
+  const w = WEAP[S.held]; if (!w || !w.mag || S.reloadT > 0 || S.mag[S.held] >= w.mag) return;
+  if (S.ammo[w.ammo] <= 0) { log(`No ${w.ammo} — make more at the Scrap Grinder or look in chests.`); G3.tone(200, 0.05, 'square', 0.03); return; }
+  S.reloadT = w.reload; S.reloading = S.held; G3.tone(600, 0.05, 'square', 0.03); setTimeout(() => G3.tone(800, 0.05, 'square', 0.03), w.reload * 900);
+}
+function finishReload() { const k = S.reloading, w = WEAP[k]; if (!w) return; const n = Math.min(w.mag - S.mag[k], S.ammo[w.ammo]); S.mag[k] += n; S.ammo[w.ammo] -= n; S.reloading = null; }
+/** what does a ray from the camera hit first? {t: target, p: point} */
+function targets() {
+  const out = [];
+  for (const e of enemies) if (e.hp > 0) out.push({ o: e, c: [e.x, e.y + 1.1, e.z], r: 0.55, kind: 'gloam' });
+  for (const a of animals) if (a.hp > 0) out.push({ o: a, c: [a.x, a.y + AN[a.kind].h, a.z], r: AN[a.kind].r, kind: 'animal' });
+  for (const r of raiders) out.push({ o: r, c: [r.x, r.y + 1.1, r.z], r: 0.5, kind: 'raider' });
+  if (warden) out.push({ o: warden, c: [warden.x, warden.y + 2, warden.z], r: 0.8, kind: 'warden' });
+  return out;
+}
+function raySphere(o, d, c, r) { const ox = o[0] - c[0], oy = o[1] - c[1], oz = o[2] - c[2], b = ox * d[0] + oy * d[1] + oz * d[2], cc = ox * ox + oy * oy + oz * oz - r * r, h = b * b - cc; if (h < 0) return null; const t = -b - Math.sqrt(h); return t > 0 ? t : null; }
+function rayTarget(o, d, max) {
+  let best = null, bt = max;
+  // walls only count from your character onwards (the camera sits behind you and may be behind a wall or in a tree)
+  const s0 = Math.max(0, (P.x - o[0]) * d[0] + (P.y + 1.5 - o[1]) * d[1] + (P.z - o[2]) * d[2]), o2 = [o[0] + d[0] * s0, o[1] + d[1] * s0, o[2] + d[2] * s0];
+  const wall = s0 + G3.rayBoxes(o2, d, boxesNear(P.x, P.z).filter(b => !(o2[0] > b[0] && o2[0] < b[3] && o2[1] > b[1] && o2[1] < b[4] && o2[2] > b[2] && o2[2] < b[5])), max - s0); if (wall < bt) bt = wall;
+  for (const tg of targets()) { const t = raySphere(o, d, tg.c, tg.r); if (t != null && t < bt && t > (G3.view.fp ? 0.3 : camDist * 0.6)) { bt = t; best = tg; } }
+  return { t: best, p: [o[0] + d[0] * bt, o[1] + d[1] * bt, o[2] + d[2] * bt] };
+}
+function damageTarget(tg, dmg, d) {
+  const o = tg.o;
+  for (let k = 0; k < 4; k++) fx.push({ k: tg.kind === 'animal' ? 'blood' : 'puff', x: tg.c[0], y: tg.c[1], z: tg.c[2], t: 0.4, vx: (Math.random() - 0.5) * 3, vy: Math.random() * 2, vz: (Math.random() - 0.5) * 3 });
+  if (tg.kind === 'gloam') { o.hp -= dmg; o.stun = 0.4; o.vx = d[0] * 3; o.vz = d[2] * 3; if (o.hp <= 0) killEnemy(o); }
+  else if (tg.kind === 'animal') hurtAnimal(o, dmg, d);
+  else if (tg.kind === 'raider') hurtRaider(o, dmg, d);
+  else if (tg.kind === 'warden') { o.fear += 0.35; o.hp -= dmg * 0.3; }
+  G3.tone(240, 0.05, 'square', 0.04, 160);
+}
+function updArrows(dt) {
+  for (const a of arrows) {
+    a.t += dt; a.vy -= 9.8 * dt; const nx = a.x + a.vx * dt, ny = a.y + a.vy * dt, nz = a.z + a.vz * dt;
+    const d = [nx - a.x, ny - a.y, nz - a.z], len = Math.hypot(...d) || 1;
+    for (const tg of targets()) { const t = raySphere([a.x, a.y, a.z], d.map(v => v / len), tg.c, tg.r); if (t != null && t <= len) { damageTarget(tg, WEAP.bow.dmg, d.map(v => v / len)); a.dead = true; if (Math.random() < 0.5) dropItem('arrow', tg.c[0], tg.c[2], 0.8); break; } }
+    if (a.dead) continue;
+    const g = groundAt(nx, nz), wall = G3.rayBoxes([a.x, a.y, a.z], d.map(v => v / len), boxesNear(a.x, a.z), len);
+    if (ny <= g || wall < len || a.t > 4) { a.dead = true; if (Math.random() < 0.7 && a.t < 4) { const k = Math.min(1, wall / len); dropItem('arrow', a.x + d[0] * k, a.z + d[2] * k, 0.1); } continue; }
+    a.x = nx; a.y = ny; a.z = nz;
+  }
+  arrows = arrows.filter(a => !a.dead);
+}
+
+/* =================== WILDLIFE: wolf packs, alphas, the bear =================== */
+const AN = {
+  wolf: { hp: 60, spd: 6.0, dmg: 9, aggro: 15, r: 0.7, h: 0.6, size: 1, meat: 1, pelt: 1 },
+  alpha: { hp: 130, spd: 6.4, dmg: 15, aggro: 19, r: 0.85, h: 0.75, size: 1.3, meat: 2, pelt: 2 },
+  bear: { hp: 400, spd: 5.4, dmg: 26, aggro: 12, r: 1.3, h: 1.1, size: 1.9, meat: 4, pelt: 0 },
+};
+const DENS = [{ x: -32, z: 30 }, { x: 30, z: 28 }, { x: -38, z: -22 }, { x: 58, z: -15 }];
+const BEAR_DEN = { x: -80, z: -78 };
+let animals = [], animalN = 0;
+function spawnWildlife() {
+  DENS.forEach((dn, di) => {
+    const size = Math.min(5, 3 + Math.floor(S.night / 4)), have = animals.filter(a => a.den === di);
+    for (let k = have.length; k < size; k++) { const kind = !have.some(a => a.kind === 'alpha') && k === 0 && (S.night >= 1 || di % 2 === 0) ? 'alpha' : 'wolf'; const a0 = Math.random() * 6.283; const x = dn.x + Math.cos(a0) * 5, z = dn.z + Math.sin(a0) * 5; const a = { id: ++animalN, kind, den: di, x, z, y: groundAt(x, z), hp: AN[kind].hp, st: 'roam', cd: 1, stun: 0, face: 0, walk: 0, slot: k, tx: x, tz: z, wait: 0, flee: 0 }; animals.push(a); have.push(a); }
+  });
+  if (!animals.some(a => a.kind === 'bear') && (S.night - (S.bearDay || -9)) >= 3) { const x = BEAR_DEN.x, z = BEAR_DEN.z; animals.push({ id: ++animalN, kind: 'bear', den: -1, x, z, y: groundAt(x, z), hp: AN.bear.hp, st: 'roam', cd: 1, stun: 0, face: 0, walk: 0, slot: 0, tx: x, tz: z, wait: 0, flee: 0 }); }
+}
+const denOf = a => a.den >= 0 ? DENS[a.den] : BEAR_DEN;
+function hearShot(r) { for (const a of animals) if (Math.hypot(a.x - P.x, a.z - P.z) < r && a.st === 'roam') { a.st = a.kind === 'bear' || Math.random() < 0.6 ? 'hunt' : 'flee'; a.flee = 4; } }
+function hurtAnimal(a, dmg, d) {
+  a.hp -= dmg; a.stun = 0.18; const dx = d ? d[0] : a.x - P.x, dz = d ? d[2] : a.z - P.z, l = Math.hypot(dx, dz) || 1; a.kx = dx / l * 5; a.kz = dz / l * 5;
+  G3.tone(a.kind === 'bear' ? 90 : 330, 0.15, 'sawtooth', 0.05, a.kind === 'bear' ? 60 : 200);
+  for (const b of animals) if (b.den === a.den && b.st === 'roam') b.st = 'hunt';
+  if (a.st !== 'flee') a.st = 'hunt';
+  if (a.hp <= 0) {
+    a.dead = true; const A = AN[a.kind];
+    for (let k = 0; k < A.meat; k++) dropItem('meat', a.x, a.z, 1);
+    for (let k = 0; k < A.pelt; k++) if (Math.random() < 0.7 || a.kind === 'alpha') dropItem('pelt', a.x, a.z, 1);
+    if (a.kind === 'bear') { dropItem('bearpelt', a.x, a.z, 1); dropItem('shells', a.x, a.z, 1); S.bearDay = S.night; kit && kit.unlock('bear'); log('🐻 The bear goes down. Meat, a bear pelt… and some shells it was sitting on.'); }
+    else { S.wolves++; kit && kit.unlock('wolf'); if (a.kind === 'alpha') { kit && kit.unlock('alpha'); log('👑 The alpha falls — the pack scatters.'); for (const b of animals) if (b.den === a.den) { b.st = 'flee'; b.flee = 8; } } if (S.wolves >= 15) kit && kit.unlock('pack'); }
+    for (let k = 0; k < 8; k++) fx.push({ k: 'blood', x: a.x, y: a.y + 0.6, z: a.z, t: 0.6, vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3, vz: (Math.random() - 0.5) * 4 });
+  }
+}
+function updWildlife(dt) {
+  const pSafe = lightAt(P.x, P.z) >= 1, night = S.isNight;
+  for (const a of animals) {
+    if (a.dead) continue;
+    const A = AN[a.kind], dx = P.x - a.x, dz = P.z - a.z, d = Math.hypot(dx, dz) || 1, dn = denOf(a), fromDen = Math.hypot(a.x - dn.x, a.z - dn.z);
+    a.cd -= dt;
+    if (d > 130) continue;
+    if (a.kx) { a.x += a.kx * dt; a.z += a.kz * dt; a.kx *= 0.85; a.kz *= 0.85; if (Math.abs(a.kx) + Math.abs(a.kz) < 0.1) a.kx = a.kz = 0; }
+    if (a.stun > 0) { a.stun -= dt; continue; }
+    // states
+    if (a.kind !== 'bear' && a.hp < A.hp * 0.3 && a.st !== 'flee') { a.st = 'flee'; a.flee = 6; }
+    if (a.st === 'roam' && d < A.aggro * (night ? 1.4 : 1) && !pSafe && P.dead !== true) { a.st = 'hunt'; G3.tone(a.kind === 'bear' ? 70 : 180, 0.5, 'sawtooth', 0.04, a.kind === 'bear' ? 50 : 420); for (const b of animals) if (b.den === a.den && b.den >= 0 && Math.hypot(b.x - a.x, b.z - a.z) < 25) b.st = 'hunt'; }
+    if (a.st === 'hunt' && (fromDen > 48 || pSafe || d > 45)) a.st = 'return';
+    if (a.st === 'return' && fromDen < 8) a.st = 'roam';
+    if (a.st === 'flee') { a.flee -= dt; if (a.flee <= 0) a.st = 'return'; }
+    let tx = a.x, tz = a.z, sp = 0;
+    if (a.st === 'roam') { a.wait -= dt; if (a.wait <= 0 || Math.hypot(a.tx - a.x, a.tz - a.z) < 0.6) { a.wait = 2 + Math.random() * 4; const r = Math.random() * 10; const an = Math.random() * 6.283; a.tx = dn.x + Math.cos(an) * r; a.tz = dn.z + Math.sin(an) * r; } tx = a.tx; tz = a.tz; sp = Math.hypot(a.tx - a.x, a.tz - a.z) > 0.6 ? 1.6 : 0; }
+    else if (a.st === 'return') { tx = dn.x; tz = dn.z; sp = A.spd * 0.6; }
+    else if (a.st === 'flee') { tx = a.x - dx; tz = a.z - dz; sp = A.spd * 0.9; }
+    else if (a.st === 'hunt') {
+      // pack wolves spread out to surround you, then dart in one at a time
+      const pack = animals.filter(b => !b.dead && b.den === a.den && b.st === 'hunt'), idx = pack.indexOf(a), ang = Math.atan2(-dx, -dz) + (idx - (pack.length - 1) / 2) * 0.9;
+      const attacker = a.kind === 'bear' || (pack.length && pack.reduce((m, b) => (b.cd < m.cd ? b : m)) === a);
+      if (attacker && a.cd <= 0.6) { tx = P.x; tz = P.z; sp = A.spd * (d < 4 ? 1.25 : 1); }
+      else { const ring = 3.6; tx = P.x + Math.sin(ang) * ring; tz = P.z + Math.cos(ang) * ring; sp = Math.hypot(tx - a.x, tz - a.z) > 0.5 ? A.spd * 0.85 : 0; }
+      if (d < 1.2 + A.r && a.cd <= 0 && Math.abs(P.y - a.y) < 2) { a.cd = a.kind === 'bear' ? 1.5 : 1.3 + Math.random() * 0.8; a.bite = 0.25; hurt(A.dmg); G3.tone(a.kind === 'bear' ? 80 : 240, 0.12, 'square', 0.06, 120); }
+    }
+    // the campfire scares them off
+    const mx = tx - a.x, mz = tz - a.z, ml = Math.hypot(mx, mz);
+    if (ml > 0.05 && sp > 0) {
+      let vx = mx / ml * sp, vz = mz / ml * sp;
+      if (lightAt(a.x + vx * 0.5, a.z + vz * 0.5) >= 0.95) { const al = Math.hypot(a.x, a.z) || 1; vx = a.x / al * sp; vz = a.z / al * sp;   /* back away from the fire */ if (a.st === 'hunt') a.st = 'return'; }
+      a.x += vx * dt; a.z += vz * dt; a.face = Math.atan2(-vx, -vz); a.walk += dt * sp * 2.2;
+      a.x = clamp(a.x, -HALF + 2, HALF - 2); a.z = clamp(a.z, -HALF + 2, HALF - 2);
+    } else if (a.st === 'hunt') a.face = Math.atan2(-dx, -dz);
+    a.y = groundAt(a.x, a.z); a.bite = Math.max(0, (a.bite || 0) - dt);
+  }
+  animals = animals.filter(a => !a.dead);
+}
+function drawAnimal(a, now) {
+  const A = AN[a.kind], s = A.size, b = M.chain(M.T(a.x, a.y, a.z), M.RY(a.face || 0), M.S(s, s, s));
+  const fur = a.kind === 'bear' ? '#5b3a1e' : a.kind === 'alpha' ? '#2d3340' : '#7c818c', belly = a.kind === 'bear' ? '#4a2f18' : a.kind === 'alpha' ? '#e5e7eb' : '#a8adb7';
+  const sw = Math.sin(a.walk * 3) * 0.5, bob = Math.abs(Math.sin(a.walk * 3)) * 0.04, lunge = a.bite > 0 ? 0.25 : 0;
+  R.shadow(a.x, a.y, a.z, 0.7 * s, 0.32);
+  const body = a.kind === 'bear' ? [0.75, 0.6, 1.15] : [0.42, 0.42, 1.1];
+  R.cube(M.chain(b, M.T(0, 0.62 + bob, 0), M.S(...body)), fur);
+  R.cube(M.chain(b, M.T(0, 0.48 + bob, -0.05), M.S(body[0] * 0.8, 0.12, body[2] * 0.7)), belly);
+  const hz = -body[2] / 2 - 0.12 - lunge;
+  R.cube(M.chain(b, M.T(0, 0.78 + bob, hz), M.S(a.kind === 'bear' ? 0.5 : 0.32, a.kind === 'bear' ? 0.45 : 0.3, 0.32)), fur);
+  R.cube(M.chain(b, M.T(0, 0.72 + bob, hz - 0.24), M.S(a.kind === 'bear' ? 0.28 : 0.16, 0.16, 0.24)), a.kind === 'bear' ? '#3f2a14' : belly);
+  R.cube(M.chain(b, M.T(0, 0.74 + bob, hz - 0.37), M.S(0.08, 0.07, 0.04)), '#111');
+  for (const sx of [-1, 1]) {
+    R.cube(M.chain(b, M.T(sx * (a.kind === 'bear' ? 0.17 : 0.1), 0.99 + bob, hz + 0.05), M.S(0.09, a.kind === 'bear' ? 0.09 : 0.16, 0.06)), fur);
+    R.cube(M.chain(b, M.T(sx * 0.09, 0.82 + bob, hz - 0.165), M.S(0.05, 0.04, 0.01)), S.isNight ? [1, 0.85, 0.3] : '#111', 1, S.isNight ? 1 : 0);
+  }
+  for (const [lx, lz, ph] of [[-1, -1, 0], [1, -1, Math.PI], [-1, 1, Math.PI], [1, 1, 0]]) R.cube(M.chain(b, M.T(lx * body[0] * 0.38, 0.42, lz * body[2] * 0.36), M.RX(Math.sin(a.walk * 3 + ph) * 0.55), M.T(0, -0.21, 0), M.S(0.12, 0.42, 0.13)), fur);
+  if (a.kind !== 'bear') R.cube(M.chain(b, M.T(0, 0.72 + bob, body[2] / 2 + 0.15), M.RX(0.7 + sw * 0.3), M.T(0, 0, 0.18), M.S(0.1, 0.1, 0.42)), fur);
+  if (S.isNight) { const f = dirOf(a.face || 0); R.glow([a.x + f[0] * 0.75 * s, a.y + 0.82 * s, a.z + f[2] * 0.75 * s], 0.35 * s, [1, 0.8, 0.3], 0.6); }
+  if (a.hp < AN[a.kind].hp) { const w = 0.9 * s, k = a.hp / AN[a.kind].hp; R.box(a.x - w / 2, a.y + 1.35 * s, a.z, a.x - w / 2 + w * k, a.y + 1.42 * s, a.z + 0.02, k > 0.3 ? '#ef4444' : '#f97316', 1, 1); }
+}
+
+/* =================== CHESTS =================== */
+const CHESTS = [
+  { id: 'cabin', at: () => [LM.cabin.x - 2.6, groundH(LM.cabin.x - 2.6, LM.cabin.z + 1.6), LM.cabin.z + 1.6], loot: ['revolver', 'bullets'], name: 'the ranger’s gun locker' },
+  { id: 'mill', at: () => [LM.mill.x + 1.6, 0.3, LM.mill.z + 1.8], loot: ['shotgun', 'shells'], name: 'an old feed chest' },
+  { id: 'tower', at: () => [LM.tower.x - 1.4, 6.3, LM.tower.z + 1.2], loot: ['bullets', 'arrow', 'arrow', 'arrow', 'battery'], name: 'the lookout’s box' },
+  { id: 'oldcamp', at: () => [LM.oldcamp.x - 1.5, 0.3, LM.oldcamp.z - 2.5], loot: ['shells', 'bullets', 'can', 'can', 'seed', 'seed'], name: 'a campers’ cooler' },
+  { id: 'stones', at: () => [LM.stones.x + 2.5, 0.3, LM.stones.z - 2.2], loot: ['bullets', 'battery', 'radio', 'seed'], name: 'a mossy chest' },
+];
+function openChest(c) { S.chests.push(c.id); const p = c.at(); for (const id of c.loot) dropItem(id, p[0], p[2], 1.2); log(`📦 You open ${c.name}: ` + c.loot.map(id => ITEMS[id].i).join(' ')); sfx('coin'); G3.tone(300, 0.3, 'triangle', 0.05, 600); }
+
+/* =================== WEATHER =================== */
+const WX = { clear: { n: 'Clear', i: '☀️', burn: 1, fog: 1 }, rain: { n: 'Rain', i: '🌧️', burn: 1.5, fog: 0.6, grow: 2 }, storm: { n: 'Thunderstorm', i: '⛈️', burn: 2, fog: 0.45, grow: 2 }, fog: { n: 'Fog', i: '🌫️', burn: 1, fog: 0.3 } };
+function rollWeather() {
+  const r = Math.random(), late = Math.min(0.25, S.night * 0.015), old = S.weather;
+  S.weather = r < 0.52 - late ? 'clear' : r < 0.75 - late / 2 ? 'rain' : r < 0.88 ? 'fog' : 'storm';
+  if (S.weather !== old) { S.wxK = 0; if (S.weather !== 'clear') log(`${WX[S.weather].i} ${WX[S.weather].n} rolls in${S.weather === 'rain' || S.weather === 'storm' ? ' — the fire burns faster, crops grow faster' : S.weather === 'fog' ? ' — you can’t see far' : ''}.`); else log('☀️ The sky clears.'); }
+}
+let thunderT = 5, flashA = 0, rainT = 0, rainMesh = null;
+function updWeather(dt) {
+  const target = S.weather === 'clear' ? 0 : 1; S.wxK += (target - S.wxK) * Math.min(1, dt * 0.15);
+  if (S.weather === 'clear' && S.wxK < 0.02) S.wxK = 0;
+  if ((S.weather === 'rain' || S.weather === 'storm') && S.wxK > 0.3 && (rainT -= dt) <= 0) { rainT = 0.45; G3.noise(0.5, 0.012 * S.wxK, 3500); }
+  if (S.weather === 'storm' && S.wxK > 0.5 && (thunderT -= dt) <= 0) {
+    thunderT = 6 + Math.random() * 12; flashA = 1; setTimeout(() => G3.noise(1.8, 0.09, 50), 250 + Math.random() * 900);
+    if (Math.random() < 0.25) { // lightning splits a tree near you
+      const t = trees.filter(t => t.alive && Math.hypot(t.x - P.x, t.z - P.z) > 8 && Math.hypot(t.x - P.x, t.z - P.z) < 30)[0];
+      if (t) { t.alive = false; S.chopped.push(t.id); dirtyAt(t.x, t.z); for (let k = 0; k < 3; k++) dropItem('log', t.x, t.z, 1.8); log('⚡ Lightning splits a tree nearby — free logs!'); for (let k = 0; k < 10; k++) fx.push({ k: 'puff', x: t.x, y: t.y + 2 + Math.random() * 3, z: t.z, t: 0.8, vx: (Math.random() - .5) * 3, vy: Math.random() * 3, vz: (Math.random() - .5) * 3 }); }
+    }
+  }
+  flashA = Math.max(0, flashA - dt * 3);
+}
+/* =================== FARMING =================== */
+const FARMSPOTS = [[9.6, 4.4], [11.2, 6.6], [9.6, 8.8], [7.2, 10.2]];
+function updFarms(dt) { const k = (WX[S.weather].grow || 1) > 1 ? 1 + S.wxK : 1; for (const pl of S.plots) if (pl.crop && pl.g < 1) pl.g = Math.min(1, pl.g + dt / 300 * k); }
+/* =================== FISHING =================== */
+function inLake(x, z) { return Math.hypot(x - LAKE[0], z - LAKE[1]) < LAKE[2] - 1.5; }
+function useRod() {
+  const F = S.fishing;
+  if (F && F.state === 'bite') { F.state = 'game'; F.m = 0; F.zone = 0.25 + Math.random() * 0.5; F.w = 0.16 - Math.min(0.06, S.night * 0.003); F.sp = 1.3 + Math.random() * 0.8; $('fishgame').hidden = false; return; }
+  if (F) { S.fishing = null; log('🎣 Reeled in.'); return; }
+  const f = dirOf(camYaw), x = P.x + f[0] * 5, z = P.z + f[2] * 5;
+  if (!inLake(x, z)) { log('🎣 Stand at the lake shore and face the water to cast.'); return; }
+  S.fishing = { x, z, t: 0, biteAt: 3 + Math.random() * 6, state: 'wait', px: P.x, pz: P.z }; G3.tone(400, 0.15, 'triangle', 0.04, 200); G3.noise(0.15, 0.03, 2000);
+}
+function fishStep(dt) {
+  const F = S.fishing; if (!F) return false;
+  if (Math.hypot(P.x - F.px, P.z - F.pz) > 1.5) { S.fishing = null; $('fishgame').hidden = true; return false; }
+  F.t += dt;
+  if (F.state === 'wait' && F.t > F.biteAt) { F.state = 'bite'; F.bt = 0; G3.tone(900, 0.06, 'square', 0.05); G3.noise(0.25, 0.05, 1500); log('🎣 A bite! Click now!'); }
+  if (F.state === 'bite') { F.bt += dt; if (F.bt > 1.1) { F.state = 'wait'; F.t = 0; F.biteAt = 2 + Math.random() * 5; log('🐟 It got away… wait for another bite.'); } }
+  if (F.state === 'game') {
+    F.m = (Math.sin(F.t * F.sp * 3) + 1) / 2;
+    const z = $('fishgame').querySelector('.fg-zone'); z.style.left = (F.zone - F.w / 2) * 100 + '%'; z.style.width = F.w * 100 + '%'; $('fishgame').querySelector('.fg-m').style.left = F.m * 100 + '%';
+    if (IN.hit('Mouse0') || IN.hit('Space') || IN.hit('KeyE') || IN.hit('KeyJ') || IN.hit('Btnact') || IN.hit('Tap') || IN.hit('Btnuse')) { landFish(Math.abs(F.m - F.zone) < F.w / 2 + 0.02); }
+    return true;
+  }
+  return false;
+}
+function landFish(ok) {
+  $('fishgame').hidden = true; const F = S.fishing; S.fishing = null;
+  if (!ok) { log('🐟 Missed — it slipped off the hook.'); G3.tone(200, 0.15, 'sawtooth', 0.04); return; }
+  const r = Math.random(), id = r < 0.06 ? 'goldfish' : r < 0.3 ? 'bigfish' : 'fish';
+  give(id, P.x, P.z); log(`${ITEMS[id].i} You caught a ${ITEMS[id].n.toLowerCase()}!`); sfx('coin'); kit && kit.unlock('angler'); if (id === 'goldfish') kit && kit.unlock('golden');
+}
+/* =================== RAIDERS (the Ash Hoods: they come for your fire) =================== */
+let raiders = [];
+const LOOK_HOOD = { skin: '#d6d3d1', hair: '#1c1917', shirt: '#292524', shirt2: '#44403c', shirtStyle: 1, pants: '#1c1917', shoes: '#0c0a09', hat: 2, hatColor: '#3f3a36', acc: 3, accColor: '#e7e5e4', body: 1 };
+function maybeRaid() {
+  if (S.night < 3 || !(S.night % 3 === 0 || Math.random() < 0.15 + S.night * 0.01)) return;
+  const n = Math.min(8, 3 + Math.floor(S.night / 4)), a = Math.random() * 6.283;
+  for (let k = 0; k < n; k++) { const an = a + (k - n / 2) * 0.12, x = Math.cos(an) * 62, z = Math.sin(an) * 62; raiders.push({ x, z, y: groundH(x, z), hp: 70 + S.night * 3, cd: 1, face: 0, walk: 0, st: 'march', stun: 0, douse: 2 }); }
+  S.raid = { n, at: S.night }; log(`🔥 Torches between the trees… the Ash Hoods are coming for your fire! (${n})`); G3.tone(110, 1.2, 'sawtooth', 0.05, 70);
+}
+function updRaiders(dt) {
+  for (const r of raiders) {
+    if (r.kx) { r.x += r.kx * dt; r.z += r.kz * dt; r.kx *= 0.85; r.kz *= 0.85; if (Math.abs(r.kx) + Math.abs(r.kz) < 0.1) r.kx = r.kz = 0; }
+    if (r.stun > 0) { r.stun -= dt; continue; }
+    const dP = Math.hypot(P.x - r.x, P.z - r.z), dF = Math.hypot(r.x, r.z);
+    if (r.st !== 'flee') r.st = dP < 7 ? 'fight' : dF < 2.6 ? 'douse' : 'march';
+    let tx = 0, tz = 0, sp = 3.9;
+    if (r.st === 'fight') { tx = P.x; tz = P.z; sp = dP > 1.4 ? 4.3 : 0; r.cd -= dt; if (dP < 1.6 && r.cd <= 0) { r.cd = 1.2; r.swing = 0.3; hurt(10); } }
+    else if (r.st === 'douse') { sp = 0; r.douse -= dt; if (r.douse <= 0) { r.douse = 2.5; r.swing = 0.3; S.fire = Math.max(0, S.fire - 12); G3.noise(0.5, 0.05, 1200); log('💨 A raider is smothering the fire!'); } }
+    else if (r.st === 'flee') { tx = r.x * 3; tz = r.z * 3; sp = 5; if (dF > 70) r.gone = true; }
+    else { tx = 0; tz = 0; }
+    const mx = tx - r.x, mz = tz - r.z, ml = Math.hypot(mx, mz);
+    if (sp && ml > 0.3) { r.x += mx / ml * sp * dt; r.z += mz / ml * sp * dt; r.face = Math.atan2(-mx, -mz); r.walk += dt * 8; }
+    else if (r.st === 'fight') r.face = Math.atan2(-(P.x - r.x), -(P.z - r.z));
+    r.y = groundH(r.x, r.z); r.swing = Math.max(0, (r.swing || 0) - dt);
+  }
+  for (const r of raiders) if (r.hp <= 0 && !r.dead) { r.dead = true; dropItem(Math.random() < 0.5 ? 'bolts' : 'pipe', r.x, r.z, 0.8); if (Math.random() < 0.35) dropItem('bullets', r.x, r.z, 0.8); if (Math.random() < 0.3) dropItem('can', r.x, r.z, 0.8); for (let k = 0; k < 6; k++) fx.push({ k: 'puff', x: r.x, y: r.y + 1, z: r.z, t: 0.6, vx: (Math.random() - .5) * 3, vy: Math.random() * 2, vz: (Math.random() - .5) * 3 }); }
+  raiders = raiders.filter(r => !r.dead && !r.gone);
+  if (S.raid && !raiders.length) { S.raidsWon++; kit && kit.unlock('raid'); log('🛡️ The raid is over — the Ash Hoods are gone.'); S.raid = null; }
+}
+function hurtRaider(r, dmg, d) { r.hp -= dmg; r.stun = 0.2; const dx = d ? d[0] : r.x - P.x, dz = d ? d[2] : r.z - P.z, l = Math.hypot(dx, dz) || 1; r.kx = dx / l * 4; r.kz = dz / l * 4; G3.tone(200, 0.1, 'square', 0.05, 120); if (r.hp < 25 && Math.random() < 0.3) r.st = 'flee'; }
+/* =================== TRAPS =================== */
+function placeTrap() { if ((S.inv.traps || 0) <= 0) return; S.inv.traps--; const f = dirOf(P.face), x = P.x + f[0] * 1.3, z = P.z + f[2] * 1.3; S.traps.push({ x, z, y: groundAt(x, z), armed: true }); log('🪤 Trap set. Walk up and press E to pick it up or reset it.'); G3.tone(500, 0.05, 'square', 0.04); }
+function updTraps() {
+  for (const t of S.traps) {
+    if (!t.armed) continue;
+    const hit = animals.find(a => Math.hypot(a.x - t.x, a.z - t.z) < 0.6 + AN[a.kind].r * 0.5) || raiders.find(r => Math.hypot(r.x - t.x, r.z - t.z) < 0.8) || enemies.find(e => Math.hypot(e.x - t.x, e.z - t.z) < 0.8);
+    if (!hit) continue;
+    t.armed = false; G3.tone(150, 0.2, 'square', 0.08, 60); G3.noise(0.15, 0.1, 2000); kit && kit.unlock('trapper');
+    if (animals.includes(hit)) { hurtAnimal(hit, 60); hit.stun = 4; hit.x = t.x; hit.z = t.z; log(`🪤 Snap! The trap caught a ${hit.kind}.`); }
+    else if (raiders.includes(hit)) { hurtRaider(hit, 60); hit.stun = 4; hit.kx = hit.kz = 0; log('🪤 Snap! A raider is caught in your trap.'); }
+    else { hit.hp -= 60; hit.stun = 3; if (hit.hp <= 0) killEnemy(hit); }
+  }
+}
+
+/* =================== ENEMIES =================== */
+function spawnEnemy(cave) {
+  let x, z, tries = 0;
+  do { const a = Math.random() * 6.283, d = 26 + Math.random() * 18; x = cave ? LM.cave.x + (Math.random() - .5) * 2 : P.x + Math.cos(a) * d; z = cave ? LM.cave.z + 10 + Math.random() * 6 : P.z + Math.sin(a) * d; tries++; }
+  while (!cave && (lightAt(x, z) >= 0.9 || Math.abs(x) > HALF - 3 || Math.abs(z) > HALF - 3) && tries < 20);
+  const lvl = S.night;
+  enemies.push({ x, z, y: cave ? 0 : groundH(x, z), hp: 40 + lvl * 6, spd: 2.6 + Math.min(2.2, lvl * 0.15) + Math.random() * 0.6, stun: 0, cd: 0, vx: 0, vz: 0, phase: Math.random() * 6, cave, burn: 0 });
+}
+function updEnemies(dt) {
+  const night = S.isNight && S.t > 6, want = night ? Math.min(14, 3 + Math.floor(S.night * 1.3) + (S.finalNight ? 8 : 0)) : 0;
+  const caveWant = Math.hypot(P.x - LM.cave.x, P.z - (LM.cave.z + 8)) < 40 ? 3 : 0;
+  const inCave = enemies.filter(e => e.cave).length, outside = enemies.length - inCave;
+  if (outside < want && Math.random() < dt * 0.8) spawnEnemy(false);
+  if (inCave < caveWant && Math.random() < dt * 0.3 && !S.caveCleared) spawnEnemy(true);
+  for (const e of enemies) {
+    e.phase += dt * 3;
+    if (e.stun > 0) { e.stun -= dt; e.x += e.vx * dt * 2; e.z += e.vz * dt * 2; e.vx *= 0.9; e.vz *= 0.9; continue; }
+    const dx = P.x - e.x, dz = P.z - e.z, d = Math.hypot(dx, dz) || 1;
+    // daylight burns the ones outside; light keeps them out
+    if (!night && !e.cave) { e.burn += dt; if (e.burn > 1.5) e.hp = 0; continue; }
+    let mx = dx / d, mz = dz / d;
+    const nx = e.x + mx * 1.5, nz = e.z + mz * 1.5, L = lightAt(nx, nz);
+    if (L >= 0.95) { // circle the light instead of entering
+      const cxl = Math.hypot(e.x, e.z) < 40 ? [0, 0] : [e.x - mx, e.z - mz]; const ox = e.x - cxl[0], oz = e.z - cxl[1], od = Math.hypot(ox, oz) || 1;
+      mx = -oz / od; mz = ox / od; if (lightAt(e.x, e.z) >= 1) { mx = ox / od; mz = oz / od; e.hp -= dt * 30; }
+    }
+    // the player's lantern pushes them back a little; the flashlight beam stuns
+    if (S.lanternOn && S.tools.lantern && d < 4.2) { mx = -dx / d; mz = -dz / d; }
+    if (S.flashOn && S.flash > 0 && d < 16) { const f = dirOf(camYaw, camPitch), dot = (-dx * f[0] + -dz * f[2]) / d; if (dot > 0.93) { e.stun = 0.5; e.hp -= dt * 12; e.vx = -dx / d * 3; e.vz = -dz / d * 3; } }
+    const sp = e.spd * (d < 3 ? 0.8 : 1);
+    e.x += mx * sp * dt; e.z += mz * sp * dt; e.y = e.cave ? 0 : groundH(e.x, e.z);
+    e.face = Math.atan2(-dx, -dz);
+    e.cd -= dt;
+    if (d < 1.3 && e.cd <= 0 && Math.abs(P.y - e.y) < 2) { e.cd = 1.1; hurt(8 + Math.min(10, S.night)); }
+  }
+  for (const e of enemies) if (e.hp <= 0 && !e.dead) { e.dead = true; for (let i = 0; i < 6; i++) fx.push({ k: 'puff', x: e.x, y: e.y + 1, z: e.z, t: 0.6 }); }
+  enemies = enemies.filter(e => !e.dead);
+}
+function hurt(n) {
+  if (P.inv > 0) return; n *= 1 - (S.armor || 0); S.hp -= n; P.inv = 0.4; $('hurt').style.opacity = 1; setTimeout(() => $('hurt').style.opacity = 0, 180); G3.tone(110, 0.2, 'sawtooth', 0.08, 60);
+  if (S.hp <= 0) die();
+}
+function die() {
+  S.deaths++; S.resting = false;
+  if (mode === 'endless') { endGame(false); return; }
+  for (const k of ['wood', 'stone', 'scrap', 'berries']) S.inv[k] = Math.floor(S.inv[k] / 2);
+  S.hp = 60; S.food = Math.max(S.food, 40); P.x = 1.5; P.z = 6; P.y = 0; enemies = []; S.isNight = false; S.t = 4; S.fire = Math.max(S.fire, 30);
+  story('Lost in the dark', 'Cold hands, cold breath… then morning light on your face. You wake by the campfire with half your things gone.<br><br><i>Keep the fire fed. Stay in the light at night.</i>', [['Get up', () => closePanels()]]);
+}
+// the Pale Warden: every 5th night and on the Long Night. Shine your flashlight on it (or hit it) until it leaves.
+function updWarden(dt) {
+  if (!S.isNight) { if (warden) { warden = null; } return; }
+  if (!warden && (S.night % 5 === 0 || S.finalNight) && S.t > 20 && S.wardenGone < S.night + (S.finalNight ? 1 : 0)) {
+    const a = Math.random() * 6.283; warden = { x: P.x + Math.cos(a) * 30, z: P.z + Math.sin(a) * 30, y: 0, hp: 100 + S.night * 10, fear: 0, t: 0 };
+    log('🕯 A cold blue light moves between the trees…'); G3.tone(70, 1.5, 'sine', 0.08, 50);
+  }
+  if (!warden) return;
+  const w = warden, dx = P.x - w.x, dz = P.z - w.z, d = Math.hypot(dx, dz) || 1; w.t += dt;
+  if (S.flashOn && S.flash > 0 && d < 22) { const f = dirOf(camYaw, camPitch), dot = (-dx * f[0] + -dz * f[2]) / d; if (dot > 0.9) w.fear += dt * 0.35; }
+  if (w.hp <= 0) w.fear = 9;
+  if (w.fear >= 1.5) { w.x -= dx / d * 9 * dt; w.z -= dz / d * 9 * dt; if (d > 40) { S.wardenGone = S.night + (S.finalNight ? 1 : 0); warden = null; log('🕯 The Pale Warden turns away.'); kit && kit.unlock('warden'); sfx('win'); } return; }
+  // it drinks light: drains the campfire when close to camp, and hunts you
+  if (Math.hypot(w.x, w.z) < 20) S.fire = Math.max(0, S.fire - dt * 3);
+  const sp = d > 6 ? 2.2 : 1.4; w.x += dx / d * sp * dt; w.z += dz / d * sp * dt; w.y = groundH(w.x, w.z); w.face = Math.atan2(-dx, -dz);
+  if (d < 2 && (w.cd = (w.cd || 0) - dt) <= 0) { w.cd = 1.6; hurt(18); }
+  if (d < 9) S.flash = Math.max(0, S.flash - dt * 4);
+}
+
+/* =================== MAIN UPDATE =================== */
+let camYaw = 0, camPitch = -0.25, camDist = 5;
+function update(dt) {
+  const inp = IN.frame();
+  camYaw -= inp.lookX * 0.0042; camPitch = clamp(camPitch - inp.lookY * 0.0036, G3.view.fp ? -1.45 : -1.1, G3.view.fp ? 1.3 : 0.6);
+  if (inp.wheel) S.camWant = clamp((S.camWant || 5) + inp.wheel * 0.6, 2.2, 9);
+  // time
+  S.t += dt * (S.resting ? 6 : 1);
+  if (!S.isNight && S.t >= DAY) { S.isNight = true; S.t = 0; S.night++; log(`🌙 Night ${S.night} falls. Stay near the light.`); G3.tone(180, 0.8, 'sine', 0.05, 90); rollWeather(); S.stormNight = S.weather === 'storm'; S.raidPending = true; }
+  if (S.isNight && S.raidPending && S.t > 20) { S.raidPending = false; maybeRaid(); }
+  if (S.isNight && S.t >= nightLen()) {
+    S.isNight = false; S.t = 0; S.resting = false; enemies = enemies.filter(e => e.cave);
+    log(`☀ You survived night ${S.night}!`); sfx('win');
+    if (S.night >= 1) kit && kit.unlock('night1'); if (S.night >= 5) kit && kit.unlock('night5'); if (S.night >= 10) kit && kit.unlock('night10'); if (mode === 'endless' && S.night >= 15) kit && kit.unlock('endless15');
+    for (const p of S.posts) p.fuel--; S.posts = S.posts.filter(p => p.fuel > 0);
+    spawnWildlife(); if (S.stormNight) kit && kit.unlock('storm'); rollWeather();
+    for (const r of raiders) r.st = 'flee';
+    for (const b of bushes) if (b.berries < 3 && Math.random() < 0.5) { b.berries++; S.berriesT[b.id] = b.berries; dirtyAt(b.x, b.z); }
+    if (S.finalNight) return winGame();
+    if (mode === 'endless') kit && kit.score(S.night, 'endless');
+    save();
+  }
+  // needs
+  const burn = (S.isNight ? 1 / 1.2 : 1 / 2.6) * (1 + (WX[S.weather].burn - 1) * S.wxK);
+  S.fire = Math.max(0, S.fire - dt * burn * (S.tools.ring ? 0.6 : 1));
+  S.food = Math.max(0, S.food - dt / 7);
+  if (S.food <= 0 && Math.random() < dt * 0.4) { hurt(3); if (Math.random() < 0.3) log('🍖 You’re starving — eat something (Q).'); }
+  const warm = lightAt(P.x, P.z) >= 1;
+  if (S.food > 45 && (warm || !S.isNight)) S.hp = Math.min(100, S.hp + dt * (S.resting && warm ? 4 : 0.6));
+  if (S.resting && (!warm || !S.isNight)) S.resting = false;
+  if (S.flashOn) { S.flash = Math.max(0, S.flash - dt * 1.1); if (S.flash <= 0) { if (sackCount('battery')) { S.sack.splice(S.sack.indexOf('battery'), 1); S.flash = 100; log('🔋 New battery'); } else if (S.inv.batteries > 0 && Math.hypot(P.x, P.z) < 12) { S.inv.batteries--; S.flash = 100; log('🔋 New battery from the camp pile'); } else { S.flashOn = false; log('🔦 The flashlight died. Find batteries in old crates.'); } } }
+  // keys
+  if (IN.hit('Escape')) { pause(true); return; }
+  if (IN.hit('KeyC') || IN.hit('Btncraft')) { if (Math.hypot(P.x - SPOTS.bench[0], P.z - SPOTS.bench[2]) < 3) openPanel('craft'); else log('Crafting needs the workbench at camp.'); }
+  if (IN.hit('KeyM') || IN.hit('Btnjournal')) openPanel('journal');
+  if (IN.hit('Tab') || IN.hit('KeyI') || IN.hit('Btnsack')) openPanel('sackp');
+  if (IN.hit('KeyF') || IN.hit('Btnlight')) { if (S.tools.lantern && (IN.hit('Btnlight') && S.flashOn)) { S.flashOn = false; S.lanternOn = !S.lanternOn; G3.tone(900, 0.03, 'square', 0.04); } else toggleFlash(); }
+  if (IN.hit('KeyL') && S.tools.lantern) { S.lanternOn = !S.lanternOn; G3.tone(700, 0.04, 'square', 0.04); }
+  if (IN.hit('KeyQ') || IN.hit('Btneat')) eat();
+  if (IN.hit('KeyG')) placePost();
+  { const hb = hotbar(); for (let k = 0; k < hb.length; k++) if (IN.hit('Digit' + (k + 1))) selectSlot(hb[k]); if (!hb.includes(S.held)) S.held = hb[0]; }
+  const fishing = fishStep(dt);
+  if (fishing) {} else if (IN.hit('Mouse0') || IN.hit('KeyJ') || IN.hit('Btnact') || IN.hit('Tap')) useHeld();
+  else if ((IN.down('Mouse0') || IN.down('Btnact')) && WEAP[S.held] && WEAP[S.held].gun && S.held !== 'shotgun') useHeld();   // hold to keep firing
+  if (IN.hit('KeyR') || IN.hit('Btnreload')) reload();
+  shotCd = Math.max(0, shotCd - dt);
+  if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) finishReload(); }
+  S.aiming = (IN.down('Mouse2') || IN.down('aim')) && WEAP[S.held] && WEAP[S.held].gun;
+  camDist = lerp(camDist, S.aiming ? 2.4 : (S.camWant || 5), Math.min(1, dt * 10));
+  if (S.grindT > 0) S.grindT -= dt;
+  const u = usable();
+  $('prompt').textContent = u ? (IN.touch ? '✋ ' : 'E: ') + u.label : '';
+  if ((IN.hit('KeyE') || IN.hit('Btnuse')) && u && !fishing) u.run();
+  // movement
+  if (!S.resting) {
+    const f = dirOf(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+    let mx = rx * inp.mx + f[0] * -inp.mz, mz = rz * inp.mx + f[2] * -inp.mz; const ml = Math.hypot(mx, mz);
+    const running = (inp.run || IN.down('run')) && S.stam > 5 && ml > 0.1;
+    const inWater = P.y < WATER_Y - 0.3;
+    const spd = (running ? 7.2 : 4.4) * (inWater ? 0.55 : 1) * (S.food <= 0 ? 0.7 : 1);
+    if (ml > 0.05) { mx /= Math.max(1, ml); mz /= Math.max(1, ml); P.face = Math.atan2(-mx, -mz); P.walk += dt * (running ? 13 : 9); }
+    P.vx = lerp(P.vx, mx * spd, Math.min(1, dt * 12)); P.vz = lerp(P.vz, mz * spd, Math.min(1, dt * 12));
+    S.stam = clamp(S.stam + (running ? -22 : 14) * dt, 0, 100);
+    if ((IN.hit('Space') || IN.hit('Btnjump')) && P.ground) { P.vy = 7.5; G3.tone(260, 0.06, 'triangle', 0.03); }
+    if (ml > 0.1 && P.ground && Math.floor(P.walk / Math.PI) !== Math.floor((P.walk - dt * 9) / Math.PI)) G3.noise(0.05, 0.015, 2000);
+  } else { P.vx = P.vz = 0; }
+  G3.moveBody(P, dt, boxesNear(P.x, P.z), (x, z) => { if (Math.abs(x - LM.cave.x) < 2 && z > LM.cave.z - 1 && z < LM.cave.z + 18) return 0; return groundH(x, z); });
+  if (P.y < -20) { P.x = 1.5; P.z = 6; P.y = 0; }
+  // turn the body toward where you're going (or attacking)
+  if (P.swingT > 0) { P.swingT -= dt; P.swing = 1 - P.swingT / 0.45; P.face = camYaw; } else P.swing = 0;
+  P.yaw += Math.atan2(Math.sin(P.face - P.yaw), Math.cos(P.face - P.yaw)) * Math.min(1, dt * 12);
+  P.inv = Math.max(0, P.inv - dt);
+  updEnemies(dt); updWarden(dt); updWildlife(dt); updArrows(dt); updWeather(dt); updFarms(dt); updRaiders(dt); updTraps();
+  if (Math.hypot(P.x - LM.cave.x, P.z - LM.cave.z - 9) < 12 && S.stones.includes('caveEnd') && !enemies.some(e => e.cave)) S.caveCleared = true;
+  for (const e of fx) { e.t -= dt; if (e.k === 'blood' || (e.k === 'puff' && e.vx != null)) { e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.vy -= 9 * dt; } if (e.k === 'fly') { const k = Math.min(1, dt * 14); e.x += (P.x - e.x) * k; e.y += (P.y + 1.1 - e.y) * k; e.z += (P.z - e.z) * k; } } fx = fx.filter(e => e.t > 0);
+  IN.endFrame();
+}
+function selectSlot(id) { if (S.held !== id) { S.held = id; G3.tone(520, 0.03, 'square', 0.03); } }
+
+/* =================== DRAW =================== */
+const look = () => (window.SJLook && SJLook.cached) || null;
+function render(now) {
+  if (!R) return;
+  const dk = darkness(), night = dk > 0.4;
+  const fp = G3.view.fp, tgt = [P.x, P.y + 1.55, P.z], f = dirOf(camYaw, camPitch);
+  let eye = fp ? [P.x, P.y + 1.62, P.z] : [tgt[0] - f[0] * camDist, tgt[1] - f[1] * camDist + 0.4, tgt[2] - f[2] * camDist];
+  if (fp) P.face = camYaw;
+  // pull the camera in front of walls/trees
+  const back = [eye[0] - tgt[0], eye[1] - tgt[1], eye[2] - tgt[2]], bl = Math.hypot(...back), hitD = G3.rayBoxes(tgt, back.map(v => v / bl), boxesNear(P.x, P.z), bl);
+  if (!fp && hitD < bl) eye = [tgt[0] + back[0] / bl * (hitD - 0.25), tgt[1] + back[1] / bl * (hitD - 0.25), tgt[2] + back[2] / bl * (hitD - 0.25)];
+  eye[1] = Math.max(eye[1], groundH(eye[0], eye[2]) + 0.3);
+  const inCave = Math.abs(P.x - LM.cave.x) < 2.2 && P.z > LM.cave.z && P.z < LM.cave.z + 18;
+  const dayK = 1 - dk, sky = night ? '#05070d' : dk > 0.05 ? mixHex('#8fb8d8', '#2a1b3d', dk / 0.4) : '#8fb8d8';
+  const lights = [];
+  const fr = fireR(), flick = 0.85 + Math.sin(now * 0.017) * 0.08 + Math.sin(now * 0.031) * 0.07;
+  if (fr > 0) lights.push({ p: [0, 1.2, 0], c: [1.4 * flick, 0.72 * flick, 0.3 * flick], r: fr * 1.6 });
+  for (const p of S.posts) lights.push({ p: [p.x, p.y + 2, p.z], c: [1.1, 0.7, 0.35], r: 9 });
+  if (S.tools.lantern && S.lanternOn) lights.push({ p: [P.x, P.y + 1.3, P.z], c: [1, 0.78, 0.45], r: 7 });
+  if (S.beaconLit) lights.push({ p: [SPOTS.beacon[0], 4, SPOTS.beacon[2]], c: [1.6, 1.3, 0.7], r: 38 });
+  for (const k of STONES) if (!S.stones.includes(k)) { const p = SPOTS[k]; lights.push({ p: [p[0], p[1] + 1, p[2]], c: [1, 0.8, 0.3], r: 5 }); }
+  if (warden) lights.push({ p: [warden.x, warden.y + 2.8, warden.z], c: [0.3, 0.55, 1.2], r: 10 });
+  const env = { sky: inCave ? '#000000' : sky, skyTop: inCave ? null : night ? '#01020a' : mixHex('#2f6fb3', '#160d2e', dk / 0.4), skyHorizon: sky, skyGround: night ? '#05070d' : '#2a3a2a', stars: night ? 1 : clamp((dk - 0.2) * 2, 0, 1), clouds: Math.max(night ? 0.15 : 0.55, S.weather === 'clear' ? 0 : S.wxK * 0.95), cloudCol: (night ? [0.12, 0.13, 0.2] : dk > 0.05 ? [1, 0.75, 0.6] : [1, 1, 1]).map(v => v * (1 - (S.weather === 'rain' || S.weather === 'storm' ? 0.55 * S.wxK : 0)) + flashA * 0.5), sunGlow: night ? [0.35, 0.4, 0.6] : [1, 0.85, 0.6], fog: (inCave ? [4, 20] : night ? [6, 34 + (S.beaconLit ? 30 : 0)] : [lerp(60, 10, dk), lerp(150, 45, dk)]).map(v => v * (1 - (1 - WX[S.weather].fog) * S.wxK) + flashA * 40),
+    sun: night ? [-0.3, 1, 0.5] : [0.4 + (S.t / DAY - 0.5), 1, 0.3], sunCol: night ? [0.06, 0.08, 0.15] : [0.62 * dayK + 0.05, 0.58 * dayK + 0.05, 0.5 * dayK + 0.08],
+    amb: (inCave ? [0.03, 0.03, 0.04] : night ? [0.045, 0.05, 0.09] : [0.38 * dayK + 0.05, 0.4 * dayK + 0.05, 0.46 * dayK + 0.09]).map(v => v * (1 - 0.35 * S.wxK * (S.weather === 'clear' ? 0 : 1)) + flashA * 0.6), lights,
+    flash: S.flashOn && S.flash > 0 ? { p: [P.x + f[0] * 0.3, P.y + 1.5, P.z + f[2] * 0.3], d: f, c: [1.3, 1.25, 1.1], range: 26 } : null };
+  aimEye = eye;
+  const camObj = { eye, yaw: camYaw, pitch: fp ? camPitch : Math.atan2(tgt[1] - eye[1], Math.hypot(tgt[0] - eye[0], tgt[2] - eye[2])), fov: fp ? 1.25 : 1.15, far: 220 };
+  R.begin(camObj, env);
+  R.draw(terrainMesh); R.draw(staticMesh);
+  const viewR = night ? 60 : 130;
+  for (const c of chunks) { if (Math.hypot(c.cx - P.x, c.cz - P.z) > viewR + 20) continue; if (c.dirty) buildChunk(c); if (c.mesh) R.draw(c.mesh); }
+  R.draw(waterMesh, M.I4(), [1, 1, 1], 0.72);
+  // campfire flames
+  if (S.fire > 0) { const s = 0.4 + S.fire / 140; for (let i = 0; i < 4; i++) { const a = now * 0.004 + i * 1.6; R.cube(M.chain(M.T(Math.sin(a) * 0.15, 0.3 + s * 0.5 + i * 0.12, Math.cos(a) * 0.15), M.RY(a), M.S(s * (0.9 - i * 0.18), s * (1.1 + Math.sin(now * 0.02 + i) * 0.2), s * (0.9 - i * 0.18))), i % 2 ? [1, 0.55, 0.1] : [1, 0.8, 0.2], 0.9, 1); } }
+  for (let i = 0; i < 5; i++) R.box(-0.9 + i * 0.4, 0.05, -0.15, -0.6 + i * 0.4, 0.3, 0.15, '#5b3a22');
+  // beacon flame / stones in it
+  for (let i = 0; i < S.placed; i++) R.box(SPOTS.beacon[0] - 0.6 + (i % 2) * 0.7, 2.6, SPOTS.beacon[2] - 0.6 + (i >> 1) * 0.7, SPOTS.beacon[0] - 0.1 + (i % 2) * 0.7, 3.0, SPOTS.beacon[2] - 0.1 + (i >> 1) * 0.7, '#fde047', 1, 1);
+  if (S.beaconLit) R.cube(M.chain(M.T(SPOTS.beacon[0], 3.6 + Math.sin(now * 0.01) * 0.1, SPOTS.beacon[2]), M.RY(now * 0.002), M.S(1.2, 1.8, 1.2)), [1, 0.85, 0.35], 0.85, 1);
+  // pages + stones
+  PAGES.forEach((pg, i) => { if (S.pages.includes(i)) return; const p = pagePos(i); R.cube(M.chain(M.T(p[0], p[1] + 0.15 + Math.sin(now * 0.003 + i) * 0.05, p[2]), M.RY(now * 0.001 + i), M.S(0.45, 0.04, 0.6)), [0.95, 0.9, 0.75], 1, 0.6); });
+  for (const k of STONES) if (!S.stones.includes(k)) { const p = SPOTS[k]; R.cube(M.chain(M.T(p[0], p[1] + 0.5 + Math.sin(now * 0.003) * 0.12, p[2]), M.RY(now * 0.002), M.RX(0.6), M.S(0.42)), [1, 0.85, 0.3], 1, 1); }
+  for (const s of scraps) if (!s.taken) R.box(s.x - 0.35, groundH(s.x, s.z), s.z - 0.3, s.x + 0.35, groundH(s.x, s.z) + 0.45, s.z + 0.3, s.battery ? '#a16207' : '#64748b');
+  for (const p of S.posts) { R.box(p.x - 0.1, p.y, p.z - 0.1, p.x + 0.1, p.y + 2, p.z + 0.1, '#5b3a22'); R.box(p.x - 0.22, p.y + 2, p.z - 0.22, p.x + 0.22, p.y + 2.4, p.z + 0.22, [1, 0.75, 0.3], 1, 1); }
+  // mill wheel
+  { const w = SPOTS.wheel; for (let i = 0; i < 6; i++) R.cube(M.chain(M.T(w[0], w[1], w[2]), M.RX(now * 0.0006 + i * Math.PI / 6), M.S(0.3, 4.6, 0.35)), '#6b4a2b'); }
+  // enemies: shadowy figures with glowing eyes
+  for (const e of enemies) {
+    const wob = Math.sin(e.phase) * 0.08, b = M.chain(M.T(e.x, e.y, e.z), M.RY(e.face || 0));
+    R.cube(M.chain(b, M.T(0, 0.9 + wob, 0), M.S(0.7, 1.5, 0.5)), [0.05, 0.05, 0.08], 0.92);
+    R.cube(M.chain(b, M.T(0, 1.85 + wob, 0), M.S(0.55, 0.5, 0.5)), [0.04, 0.04, 0.06], 0.92);
+    for (const sx of [-0.12, 0.12]) R.cube(M.chain(b, M.T(sx, 1.9 + wob, -0.26), M.S(0.1, 0.07, 0.02)), e.stun > 0 ? [0.5, 0.5, 1] : [1, 0.85, 0.3], 1, 1);
+    for (const sx of [-0.45, 0.45]) R.cube(M.chain(b, M.T(sx, 1.2 + wob, -0.1), M.RX(-0.6 + Math.sin(e.phase * 1.3) * 0.3), M.T(0, -0.4, 0), M.S(0.16, 0.9, 0.16)), [0.05, 0.05, 0.08], 0.9);
+  }
+  if (warden) {
+    const w = warden, b = M.chain(M.T(w.x, w.y, w.z), M.RY(w.face || 0));
+    R.cube(M.chain(b, M.T(0, 1.8, 0), M.S(0.7, 3.2, 0.5)), [0.82, 0.85, 0.9]); R.cube(M.chain(b, M.T(0, 3.7, 0), M.S(0.5, 0.7, 0.5)), [0.9, 0.92, 0.95]);
+    for (const sx of [-0.12, 0.12]) R.cube(M.chain(b, M.T(sx, 3.75, -0.26), M.S(0.09, 0.09, 0.02)), [0.1, 0.1, 0.12]);
+    R.cube(M.chain(b, M.T(0.55, 2.2, -0.3), M.S(0.12, 2.4, 0.12)), [0.75, 0.78, 0.82]); R.cube(M.chain(b, M.T(0.55, 1.0, -0.3), M.S(0.35, 0.45, 0.35)), [0.4, 0.65, 1.2], 1, 1);
+  }
+  // glow sprites
+  if (S.fire > 0) R.glow([0, 1.1, 0], 2 + fr * 0.25, [1, 0.55, 0.18], 0.55 * flick);
+  for (const p of S.posts) R.glow([p.x, p.y + 2.2, p.z], 1.6, [1, 0.65, 0.25], 0.6);
+  if (S.beaconLit) R.glow([SPOTS.beacon[0], 3.8, SPOTS.beacon[2]], 5, [1, 0.8, 0.4], 0.7);
+  for (const k of STONES) if (!S.stones.includes(k)) { const p = SPOTS[k]; R.glow([p[0], p[1] + 0.5, p[2]], 1.6, [1, 0.8, 0.3], 0.7); }
+  PAGES.forEach((pg, i) => { if (!S.pages.includes(i)) { const p = pagePos(i); R.glow([p[0], p[1] + 0.3, p[2]], 0.9, [0.9, 0.85, 0.6], 0.35); } });
+  for (const e of enemies) { const f2 = dirOf(e.face || 0); R.glow([e.x + f2[0] * 0.3, e.y + 1.9, e.z + f2[2] * 0.3], 0.45, e.stun > 0 ? [0.4, 0.4, 1] : [1, 0.8, 0.3], 0.8); }
+  if (warden) R.glow([warden.x, warden.y + 1, warden.z], 2.2, [0.3, 0.5, 1], 0.7);
+  if (S.tools.lantern && S.lanternOn) R.glow([P.x, P.y + 1.2, P.z], 1.4, [1, 0.75, 0.35], 0.45);
+  // you
+  for (const a of animals) if (Math.hypot(a.x - P.x, a.z - P.z) < (night ? 45 : 110)) drawAnimal(a, now);
+  for (const c of CHESTS) { const p = c.at(), open = S.chests.includes(c.id); R.box(p[0] - 0.55, p[1], p[2] - 0.35, p[0] + 0.55, p[1] + 0.55, p[2] + 0.35, '#7c4a1e'); R.box(p[0] - 0.57, p[1] + 0.25, p[2] - 0.37, p[0] + 0.57, p[1] + 0.32, p[2] + 0.37, '#ca8a04'); R.cube(M.chain(M.T(p[0], p[1] + 0.55, p[2] + 0.35), M.RX(open ? -1.9 : 0), M.T(0, 0.08, -0.35), M.S(1.12, 0.16, 0.72)), '#8b5a2b'); if (!open) R.glow([p[0], p[1] + 0.7, p[2]], 1.1, [1, 0.85, 0.4], 0.3); }
+  for (const a of arrows) R.cube(M.chain(M.T(a.x, a.y, a.z), M.RY(Math.atan2(-a.vx, -a.vz)), M.RX(Math.atan2(a.vy, Math.hypot(a.vx, a.vz))), M.S(0.04, 0.04, 0.7)), '#d6a756');
+  for (const e of fx) { if (e.k === 'tracer') { const m = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2, (e.a[2] + e.b[2]) / 2], dx = e.b[0] - e.a[0], dy = e.b[1] - e.a[1], dz = e.b[2] - e.a[2], L = Math.hypot(dx, dy, dz); R.cube(M.chain(M.T(...m), M.RY(Math.atan2(-dx, -dz)), M.RX(Math.atan2(dy, Math.hypot(dx, dz))), M.S(0.025, 0.025, L)), [1, 0.9, 0.6], 0.8, 1); } if (e.k === 'muzzle') R.glow([e.x, e.y, e.z], 0.9, [1, 0.75, 0.3], 1); if (e.k === 'blood') R.cube(M.chain(M.T(e.x, e.y, e.z), M.S(0.1)), '#991b1b'); }
+  const hold = { strongaxe: '#cbd5e1', bow: '#a16207', revolver: '#1f2937', shotgun: '#3f2a1a', axe: '#9ca3af', spear: '#a16207', flash: '#e5e7eb', lantern: '#fbbf24', post: '#5b3a22', food: '#dc2626' }[S.held] || (S.tools.lantern && S.lanternOn ? '#fbbf24' : null);
+  // dropped things lying around (only the ones near you)
+  for (const d of S.drops) { const dx = d.x - P.x, dz = d.z - P.z; if (dx * dx + dz * dz > 2500) continue; const it = ITEMS[d.id], bob = Math.sin(now * 0.003 + d.u) * 0.04;
+    if (d.id === 'log') R.cube(M.chain(M.T(d.x, d.y + 0.2, d.z), M.RY(d.u * 1.7), M.RZ(Math.PI / 2), M.S(0.32, 1.1, 0.32)), it.col);
+    else R.cube(M.chain(M.T(d.x, d.y + 0.22 + bob, d.z), M.RY(now * 0.001 + d.u), M.S(d.id === 'tire' ? 0.6 : 0.35, d.id === 'tire' ? 0.2 : 0.32, d.id === 'tire' ? 0.6 : 0.35)), it.col, 1, d.id === 'battery' || d.id === 'can' ? 0.3 : 0);
+    if (dx * dx + dz * dz < 400) R.glow([d.x, d.y + 0.35, d.z], 0.6, [1, 0.95, 0.8], 0.14); }
+  // beds around camp
+  for (let b = 0; b < S.beds; b++) { const [x, z] = BEDSPOTS[b], y = groundH(x, z); R.box(x - 0.6, y, z - 1.1, x + 0.6, y + 0.35, z + 1.1, '#6b4a2b'); R.box(x - 0.55, y + 0.35, z - 1.05, x + 0.55, y + 0.5, z + 1.05, ['#1d4ed8', '#be123c', '#15803d', '#7e22ce', '#b45309'][b]); R.box(x - 0.45, y + 0.5, z - 1.0, x + 0.45, y + 0.62, z - 0.55, '#f8fafc'); }
+  // camp pile: logs stacked as the pile grows
+  for (let k = 0; k < Math.min(14, S.inv.wood); k++) R.cube(M.chain(M.T(1.3 - 0.7 + (k % 4) * 0.45, 0.35 + Math.floor(k / 4) * 0.3, -6.1), M.RX(Math.PI / 2), M.S(0.3, 1.5, 0.3)), '#7c4a1e');
+  for (let k = 0; k < Math.min(6, S.inv.stone); k++) R.box(2.6 + (k % 2) * 0.4, 0, -7.2 + (k >> 1) * 0.4, 2.9 + (k % 2) * 0.4, 0.3, -6.9 + (k >> 1) * 0.4, '#8b8f99');
+  // grinder teeth spin while grinding
+  { const g = SPOTS.grinder, sp = (S.grindT > 0 ? now * 0.03 : now * 0.002); for (let k = 0; k < 3; k++) R.cube(M.chain(M.T(g[0], 1.75, g[2]), M.RX(sp + k * 1.05), M.S(1.2, 0.08, 0.5)), '#a8a29e'); if (S.grindT > 0) for (let k = 0; k < 4; k++) R.glow([g[0] + (Math.random() - 0.5), 1.9 + Math.random() * 0.6, g[2] + (Math.random() - 0.5)], 0.2, [1, 0.7, 0.3], 0.9); }
+  // the sack on your back grows as it fills
+  if (S.sack.length && !fp) { const k = 0.25 + 0.35 * S.sack.length / S.sackCap; R.cube(M.chain(M.T(P.x, P.y, P.z), M.RY(P.yaw), M.T(0, 1.15, 0.28 + k * 0.3), M.S(k * 1.3, k * 1.6, k)), '#a16207'); }
+  for (const e of fx) if (e.k === 'fly') R.cube(M.chain(M.T(e.x, e.y, e.z), M.S(0.2)), e.col, 1, 0.4);
+  if (!fp) R.person(look(), P.x, P.y, P.z, P.yaw, { groundY: groundH(P.x, P.z), walk: P.walk, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 4), swing: P.swing, hold, holdGlow: hold === '#fbbf24' ? 1 : 0 });
+  for (const e of fx) { if (e.k === 'fly' || e.k === 'tracer' || e.k === 'muzzle' || e.k === 'blood') continue; const k = e.t; R.cube(M.chain(M.T(e.x, e.y + (0.7 - k), e.z), M.S(0.15 * k * 2)), e.k === 'chip' ? '#a16207' : [0.1, 0.1, 0.15], k, 0); }
+  // the camp border: glowing marker stones exactly where the firelight's protection ends
+  { const fr = fireR(); if (fr > 0) { const n = Math.max(24, Math.round(fr * 4)); for (let k = 0; k < n; k++) { const an = k / n * 6.2832 + now * 0.00004, x = Math.cos(an) * fr, z = Math.sin(an) * fr, y = groundH(x, z), pulse = 0.75 + 0.25 * Math.sin(now * 0.003 + k); R.box(x - 0.12, y, z - 0.12, x + 0.12, y + 0.28, z + 0.12, [1, 0.62 * pulse, 0.22], 1, 1); if (k % 2 === 0 && (night || dk > 0.2)) R.glow([x, y + 0.35, z], 0.7, [1, 0.6, 0.2], 0.35 * pulse); } } }
+  for (const t of S.traps) { R.box(t.x - 0.4, t.y, t.z - 0.4, t.x + 0.4, t.y + 0.05, t.z + 0.4, '#57534e'); for (const sx of [-1, 1]) R.cube(M.chain(M.T(t.x + sx * 0.32, t.y + 0.05, t.z), M.RZ(t.armed ? sx * 1.45 : sx * 0.25), M.T(0, 0.2, 0), M.S(0.05, 0.4, 0.75)), '#a8a29e'); }
+  S.plots.forEach((pl, i) => { const [x, z] = FARMSPOTS[i], y = groundH(x, z); R.box(x - 0.9, y, z - 0.9, x + 0.9, y + 0.15, z + 0.9, '#4a3220'); R.box(x - 0.8, y + 0.15, z - 0.8, x + 0.8, y + 0.2, z + 0.8, '#3b2a1a'); if (pl.crop) for (let k = 0; k < 4; k++) { const cx = x - 0.4 + (k % 2) * 0.8, cz = z - 0.4 + (k >> 1) * 0.8, h = 0.1 + pl.g * 0.55; R.box(cx - 0.06, y + 0.2, cz - 0.06, cx + 0.06, y + 0.2 + h, cz + 0.06, '#65a30d'); if (pl.g >= 1) R.box(cx - 0.1, y + 0.14, cz - 0.1, cx + 0.1, y + 0.24, cz + 0.1, '#f97316'); } if (pl.g >= 1) R.glow([x, y + 0.6, z], 1.2, [1, 0.6, 0.2], 0.3); });
+  for (const r of raiders) { R.person(LOOK_HOOD, r.x, r.y, r.z, r.face || 0, { walk: r.walk, speed: 1, swing: r.swing ? 1 - r.swing / 0.3 : 0, hold: '#f97316', holdGlow: 1 }); const f2 = dirOf(r.face || 0); R.glow([r.x + f2[0] * 0.7 + Math.cos(r.face || 0) * 0.35, r.y + 1.2, r.z + f2[2] * 0.7 - Math.sin(r.face || 0) * 0.35], 1.3, [1, 0.55, 0.15], 0.7); }
+  if (S.fishing) { const F = S.fishing, by = WATER_Y + 0.08 + (F.state === 'bite' ? -0.15 : Math.sin(now * 0.004) * 0.04), hx = P.x + dirOf(P.yaw)[0] * 0.8, hz = P.z + dirOf(P.yaw)[2] * 0.8, hy = P.y + 2.2, dx = F.x - hx, dy = by - hy, dz = F.z - hz, L = Math.hypot(dx, dy, dz); R.cube(M.chain(M.T((hx + F.x) / 2, (hy + by) / 2, (hz + F.z) / 2), M.RY(Math.atan2(-dx, -dz)), M.RX(Math.atan2(dy, Math.hypot(dx, dz))), M.S(0.015, 0.015, L)), '#e5e7eb', 0.8, 1); R.box(F.x - 0.08, by, F.z - 0.08, F.x + 0.08, by + 0.16, F.z + 0.08, '#ef4444', 1, 0.4); if (F.state === 'bite') R.glow([F.x, by + 0.1, F.z], 0.8, [1, 1, 1], 0.6); }
+  // rain around the camera
+  if ((S.weather === 'rain' || S.weather === 'storm') && S.wxK > 0.05 && !inCave) { if (!rainMesh) { const a = [], rr = G3.rng(3); for (let i = 0; i < 420; i++) { const x = (rr() - 0.5) * 30, y = rr() * 18, z = (rr() - 0.5) * 30; pushBox(a, x, y, z, x + 0.025, y + 0.6, z + 0.025, '#94a3b8'); } rainMesh = R.mesh(a); } const ry = -((now * 0.024) % 18); for (const [ox, oz] of [[0, 0], [15, 15]]) for (const off of [0, 18]) R.draw(rainMesh, M.T(Math.floor(eye[0] / 30) * 30 + ox, eye[1] - 8 + ry + off, Math.floor(eye[2] / 30) * 30 + oz), [0.75, 0.8, 0.9], 0.3 * S.wxK); }
+  R.end();
+  if (fp) { const lk = look() || {}, held = S.held, gun = held === 'revolver' || held === 'shotgun';
+    R.viewModel(camObj, { walk: P.walk, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 4), swing: P.swing, sleeve: lk.shirt || '#3b82f6', skin: lk.skin || '#f8c9a0', hold, holdGlow: hold === '#fbbf24' ? 1 : 0,
+      holdLen: gun ? 0.35 : held === 'bow' ? 0.7 : held === 'spear' ? 1.0 : 0.55, holdHead: held === 'axe' || held === 'strongaxe' ? [0.05, 0.22, 0.16] : held === 'lantern' ? [0.16, 0.2, 0.16] : null, holdHeadCol: held === 'lantern' ? '#fbbf24' : '#9ca3af' }); }
+}
+function mixHex(a, b, t) { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round((v + (B[i] - v) * clamp(t, 0, 1)) * 255).toString(16).padStart(2, '0')).join(''); }
+
+/* =================== HUD =================== */
+let hudT = 0;
+function hud(dt) {
+  hudT -= dt; if (hudT > 0) return; hudT = 0.15;
+  const bar = (n, v, c) => `<div class="bar"><i style="width:${clamp(v, 0, 100)}%;background:${c}"></i><span>${n}</span></div>`;
+  $('bars').innerHTML = bar('❤ Health', S.hp, '#ef4444') + bar('🍖 Food', S.food, '#f59e0b') + bar('⚡ Stamina', S.stam, '#38bdf8') + bar('🔥 Campfire', S.fire, '#fb923c') + (S.flashOn || S.flash < 100 ? bar('🔦 Battery', S.flash, '#facc15') : '');
+  const left = Math.ceil((S.isNight ? nightLen() : DAY) - S.t);
+  $('clock').innerHTML = `<b>${S.isNight ? '🌙 Night ' + S.night : '☀ Day ' + (S.night + 1)}</b><small>${S.isNight ? 'Dawn in ' : 'Dark in '}${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}${S.finalNight ? ' · The Long Night' : ''} · ${WX[S.weather].i} ${WX[S.weather].n}${S.raid ? ' · 🔥 RAID' : ''}</small>`;
+  const iv = S.inv; $('inv').innerHTML = `<span style="grid-column:span 2;opacity:.75;font-size:11px">🏕 CAMP PILE</span><span>🪵 ${iv.wood}</span><span>🪨 ${iv.stone}</span><span>⚙️ ${iv.scrap}</span><span>🍓 ${iv.berries}</span><span>🥫 ${iv.cans}</span><span>🔋 ${iv.batteries}</span><span>🛏 ${S.beds}</span><span>🐺 ${S.inv.pelts || 0}</span><span>🍖 ${(S.inv.cooked || 0) + (S.inv.meat || 0)}</span><span>🔆 ${S.stones.length - S.placed}</span>`;
+  renderHotbar();
+  const dc = Math.hypot(P.x, P.z), safe = lightAt(P.x, P.z) >= 1, inCamp = dc < Math.max(fireR(), 6);
+  $('camp').textContent = inCamp && safe ? '🏕 In camp — the fire keeps you safe' : safe ? '🕯 Safe in the light' : (S.isNight ? '🌲 Dark forest — danger!' : '🌲 Forest') + ` · camp ${Math.round(dc)} m ${arrow(Math.atan2(-P.x, -P.z))}`;
+  $('camp').style.color = inCamp && safe ? '#86efac' : safe ? '#fde68a' : S.isNight ? '#fca5a5' : '#e5e7eb';
+  $('camp').style.background = inCamp && safe ? 'rgba(22,101,52,.45)' : S.isNight && !safe ? 'rgba(127,29,29,.5)' : 'rgba(0,0,0,.35)';
+  $('vig').style.boxShadow = `inset 0 0 ${160 + (100 - S.hp) * 2}px rgba(${S.hp < 35 ? '120,0,0' : '0,0,0'},.8)`;
+}
+function arrow(a) { const rel = Math.atan2(Math.sin(a - camYaw), Math.cos(a - camYaw)); return ['⬆', '↖', '⬅', '↙', '⬇', '↘', '➡', '↗'][((Math.round(rel / (Math.PI / 4)) % 8) + 8) % 8]; }
+
+/* =================== HOTBAR & SACK UI =================== */
+let hbKey = '';
+function renderHotbar() {
+  const hb = hotbar(), fc = foodCount();
+  const key = hb.join() + '|' + S.held + '|' + JSON.stringify(S.ammo) + JSON.stringify(S.mag) + '|' + fc + '|' + S.inv.posts + '|' + S.flashOn + '|' + S.lanternOn + '|' + S.sack.length + '|' + S.sackCap;
+  $('sackbar').textContent = (S.reloadT > 0 ? '🔄 Reloading… · ' : '') + (S.armor ? `🛡 ${Math.round(S.armor * 100)}% · ` : '') + `🎒 ${SACKS[S.sackCap] || 'Sack'} ${S.sack.length}/${S.sackCap}`;
+  if (key === hbKey) return; hbKey = key;
+  $('hotbar').innerHTML = hb.map((id, k) => { const [ic, nm] = HB[id]; const n = id === 'food' ? fc : id === 'post' ? S.inv.posts : id === 'trap' ? S.inv.traps : id === 'sack' ? `${S.sack.length}/${S.sackCap}` : id === 'bow' ? S.ammo.arrows : WEAP[id] && WEAP[id].mag ? `${S.mag[id]}/${S.ammo[WEAP[id].ammo]}` : (id === 'flash' && S.flashOn) || (id === 'lantern' && S.lanternOn) ? 'on' : ''; return `<button class="${S.held === id ? 'on' : ''}" data-hb="${id}" title="${nm} (${k + 1})"><i>${k + 1}</i>${ic}${n !== '' ? `<b>${n}</b>` : ''}<small>${nm}</small></button>`; }).join('');
+}
+$('hotbar').addEventListener('pointerdown', e => { const b = e.target.closest('[data-hb]'); if (!b) return; e.preventDefault(); e.stopPropagation(); if (S.held === b.dataset.hb && IN.touch) useHeld(); else selectSlot(b.dataset.hb); hbKey = ''; renderHotbar(); });
+let sackSel = -1;
+function renderSack() {
+  $('sackTitle').textContent = `🎒 ${SACKS[S.sackCap] || 'Sack'} — ${S.sack.length}/${S.sackCap}`;
+  $('sackCap').style.width = (S.sack.length / S.sackCap * 100) + '%';
+  const slots = []; for (let i = 0; i < S.sackCap; i++) { const id = S.sack[i]; slots.push(id ? `<button class="slot${i === sackSel ? ' sel' : ''}" data-s="${i}">${ITEMS[id].i}<small>${ITEMS[id].n}</small></button>` : `<div class="slot empty">·</div>`); }
+  $('slots').innerHTML = slots.join('');
+  const it = sackSel >= 0 && S.sack[sackSel] ? ITEMS[S.sack[sackSel]] : null;
+  $('sackInfo').textContent = it ? `${it.i} ${it.n}${it.food ? ` — food (+${it.food})` : it.scrap ? ` — junk, grinds into ${it.scrap} scrap` : it.pile ? ' — unload at the camp pile' : ''}` : 'Tap an item to choose it.';
+  $('sDrop').disabled = !it; $('sEat').disabled = !(it && it.food);
+}
+$('slots').onclick = e => { const b = e.target.closest('[data-s]'); if (b) { sackSel = +b.dataset.s; renderSack(); } };
+$('sDrop').onclick = () => { if (sackSel < 0) return; const id = S.sack.splice(sackSel, 1)[0]; if (id) dropItem(id, P.x, P.z, 1); sackSel = -1; renderSack(); };
+$('sEat').onclick = () => { const id = S.sack[sackSel]; if (!id || !ITEMS[id].food) return; S.sack.splice(sackSel, 1); S.food = Math.min(100, S.food + ITEMS[id].food); log(`${ITEMS[id].i} Ate ${ITEMS[id].n.toLowerCase()} (+${ITEMS[id].food})`); sackSel = -1; renderSack(); };
+$('sDropAll').onclick = () => { for (const id of S.sack.splice(0)) dropItem(id, P.x, P.z, 1.4); sackSel = -1; renderSack(); };
+function renderGrinder() {
+  if ($('grinder').hidden) return;
+  const junk = S.sack.filter(x => ITEMS[x].scrap).length;
+  $('grindInfo').innerHTML = `⚙️ Scrap: <b>${S.inv.scrap}</b> · 🪵 Wood in the pile: <b>${S.inv.wood}</b> · 🛏 Beds: <b>${S.beds}/5</b> (nights ${Math.round(nightLen())}s)${junk ? ` · <b>${junk}</b> junk still in your sack` : ''}`;
+  $('grecipes').innerHTML = GRINDER.map((r, i) => { const have = builtOut(r), can = !have && Object.entries(r.cost).every(([k, v]) => (S.inv[k] || 0) >= v); return `<button class="rec${have ? ' done' : can ? '' : ' no'}" data-g="${i}" ${have ? 'disabled' : ''}><b>${r.name}${r.bed ? ` (${S.beds}/5)` : ''}${have ? ' ✓' : ''}</b><small>${r.desc}</small><span class="cost">${Object.entries(r.cost).map(([k, v]) => `${{ wood: '🪵', stone: '🪨', scrap: '⚙️', berries: '🍓' }[k]} ${S.inv[k] || 0}/${v}`).join(' · ')}</span></button>`; }).join('');
+  $('grecipes').querySelectorAll('[data-g]').forEach(b => b.onclick = () => craft(GRINDER[+b.dataset.g]));
+}
+
+/* =================== PANELS =================== */
+function openPanel(id) { closePanels(); $(id).hidden = false; paused = true; if (document.pointerLockElement) document.exitPointerLock(); if (id === 'craft') renderCraft(); if (id === 'sackp') { sackSel = -1; renderSack(); } if (id === 'grinder') renderGrinder(); if (id === 'journal') renderJournal('pages'); }
+function closePanels() { for (const id of ['craft', 'journal', 'reader', 'pause', 'over', 'sackp', 'grinder']) $(id).hidden = true; paused = false; last = performance.now(); }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = closePanels);
+addEventListener('keydown', e => { if (!running) return; const open = ['craft', 'journal', 'reader', 'pause', 'sackp', 'grinder'].find(id => !$(id).hidden); if (!open) return; if (e.code === 'Escape' || (open === 'craft' && e.code === 'KeyC') || (open === 'journal' && e.code === 'KeyM') || (open === 'sackp' && (e.code === 'Tab' || e.code === 'KeyI')) || (open === 'reader' && (e.code === 'KeyE' || e.code === 'Enter'))) { e.preventDefault(); closePanels(); IN.endFrame(); } });
+function renderCraft() {
+  $('recipes').innerHTML = RECIPES.map((r, i) => { const have = (r.tool && S.tools[r.id]) || (r.once && S.tools[r.id]), can = !have && Object.entries(r.cost).every(([k, v]) => (S.inv[k] || 0) >= v); return `<button class="rec${have ? ' done' : can ? '' : ' no'}" data-i="${i}" ${have ? 'disabled' : ''}><b>${r.name}${have ? ' ✓' : ''}</b><small>${r.desc}</small><span class="cost">${Object.entries(r.cost).map(([k, v]) => `${{ wood: '🪵', stone: '🪨', scrap: '🔩', berries: '🍓' }[k]} ${S.inv[k] || 0}/${v}`).join(' · ')}</span></button>`; }).join('');
+  $('recipes').querySelectorAll('[data-i]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.i]));
+}
+function renderJournal(tab) {
+  document.querySelectorAll('#journal [data-t]').forEach(b => { b.classList.toggle('on', b.dataset.t === tab); b.onclick = () => renderJournal(b.dataset.t); });
+  const jb = $('jbody');
+  if (tab === 'pages') { jb.innerHTML = `<div class="plist">${PAGES.map((p, i) => S.pages.includes(i) ? `<button data-p="${i}">📜 ${p.title}</button>` : `<button disabled style="opacity:.4">❔ Missing page — somewhere near the ${LM[p.at].name.toLowerCase()}</button>`).join('')}</div>`; jb.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { $('ptext').innerHTML = `<h3>${PAGES[+b.dataset.p].title}</h3>${PAGES[+b.dataset.p].text}`; closePanels(); openPanel('reader'); }); }
+  if (tab === 'goals') jb.innerHTML = `<div class="plist">${[[`Journal pages: ${S.pages.length}/8`, S.pages.length >= 8], [`Sunstones found: ${S.stones.length}/4`, S.stones.length >= 4], [`Sunstones in the Beacon: ${S.placed}/4`, S.placed >= 4], ['Survive the Long Night', S.over], [`Nights survived: ${S.night - (S.isNight ? 1 : 0)}`, false], [`Trees chopped: ${S.chops} · Gloam banished: ${S.kills}`, false]].map(([t, ok]) => `<div style="padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)">${ok ? '✅' : '▫️'} ${t}</div>`).join('')}</div><p style="opacity:.7;font-size:13px">Tips: chop pines for wood, mine rocks for stone, search crates at landmarks for scrap and batteries. The Gloam burns away at dawn.</p>`;
+  if (tab === 'map') {
+    jb.innerHTML = '<canvas id="map" width="440" height="440"></canvas>';
+    const c = $('map').getContext('2d'), k = 440 / (HALF * 2), X = x => (x + HALF) * k, Z = z => (z + HALF) * k;
+    c.fillStyle = '#0d1a12'; c.fillRect(0, 0, 440, 440);
+    c.fillStyle = '#14301d'; for (const t of trees) if (t.alive) c.fillRect(X(t.x) - 1, Z(t.z) - 1, 2, 2);
+    c.fillStyle = '#1e3a5f'; c.beginPath(); c.arc(X(LAKE[0]), Z(LAKE[1]), LAKE[2] * k, 0, 7); c.fill();
+    c.font = '11px system-ui'; c.textAlign = 'center';
+    for (const key in LM) { const l = LM[key]; c.fillStyle = key === 'camp' ? '#fb923c' : '#e5e7eb'; c.beginPath(); c.arc(X(l.x), Z(l.z), 4, 0, 7); c.fill(); c.fillText(l.name, X(l.x), Z(l.z) - 7); }
+    for (const kk of STONES) if (!S.stones.includes(kk)) { c.fillStyle = '#fde047'; c.fillText('🔆', X(SPOTS[kk][0]), Z(SPOTS[kk][2]) + 14); }
+    c.fillStyle = '#38bdf8'; c.beginPath(); c.arc(X(P.x), Z(P.z), 5, 0, 7); c.fill(); const fd = dirOf(camYaw); c.strokeStyle = '#38bdf8'; c.lineWidth = 2; c.beginPath(); c.moveTo(X(P.x), Z(P.z)); c.lineTo(X(P.x + fd[0] * 8), Z(P.z + fd[2] * 8)); c.stroke();
+  }
+}
+function story(title, html, btns) {
+  closePanels(); $('over').hidden = false; paused = true; if (document.pointerLockElement) document.exitPointerLock();
+  $('story').innerHTML = `<h2>${title}</h2>${html}`;
+  $('overBtns').innerHTML = ''; for (const [t, fn] of btns) { const b = document.createElement('button'); b.className = 'btn pri'; b.textContent = t; b.onclick = fn; $('overBtns').appendChild(b); }
+}
+function winGame() {
+  S.over = true; kit && kit.unlock('beacon'); kit && kit.score(S.night, 'story'); try { localStorage.removeItem(SAVE); } catch {} sfx('win');
+  story('Morning at Hollowpine', `The Long Night ends the way all nights end — slowly, then all at once. Gold light spills between the pines and the last of the Gloam melts like frost.<br><br>Someone is walking up the path from the hollow. Slow, limping, wrapped in a blanket that smells of smoke. Grandpa Odell squints at the Beacon, then at you.<br><br><i>“Saw your light from the bottom of the world, kiddo. Knew you’d keep it burning.”</i><br><br><b>You survived ${S.night} nights.</b> Pages found: ${S.pages.length}/8.`, [['Back to the menu', () => { closePanels(); toMenu(); }]]);
+}
+function endGame() {
+  S.over = true; kit && kit.score(Math.max(0, S.night - 1), 'endless');
+  story('The fire went cold', `The Gloam closes in.<br><br><b>You lasted ${Math.max(0, S.night - (S.isNight ? 1 : 0))} night${S.night === 2 ? '' : 's'}.</b> Gloam banished: ${S.kills}. Trees chopped: ${S.chops}.`, [['Try again', () => { closePanels(); startGame('endless'); }], ['Menu', () => { closePanels(); toMenu(); }]]);
+}
+function pause(on) { if (on) { openPanel('pause'); } else closePanels(); }
+$('bResume').onclick = () => pause(false);
+$('bSave').onclick = () => { save(); closePanels(); toMenu(); };
+
+/* =================== FLOW =================== */
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) { drawMe(now); return; }
+  if (!paused) update(dt); else IN.frame(), IN.endFrame();
+  render(now); hud(dt);
+}
+function startGame(m, cont) {
+  if (!R && !TEST) return;
+  for (const t of trees) { t.alive = true; t.hp = 0; } for (const r of rocks) r.left = 3; for (const b of bushes) b.berries = 3; for (const s of scraps) s.taken = false; chunks.forEach(c => c.dirty = true);
+  if (cont) { if (!loadSave()) fresh('story'); } else fresh(m);
+  enemies = []; warden = null; fx = []; animals = []; arrows = []; raiders = []; S.raid = null; S.fishing = null; $('fishgame').hidden = true; spawnWildlife();
+  $('menu').hidden = true; running = true; paused = false; $('touch').classList.toggle('on', IN.touch); $('stick').classList.toggle('on', IN.touch); $('hotbar').hidden = false; $('sackbar').hidden = false; hbKey = '';
+  if (!cont) story(m === 'story' ? 'Hollowpine' : 'Endless nights', m === 'story' ? 'The clearing is quiet. The campfire is low, Grandpa’s chair is empty, and the old Beacon on its stone pillar is cold.<br><br><b>Before dark:</b> chop trees, pick up the logs in your sack 🎒 and burn them in the fire. Junk you find goes in the Scrap Grinder — build beds to make the nights shorter. There’s a page of Grandpa’s journal by the workbench.' : 'No story, no end. How many nights can you keep the fire alive? It gets harder every night.', [['Begin', () => closePanels()]]);
+  try { cv.focus(); } catch {}
+}
+function toMenu() { running = false; $('menu').hidden = false; $('hotbar').hidden = true; $('sackbar').hidden = true; $('touch').classList.remove('on'); $('stick').classList.remove('on'); $('bCont').hidden = !localStorage.getItem(SAVE); }
+$('bStory').onclick = () => { if (localStorage.getItem(SAVE) && !confirm('Start a new story? Your saved game will be replaced.')) return; startGame('story'); };
+$('bCont').onclick = () => startGame('story', true);
+$('bEndless').onclick = () => startGame('endless');
+$('bKeys').onclick = () => { $('keys').hidden = !$('keys').hidden; };
+$('bLook').onclick = () => { if (window.parent !== window) window.parent.postMessage({ sjg: 1, type: 'open', app: 'html-avatar' }, location.origin); location.href = '../sj-avatar/'; };
+$('lowq').checked = localStorage.getItem('sj-lantern-low') === '1';
+$('lowq').onchange = () => { localStorage.setItem('sj-lantern-low', $('lowq').checked ? '1' : '0'); if (R) R.scale = $('lowq').checked ? 0.6 : 1; };
+if (R) R.scale = $('lowq').checked ? 0.6 : 1;
+$('bCont').hidden = !localStorage.getItem(SAVE);
+const meC = $('me').getContext('2d');
+function drawMe(now) { if ($('menu').hidden || !window.SJLook) return; meC.clearRect(0, 0, 300, 400); SJLook.draw(meC, look(), 150, 380, 330, { t: now / 1000, pose: 'idle' }); }
+if (window.SJLook) SJLook.get().then(() => {});
+document.addEventListener('visibilitychange', () => { if (document.hidden && running && !paused) pause(true); });
+requestAnimationFrame(frame);
+// test hooks
+window.__lantern = () => ({ S, P: { x: P && P.x, y: P && P.y, z: P && P.z }, enemies: enemies.length, warden: !!warden, running, usable: running && usable() && usable().label });
+window.__lanternStep = (n, dt = 1 / 30, inputs) => { for (let i = 0; i < n; i++) { if (inputs) inputs(i); if (!paused) update(dt); } return window.__lantern(); };
+window.__lanternApi = { get raiders() { return raiders; }, maybeRaid, rollWeather, FARMSPOTS, useRod, landFish, placeTrap, updTraps, inLake, LAKE, fireR, rayTarget, aim: () => { const f = aimDir(); return { eye: aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist], f }; }, collectAround, get animals() { return animals; }, spawnWildlife, fire, reload, WEAP, CHESTS, openChest, hurtAnimal, AN, DENS, get arrows() { return arrows; }, hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
+})();
+</script>
+<script>window.GL3D && (GL3D.fullscreenButton(), GL3D.viewButton());</script>
+</body></html>

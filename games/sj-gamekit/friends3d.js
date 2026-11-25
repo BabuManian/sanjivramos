@@ -1,7 +1,7 @@
 /* Play together in 3D games: everyone in the room sees everyone else's character (their SanjivramOS "look")
    running around live, with name tags. No host simulation — each player sends their own position ~12×/s.
    const F = await SJFriends.join({ game, gameName, join })   (opens the SanjivramOS lobby)
-   F.send({x,y,z,yaw,walk,spd, ...extra}) every frame (throttled) · F.update(dt) · F.draw(R) · F.tags(R) · F.list() · F.leave()
+   F.send({x,y,z,yaw,walk,spd, ...extra}) every frame (throttled) · F.update(dt) · F.draw(R[, extra, keep]) · F.tags(R, box[, keep]) · F.list() · F.leave()
    F.seed (same for everyone; changes on rematch) · F.on('start', seed => …) · F.isHost · F.rematch()                   */
 (() => {
   'use strict';
@@ -29,9 +29,9 @@
           o.walk += dt * 11 * Math.min(1, o.t.spd || 0);
         }
       },
-      draw(R, extra) { for (const o of others.values()) { if (o.t.dead) continue; R.person(o.look, o.x, o.y, o.z, o.yaw, Object.assign({ walk: o.walk, speed: Math.min(1, o.t.spd || 0), groundY: o.t.gy == null ? o.y : o.t.gy }, extra ? extra(o) : {})); } },
+      draw(R, extra, keep) { for (const o of others.values()) { if (o.t.dead || (keep && !keep(o))) continue; R.person(o.look, o.x, o.y, o.z, o.yaw, Object.assign({ walk: o.walk, speed: Math.min(1, o.t.spd || 0), groundY: o.t.gy == null ? o.y : o.t.gy }, extra ? extra(o) : {})); } },
       /** name tags as DOM labels over each character */
-      tags(R, box) {
+      tags(R, box, keep) {
         if (!box) return;
         const seen = new Set();
         for (const [id, o] of others) {
@@ -39,7 +39,7 @@
           let el = box.querySelector(`[data-u="${id}"]`);
           if (!el) { el = document.createElement('div'); el.dataset.u = id; el.style.cssText = 'position:absolute;transform:translate(-50%,-100%);padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font:600 12px system-ui;white-space:nowrap;pointer-events:none'; box.appendChild(el); }
           const p = R.project([o.x, o.y + 2.35, o.z]);
-          el.style.display = p.vis && p.z < 60 && !o.t.dead ? '' : 'none';
+          el.style.display = p.vis && p.z < 60 && !o.t.dead && (!keep || keep(o)) ? '' : 'none';
           if (p.vis) { el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; el.style.opacity = String(Math.max(0.35, 1 - p.z / 60)); }
           const txt = o.name + (o.t.label ? ' · ' + o.t.label : ''); if (el.textContent !== txt) el.textContent = txt;
         }

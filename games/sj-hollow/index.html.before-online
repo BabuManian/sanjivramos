@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Hollow Halls</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#e5e7eb;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;z-index:3;pointer-events:none;text-shadow:0 2px 6px #000}
+#top{left:16px;top:14px;font-weight:700;display:flex;flex-direction:column;gap:6px;width:170px}
+.bar{height:7px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}.bar i{display:block;height:100%}
+#prompt{left:50%;bottom:22%;transform:translateX(-50%);padding:6px 14px;border-radius:999px;background:rgba(0,0,0,.6);font-weight:600}
+#prompt:empty{display:none}
+#msg{left:50%;top:30%;transform:translateX(-50%);font:600 18px Georgia,serif;text-align:center;opacity:0;transition:opacity .6s;max-width:80vw}
+#dot{left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:rgba(255,255,255,.5)}
+#vig{position:fixed;inset:0;z-index:2;pointer-events:none;box-shadow:inset 0 0 220px 60px #000}
+#locker{position:fixed;inset:0;z-index:2;pointer-events:none;display:none;background:repeating-linear-gradient(0deg,#000 0 26px,transparent 26px 34px)}
+#scare{position:fixed;inset:0;z-index:6;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.0),rgba(0,0,0,.9));display:none}
+#heart{position:fixed;inset:0;z-index:2;pointer-events:none;box-shadow:inset 0 0 0 0 rgba(127,29,29,0);transition:box-shadow .15s}
+.panel{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.82)}
+.panel[hidden]{display:none}
+.card{width:min(620px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:#0b0b0f;border:1px solid #27272a;border-radius:16px;padding:22px 24px;text-align:center}
+h1{margin:0;font:400 52px/1 Georgia,serif;letter-spacing:4px;color:#d4d4d8;text-shadow:0 0 30px rgba(220,38,38,.35)}
+h2{margin:0 0 10px;font:400 28px Georgia,serif;color:#e4e4e7}
+.sub{opacity:.75;line-height:1.6;margin:10px 0 16px;font-family:Georgia,serif}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.btn{padding:10px 20px;border-radius:10px;background:#18181b;border:1px solid #3f3f46;font-weight:700}
+.btn.pri{background:#7f1d1d;border-color:#991b1b}
+.keys{font-size:13px;opacity:.7;line-height:1.8}
+#touch{position:fixed;right:12px;bottom:14px;z-index:4;display:none;gap:8px}
+#touch.on{display:flex}
+#touch button{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.12);font-weight:800;font-size:12px;touch-action:none}
+#touch button.on{background:rgba(127,29,29,.6)}
+</style></head>
+<body>
+<canvas id="gl"></canvas><div id="vig"></div><div id="heart"></div><div id="locker"></div><div id="scare"></div>
+<div class="hud" id="top"></div><div class="hud" id="dot"></div><div class="hud" id="prompt"></div><div class="hud" id="msg"></div>
+<div id="touch"><button data-btn="crouch">Crouch</button><button data-btn="light">Light</button><button data-btn="use">Use</button><button data-btn="run">Run</button></div>
+<div class="panel" id="menu"><div class="card">
+  <h1>HOLLOW HALLS</h1>
+  <p class="sub">The night nurse at Greywater Hospital left a message on your phone: <i>“The pages. Find all eight pages and it can’t follow you out.”</i><br>The lights are out. Something tall is walking the halls. It hears you run. It sees your light.</p>
+  <div class="btns"><button class="btn pri" data-d="1">Enter</button><button class="btn" data-d="0">Easier (2 chances)</button><button class="btn" data-d="2">Nightmare</button></div>
+  <p class="keys">WASD move · mouse look (click to lock) · Shift run · C / Ctrl crouch (quiet) · F flashlight · E hide in lockers, pick up pages, open the exit · phone: left = walk, right = look</p>
+  <p class="keys" id="best"></p>
+</div></div>
+<div class="panel" id="over" hidden><div class="card"><div id="overText"></div><div class="btns"><button class="btn pri" id="again">Try again</button><button class="btn" id="toMenu">Menu</button></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('hollow', { title: 'Hollow Halls', vs: false, trophies: [
+  { id: 'page', name: 'The First Page', desc: 'Pick up a page', icon: '📄' },
+  { id: 'hide', name: 'Holding My Breath', desc: 'Hide in a locker while it walks past', icon: '🚪' },
+  { id: 'escape', name: 'Out', desc: 'Escape Greywater Hospital', icon: '🌅' },
+  { id: 'nightmare', name: 'Nightmare Survivor', desc: 'Escape on Nightmare', icon: '💀' },
+  { id: 'nolight', name: 'In the Dark', desc: 'Escape with the flashlight off most of the time', icon: '🌑' },
+] }) : null;
+const G3 = window.GL3D, { M, dirOf, pushBox } = G3, $ = id => document.getElementById(id);
+const TEST = /[?&]nogl\b/.test(location.search);
+let R = null; if (!TEST) try { R = G3.create($('gl'), { maxDpr: 1.25 }); } catch (e) { console.warn(e); }
+if (!R && !TEST) $('menu').querySelector('.sub').textContent = 'This browser can’t run WebGL, so Hollow Halls can’t be drawn here.';
+const IN = G3.Input($('gl')); IN.bindButtons($('touch'));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const TS = 3, WH = 3.2, N = 29;   // tile size, wall height, grid size (odd)
+
+/* ============ the building: a maze with rooms and loops ============ */
+let grid, rooms, pages, lockers, batteries, exit, startTile, mesh = null, lamps = [], tileBoxes;
+function build(seed) {
+  const rnd = G3.rng(seed);
+  grid = Array.from({ length: N }, () => new Array(N).fill(1));
+  const stack = [[1, 1]]; grid[1][1] = 0;
+  while (stack.length) {
+    const [x, y] = stack[stack.length - 1], dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].sort(() => rnd() - 0.5);
+    let moved = false;
+    for (const [dx, dy] of dirs) { const nx = x + dx, ny = y + dy; if (nx > 0 && ny > 0 && nx < N - 1 && ny < N - 1 && grid[ny][nx]) { grid[y + dy / 2][x + dx / 2] = 0; grid[ny][nx] = 0; stack.push([nx, ny]); moved = true; break; } }
+    if (!moved) stack.pop();
+  }
+  // loops: knock down some walls so it can be outrun
+  for (let i = 0; i < 70; i++) { const x = 1 + (rnd() * (N - 2) | 0), y = 1 + (rnd() * (N - 2) | 0); if (grid[y][x] && ((grid[y][x - 1] === 0 && grid[y][x + 1] === 0) || (grid[y - 1][x] === 0 && grid[y + 1][x] === 0))) grid[y][x] = 0; }
+  // rooms (wards)
+  rooms = [];
+  for (let i = 0; i < 7; i++) { const w = 3 + (rnd() * 2 | 0) * 2, h = 3 + (rnd() * 2 | 0) * 2, x = 1 + (rnd() * ((N - 2 - w) / 2) | 0) * 2, y = 1 + (rnd() * ((N - 2 - h) / 2) | 0) * 2; for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) grid[yy][xx] = 0; rooms.push({ x, y, w, h }); }
+  startTile = [1, 1];
+  const open = []; for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) if (!grid[y][x]) open.push([x, y]);
+  const far = (t, d) => Math.abs(t[0] - startTile[0]) + Math.abs(t[1] - startTile[1]) > d;
+  const deadEnds = open.filter(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => !grid[y + dy][x + dx]).length === 1 && far([x, y], 6)).sort(() => rnd() - 0.5);
+  const pick = (list, n, used) => { const out = []; for (const t of list) { if (out.length >= n) break; if (used.some(u => Math.abs(u[0] - t[0]) + Math.abs(u[1] - t[1]) < 5)) continue; out.push(t); used.push(t); } return out; };
+  const used = [startTile];
+  pages = pick(deadEnds.concat(open.filter(t => far(t, 8)).sort(() => rnd() - 0.5)), 8, used).map(t => ({ t, taken: false }));
+  const ex = open.filter(t => far(t, 22)).sort(() => rnd() - 0.5)[0] || [N - 2, N - 2]; exit = { t: ex, open: false };
+  // lockers stand against a wall in corridors
+  lockers = [];
+  for (const [x, y] of open.sort(() => rnd() - 0.5)) { if (lockers.length >= 16) break; if (Math.abs(x - startTile[0]) + Math.abs(y - startTile[1]) < 3) continue; const wall = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => grid[y + dy][x + dx]); if (!wall || lockers.some(l => Math.abs(l.t[0] - x) + Math.abs(l.t[1] - y) < 3) || pages.some(p => p.t[0] === x && p.t[1] === y)) continue; lockers.push({ t: [x, y], wall }); }
+  batteries = pick(open.slice().sort(() => rnd() - 0.5), 6, used.slice()).map(t => ({ t, taken: false }));
+  lamps = rooms.map(r => ({ p: [(r.x + r.w / 2) * TS, WH - 0.3, (r.y + r.h / 2) * TS], phase: rnd() * 10 }));
+  // collision boxes per tile + mesh
+  tileBoxes = new Map();
+  const a = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const x0 = x * TS, z0 = y * TS, x1 = x0 + TS, z1 = z0 + TS, n = (x * 7 + y * 13) % 5;
+    if (grid[y][x]) { pushBox(a, x0, 0, z0, x1, WH, z1, [0.33 - n * 0.01, 0.35 - n * 0.01, 0.32]); pushBox(a, x0 - 0.01, 0, z0 - 0.01, x1 + 0.01, 0.35, z1 + 0.01, '#1f2a24'); tileBoxes.set(y * N + x, [[x0, 0, z0, x1, WH, z1]]); }
+    else { pushBox(a, x0, -0.2, z0, x1, 0, z1, (x + y) % 2 ? '#3a3a35' : '#33332f'); pushBox(a, x0, WH, z0, x1, WH + 0.2, z1, '#262624'); }
+  }
+  for (const l of lockers) { const [x, y] = l.t, [dx, dy] = l.wall, cx = (x + 0.5) * TS + dx * 1.05, cz = (y + 0.5) * TS + dy * 1.05; l.p = [cx - dx * 0.45, cz - dy * 0.45]; pushBox(a, cx - (dx ? 0.45 : 0.6), 0, cz - (dy ? 0.45 : 0.6), cx + (dx ? 0.45 : 0.6), 2.2, cz + (dy ? 0.45 : 0.6), '#4b5563'); for (let k = 0; k < 4; k++) pushBox(a, cx - dx * 0.46 - (dx ? 0.01 : 0.45), 1.6 - k * 0.12, cz - dy * 0.46 - (dy ? 0.01 : 0.45), cx - dx * 0.46 + (dx ? 0.01 : 0.45), 1.64 - k * 0.12, cz - dy * 0.46 + (dy ? 0.01 : 0.45), '#111827'); const k2 = y * N + x; tileBoxes.set(k2, (tileBoxes.get(k2) || []).concat([[cx - (dx ? 0.45 : 0.6), 0, cz - (dy ? 0.45 : 0.6), cx + (dx ? 0.45 : 0.6), 2.2, cz + (dy ? 0.45 : 0.6)]])); }
+  // gurneys and junk in rooms
+  for (const r of rooms) { const x = (r.x + 1) * TS, z = (r.y + 1) * TS; pushBox(a, x - 0.9, 0.7, z - 0.4, x + 0.9, 0.8, z + 0.4, '#9ca3af'); pushBox(a, x - 0.9, 0.8, z - 0.4, x + 0.9, 0.95, z + 0.4, '#d6d3d1'); for (const [ox, oz] of [[-0.8, -0.3], [0.8, -0.3], [-0.8, 0.3], [0.8, 0.3]]) pushBox(a, x + ox - 0.03, 0, z + oz - 0.03, x + ox + 0.03, 0.7, z + oz + 0.03, '#52525b'); }
+  { const [x, y] = exit.t, x0 = x * TS, z0 = y * TS; pushBox(a, x0 + 0.3, 0, z0 + 0.3, x0 + TS - 0.3, 0.05, z0 + TS - 0.3, '#14532d'); }
+  if (R) { if (mesh) R.gl.deleteBuffer(mesh.b); mesh = R.mesh(a); }
+}
+const tileOf = (x, z) => [Math.floor(x / TS), Math.floor(z / TS)];
+const center = t => [(t[0] + 0.5) * TS, (t[1] + 0.5) * TS];
+const walkable = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !grid[y][x];
+function boxesNear(x, z) { const [tx, ty] = tileOf(x, z), out = []; for (let y = ty - 1; y <= ty + 1; y++) for (let xx = tx - 1; xx <= tx + 1; xx++) { const b = tileBoxes.get(y * N + xx); if (b) out.push(...b); else if (xx < 0 || y < 0 || xx >= N || y >= N) out.push([xx * TS, 0, y * TS, (xx + 1) * TS, WH, (y + 1) * TS]); } return out; }
+function los(ax, az, bx, bz) { const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / 0.5); for (let i = 1; i < n; i++) { const [x, y] = tileOf(ax + (bx - ax) * i / n, az + (bz - az) * i / n); if (!walkable(x, y)) return false; } return true; }
+function bfs(from, goal) {
+  const prev = new Int32Array(N * N).fill(-2), q = [from[1] * N + from[0]]; prev[q[0]] = -1;
+  for (let i = 0; i < q.length; i++) { const k = q[i], x = k % N, y = (k / N) | 0; if (x === goal[0] && y === goal[1]) { const path = []; let p = k; while (prev[p] !== -1) { path.unshift([p % N, (p / N) | 0]); p = prev[p]; } return path; }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (!walkable(nx, ny)) continue; const nk = ny * N + nx; if (prev[nk] !== -2) continue; prev[nk] = k; q.push(nk); } }
+  return [];
+}
+
+/* ============ state ============ */
+let S, P, mon, running = false, paused = false, camYaw = 0, camPitch = 0, last = performance.now();
+function start(diff) {
+  if (!R && !TEST) return;
+  build((Math.random() * 1e9) | 0);
+  S = { diff, pages: 0, battery: 100, light: true, stam: 100, crouch: false, hidden: null, lives: diff === 0 ? 2 : 1, t: 0, lightT: 0, noise: 0, over: false, hidT: 0 };
+  const c = center(startTile); P = Object.assign(G3.Body(c[0], 0, c[1], 0.3, 1.7), { walk: 0 });
+  camYaw = Math.PI; camPitch = 0;
+  const far = [...Array(N * N).keys()].map(k => [k % N, (k / N) | 0]).filter(([x, y]) => walkable(x, y) && Math.abs(x - startTile[0]) + Math.abs(y - startTile[1]) > 16);
+  const mt = far[(Math.random() * far.length) | 0]; const mc = center(mt);
+  mon = { x: mc[0], z: mc[1], st: 'wander', path: [], target: null, lastSeen: null, searchT: 0, yaw: 0, walk: 0, hearT: 0, seeT: 0, grab: 0 };
+  $('menu').hidden = true; $('over').hidden = true; running = true; paused = false; $('touch').classList.toggle('on', IN.touch);
+  msg('Find the eight pages.', 4);
+}
+let msgT = 0; function msg(t, s = 3) { $('msg').textContent = t; $('msg').style.opacity = 1; msgT = s; }
+
+/* ============ the thing in the halls ============ */
+function monSpeed() { const base = [2.4, 2.9, 3.4][S.diff] + S.pages * 0.12; return mon.st === 'chase' ? base * 1.25 + 0.6 : mon.st === 'investigate' ? base * 1.05 : base * 0.7; }
+function updMonster(dt) {
+  const d = Math.hypot(P.x - mon.x, P.z - mon.z), seesLight = S.light && S.battery > 0 && !S.hidden;
+  const sight = S.hidden ? 0 : (seesLight ? 22 : S.crouch ? 5 : 8) * (S.diff === 2 ? 1.3 : 1);
+  const canSee = d < sight && los(mon.x, mon.z, P.x, P.z) && (d < 3.5 || facingMon(P.x, P.z) > -0.2 || seesLight);
+  if (canSee) { if (mon.st !== 'chase') { G3.tone(90, 0.8, 'sawtooth', 0.09, 40); G3.noise(0.6, 0.12, 200); } mon.st = 'chase'; mon.lastSeen = [P.x, P.z]; mon.seeT = 0; }
+  else if (mon.st === 'chase') { mon.seeT += dt; if (mon.seeT > 0.6) { mon.st = 'search'; mon.searchT = 7; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(...mon.lastSeen)); } }
+  // noise: running and opening things can be heard
+  if (S.noise > 0 && mon.st !== 'chase' && d < S.noise) { mon.st = 'investigate'; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(P.x, P.z)); }
+  // found you in a locker? (only if it watched you get in)
+  if (S.hidden && mon.st === 'chase' && d < 4) { caught(); return; }
+  let tx, tz;
+  if (mon.st === 'chase') { tx = P.x; tz = P.z; if (!los(mon.x, mon.z, P.x, P.z)) { if (!mon.path.length || (mon.rp = (mon.rp || 0) - dt) <= 0) { mon.rp = 0.4; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(P.x, P.z)); } } else mon.path = []; }
+  if (mon.path.length) { const c = center(mon.path[0]); tx = c[0]; tz = c[1]; if (Math.hypot(tx - mon.x, tz - mon.z) < 0.4) mon.path.shift(); }
+  else if (mon.st === 'search') { mon.searchT -= dt; if (mon.searchT <= 0) mon.st = 'wander'; else { const r = [...Array(9).keys()].map(i => [tileOf(mon.x, mon.z)[0] + (i % 3) - 1, tileOf(mon.x, mon.z)[1] + ((i / 3) | 0) - 1]).filter(t => walkable(...t)); mon.path = bfs(tileOf(mon.x, mon.z), r[(Math.random() * r.length) | 0]); } }
+  else if (mon.st !== 'chase') { // wander: drift toward the player's area now and then, so it never gets boring
+    const open = [...Array(N * N).keys()].map(k => [k % N, (k / N) | 0]).filter(([x, y]) => walkable(x, y)); let goal = open[(Math.random() * open.length) | 0];
+    if (Math.random() < 0.35 + S.pages * 0.05) { const pt = tileOf(P.x, P.z); goal = open.filter(([x, y]) => Math.abs(x - pt[0]) + Math.abs(y - pt[1]) < 8)[0] || goal; }
+    mon.path = bfs(tileOf(mon.x, mon.z), goal); mon.st = 'wander';
+  }
+  if (tx !== undefined) { const dx = tx - mon.x, dz = tz - mon.z, l = Math.hypot(dx, dz); if (l > 0.05) { const sp = monSpeed(); mon.x += dx / l * Math.min(l, sp * dt); mon.z += dz / l * Math.min(l, sp * dt); mon.yaw = Math.atan2(-dx, -dz); mon.walk += dt * sp * 1.6; } }
+  if (!S.hidden && d < 1.1) caught();
+  // footsteps you can hear, heartbeat when it's close
+  if ((mon.stepT = (mon.stepT || 0) - dt) <= 0) { mon.stepT = mon.st === 'chase' ? 0.35 : 0.62; if (d < 26) G3.tone(55 + Math.random() * 10, 0.12, 'sine', clamp(0.12 - d * 0.004, 0.005, 0.12), 40); }
+  const near = clamp(1 - d / 16, 0, 1);
+  $('heart').style.boxShadow = `inset 0 0 ${80 + near * 160}px ${near * 40}px rgba(127,29,29,${near * 0.55})`;
+  if (near > 0.2 && (S.beatT = (S.beatT || 0) - dt) <= 0) { S.beatT = 1.1 - near * 0.7; G3.tone(70, 0.08, 'sine', 0.05 + near * 0.08, 50); setTimeout(() => G3.tone(60, 0.08, 'sine', 0.04 + near * 0.06, 45), 140); }
+  if (S.hidden && mon.st !== 'chase' && d < 4) S.hidT += dt; if (S.hidT > 2 && d > 6) { kit && kit.unlock('hide'); S.hidT = -99; }
+}
+function facingMon(x, z) { const f = dirOf(mon.yaw), dx = x - mon.x, dz = z - mon.z, l = Math.hypot(dx, dz) || 1; return (dx * f[0] + dz * f[2]) / l; }
+function caught() {
+  if (S.over) return;
+  S.lives--; $('scare').style.display = 'block'; G3.noise(1.4, 0.35, 80); G3.tone(180, 1, 'sawtooth', 0.12, 50); S.scareT = 1.1;
+  if (S.lives > 0) { setTimeout(() => { $('scare').style.display = 'none'; const c = center(startTile); P.x = c[0]; P.z = c[1]; const far = center(exit.t); mon.x = far[0]; mon.z = far[1]; mon.st = 'wander'; mon.path = []; msg('It let you go. Once.', 3); }, 1200); return; }
+  S.over = true; setTimeout(() => { $('scare').style.display = 'none'; end(false); }, 1400);
+}
+function end(won) {
+  running = false; if (document.pointerLockElement) document.exitPointerLock();
+  if (won) { kit && kit.unlock('escape'); if (S.diff === 2) kit && kit.unlock('nightmare'); if (S.lightT < S.t * 0.4) kit && kit.unlock('nolight'); kit && kit.score(Math.round(S.t), ['easy', 'normal', 'nightmare'][S.diff]); }
+  $('overText').innerHTML = won ? `<h2>You got out.</h2><p class="sub">Cold air. Sirens somewhere far away. Behind you, the doors of Greywater Hospital swing shut on their own.<br><br>Escaped in ${Math.floor(S.t / 60)}:${String(Math.floor(S.t % 60)).padStart(2, '0')}.</p>` : `<h2>It found you.</h2><p class="sub">Pages collected: ${S.pages}/8.</p>`;
+  $('over').hidden = false;
+}
+
+/* ============ the player ============ */
+function interact() {
+  const near = (t, r) => { const c = center(t); return Math.hypot(P.x - c[0], P.z - c[1]) < r; };
+  if (S.hidden) return { label: 'Leave the locker', run: () => { const l = S.hidden; S.hidden = null; P.x = l.p[0] - l.wall[0] * 0.7; P.z = l.p[1] - l.wall[1] * 0.7; S.noise = 7; G3.noise(0.3, 0.08, 900); } };
+  for (const p of pages) if (!p.taken && near(p.t, 1.6)) return { label: 'Take the page', run: () => { p.taken = true; S.pages++; kit && kit.unlock('page'); G3.noise(0.2, 0.05, 3000); msg(S.pages < 8 ? ['“It started in the east ward.”', '“Don’t run. It hears you run.”', '“It hates the dark less than you do.”', '“The lockers are safe if it doesn’t see you get in.”', '“It gets faster.”', '“Three left. Keep going.”', '“The exit is open now? No. Not yet.”'][S.pages - 1] + `  (${S.pages}/8)` : 'All eight. The exit is unlocked — find it.', 4); if (S.pages >= 8) exit.open = true; S.noise = 4; } };
+  for (const b of batteries) if (!b.taken && near(b.t, 1.5)) return { label: 'Take the battery', run: () => { b.taken = true; S.battery = Math.min(100, S.battery + 45); G3.tone(600, 0.05, 'square', 0.03); } };
+  for (const l of lockers) if (Math.hypot(P.x - l.p[0], P.z - l.p[1]) < 1.4) return { label: 'Hide in the locker', run: () => { S.hidden = l; S.noise = 6; G3.noise(0.3, 0.08, 900); } };
+  if (near(exit.t, 1.8)) return exit.open ? { label: 'Escape', run: () => end(true) } : { label: `The exit is chained shut (${S.pages}/8 pages)`, run: () => {} };
+  return null;
+}
+function update(dt) {
+  const inp = IN.frame();
+  camYaw -= inp.lookX * 0.0038; camPitch = clamp(camPitch - inp.lookY * 0.0034, -1.3, 1.2);
+  S.t += dt; S.noise = Math.max(0, S.noise - dt * 20);
+  if (IN.hit('KeyF') || IN.hit('Btnlight')) { S.light = !S.light && S.battery > 0; G3.tone(900, 0.03, 'square', 0.03); }
+  if (IN.hit('KeyC') || IN.hit('ControlLeft') || IN.hit('Btncrouch')) S.crouch = !S.crouch;
+  if (S.light) { S.battery = Math.max(0, S.battery - dt * 1.0); S.lightT += dt; if (S.battery <= 0) { S.light = false; msg('The flashlight dies.', 2); } }
+  const u = interact(); $('prompt').textContent = u ? (IN.touch ? '' : 'E: ') + u.label : '';
+  if (u && (IN.hit('KeyE') || IN.hit('Btnuse') || IN.hit('Tap'))) u.run();
+  if (!S.hidden) {
+    const f = dirOf(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+    let mx = rx * inp.mx + f[0] * -inp.mz, mz = rz * inp.mx + f[2] * -inp.mz; const ml = Math.hypot(mx, mz);
+    const run = (inp.run || IN.down('run')) && S.stam > 5 && !S.crouch && ml > 0.1;
+    const sp = S.crouch ? 1.7 : run ? 5.4 : 3.1;
+    if (ml > 0.05) { mx /= Math.max(1, ml); mz /= Math.max(1, ml); P.walk += dt * (run ? 11 : 7); }
+    P.vx = mx * sp; P.vz = mz * sp;
+    S.stam = clamp(S.stam + (run ? -20 : 12) * dt, 0, 100);
+    if (run) S.noise = Math.max(S.noise, 14); else if (ml > 0.1 && !S.crouch) S.noise = Math.max(S.noise, 3.5);
+    if (ml > 0.1 && Math.floor(P.walk / Math.PI) !== Math.floor((P.walk - dt * 8) / Math.PI)) G3.noise(0.04, S.crouch ? 0.005 : run ? 0.03 : 0.012, 1800);
+    G3.moveBody(P, dt, boxesNear(P.x, P.z), () => 0);
+  }
+  updMonster(dt);
+  msgT -= dt; if (msgT <= 0) $('msg').style.opacity = 0;
+  $('locker').style.display = S.hidden ? 'block' : 'none';
+  IN.endFrame();
+}
+function render(now) {
+  if (!R) return;
+  const bob = Math.sin(P.walk) * (S.crouch ? 0.02 : 0.05), eyeY = S.hidden ? 1.6 : (S.crouch ? 0.95 : 1.6) + bob;
+  const eye = S.hidden ? [S.hidden.p[0], eyeY, S.hidden.p[1]] : [P.x, eyeY, P.z], yaw = S.hidden ? Math.atan2(S.hidden.wall[0], S.hidden.wall[1]) : camYaw, pitch = S.hidden ? 0 : camPitch;
+  const f = dirOf(yaw, pitch), flick = S.battery < 15 ? (Math.random() < 0.15 ? 0.2 : 1) : 1;
+  const lights = lamps.map(l => { const on = (Math.sin(now * 0.004 + l.phase * 3) + Math.sin(now * 0.013 + l.phase)) > -0.6; return { p: l.p, c: on ? [0.55, 0.6, 0.45] : [0.05, 0.05, 0.04], r: 7 }; });
+  if (exit.open) { const c = center(exit.t); lights.push({ p: [c[0], 1.5, c[1]], c: [0.3, 1, 0.4], r: 6 }); }
+  lights.push({ p: [mon.x, 2.6, mon.z], c: [0.25, 0.02, 0.02], r: 2.5 });
+  R.begin({ eye, yaw, pitch, fov: 1.2, far: 60 }, { sky: '#000000', fog: [1.5, S.light ? 17 : 9], sun: [0.2, 1, 0.3], sunCol: [0, 0, 0], amb: [0.035, 0.035, 0.04], hemi: [[1, 1, 1], [0.6, 0.6, 0.6]], spec: 0.3, rim: 0, lights,
+    flash: S.light && S.battery > 0 && !S.hidden ? { p: [eye[0] + f[0] * 0.2, eye[1] - 0.15, eye[2] + f[2] * 0.2], d: f, c: [1.4 * flick, 1.35 * flick, 1.15 * flick], range: 22 } : null });
+  R.draw(mesh);
+  for (const p of pages) if (!p.taken) { const c = center(p.t); R.cube(M.chain(M.T(c[0], 0.9 + Math.sin(now * 0.002) * 0.05, c[1]), M.RY(now * 0.0006), M.RX(0.3), M.S(0.3, 0.02, 0.42)), [0.9, 0.86, 0.75], 1, 0.35); R.glow([c[0], 0.9, c[1]], 0.6, [1, 0.95, 0.8], 0.25); }
+  for (const b of batteries) if (!b.taken) { const c = center(b.t); R.box(c[0] - 0.08, 0, c[1] - 0.08, c[0] + 0.08, 0.3, c[1] + 0.08, '#facc15', 1, 0.3); }
+  { const c = center(exit.t); R.box(c[0] - 1.2, 0, c[1] - 0.15, c[0] + 1.2, 2.6, c[1] + 0.15, exit.open ? '#15803d' : '#57534e', 1, exit.open ? 0.4 : 0); if (!exit.open) for (let k = 0; k < 3; k++) R.cube(M.chain(M.T(c[0], 0.8 + k * 0.6, c[1] - 0.2), M.RZ(k % 2 ? 0.6 : -0.6), M.S(2.4, 0.08, 0.08)), '#a8a29e'); R.glow([c[0], 2.8, c[1]], 0.8, exit.open ? [0.3, 1, 0.4] : [1, 0.2, 0.1], 0.6); }
+  // it: tall, thin, too-long arms
+  { const b = M.chain(M.T(mon.x, 0, mon.z), M.RY(mon.yaw)), sw = Math.sin(mon.walk) * 0.35, pale = [0.78, 0.76, 0.72];
+    for (const [sx, a] of [[-0.14, sw], [0.14, -sw]]) R.cube(M.chain(b, M.T(sx, 1.4, 0), M.RX(a), M.T(0, -0.7, 0), M.S(0.12, 1.4, 0.12)), pale);
+    R.cube(M.chain(b, M.T(0, 2.0, 0), M.S(0.36, 1.2, 0.2)), pale);
+    for (const [sx, a] of [[-0.3, -sw * 0.6], [0.3, sw * 0.6]]) R.cube(M.chain(b, M.T(sx, 2.5, 0), M.RX(a - 0.2), M.T(0, -0.9, 0), M.S(0.08, 1.8, 0.08)), pale);
+    R.cube(M.chain(b, M.T(0, 2.85, 0), M.S(0.3, 0.42, 0.28)), pale);
+    for (const sx of [-0.07, 0.07]) R.cube(M.chain(b, M.T(sx, 2.9, -0.15), M.S(0.06, 0.04, 0.01)), [1, 0.15, 0.1], 1, 1);
+    R.glow([mon.x + dirOf(mon.yaw)[0] * 0.2, 2.9, mon.z + dirOf(mon.yaw)[2] * 0.2], 0.25, [1, 0.1, 0.05], 0.8); }
+  R.end();
+}
+let hudT = 0;
+function hud(dt) {
+  if ((hudT -= dt) > 0) return; hudT = 0.12;
+  const bar = (v, c) => `<div class="bar"><i style="width:${v}%;background:${c}"></i></div>`;
+  $('top').innerHTML = `<span>📄 ${S.pages} / 8</span>${bar(S.battery, '#facc15')}${bar(S.stam, '#94a3b8')}${S.crouch ? '<span style="opacity:.7">crouching</span>' : ''}${S.lives > 1 ? '<span style="opacity:.6">❤ ×' + S.lives + '</span>' : ''}`;
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) return;
+  if (!S.over) update(dt);
+  render(now); hud(dt);
+}
+document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => start(+b.dataset.d));
+$('again').onclick = () => start(S ? S.diff : 1);
+$('toMenu').onclick = () => { $('over').hidden = true; $('menu').hidden = false; $('touch').classList.remove('on'); };
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
+requestAnimationFrame(frame);
+window.GL3D && GL3D.fullscreenButton();
+window.__hollow = { los, start, get S() { return S; }, get P() { return P; }, get mon() { return mon; }, get pages() { return pages; }, get exit() { return exit; }, get lockers() { return lockers; }, interact, update, bfs, tileOf, center, get grid() { return grid; }, setCam: (y, p) => { camYaw = y; camPitch = p; } };
+})();
+</script>
+</body></html>

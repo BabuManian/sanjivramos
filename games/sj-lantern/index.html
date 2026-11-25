@@ -90,7 +90,7 @@ h2{margin:0 0 8px;font:700 22px Georgia,serif;color:#fde68a}
   <div class="row"><div style="flex:1;min-width:260px">
     <h1>LANTERN WOODS</h1>
     <p class="sub">Grandpa Odell kept the lantern at Hollowpine for forty years. Last night it went out — and so did he.<br>When the sun sets, the <b>Gloam</b> comes out of the trees. Keep the campfire burning, find his journal, and bring the four <b>Sunstones</b> home to wake the Beacon.</p>
-    <div class="btns"><button class="btn pri" id="bStory">▶ New story</button><button class="btn" id="bCont" hidden>⏵ Continue</button><button class="btn" id="bEndless">♾ Endless nights</button></div>
+    <div class="btns"><button class="btn pri" id="bStory">▶ New story</button><button class="btn" id="bCont" hidden>⏵ Continue</button><button class="btn" id="bEndless">♾ Endless nights</button><button class="btn" id="bOnline">🌐 Play with friends</button></div>
     <div class="btns"><button class="btn" id="bKeys">⌨ Controls</button><button class="btn" id="bLook">🧍 Edit my character</button><label class="btn" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="lowq"> Faster graphics</label></div>
   </div><div style="text-align:center"><canvas id="me" width="300" height="400"></canvas><div style="font-size:12px;opacity:.7;margin-top:4px">This is you — change it in Character Creator</div></div></div>
   <div id="keys" hidden style="margin-top:12px"><div class="keys"><div><b>WASD</b> move</div><div><b>Shift</b> run</div><div><b>Mouse</b> look (click to lock)</div><div><b>Space</b> jump</div><div><b>Click / J</b> hit · chop · mine</div><div><b>E</b> use · pick up · add wood</div><div><b>Q</b> eat</div><div><b>F</b> flashlight</div><div><b>L</b> lantern</div><div><b>C</b> craft (at the workbench)</div><div><b>G</b> place a light post</div><div><b>1–0</b> hotbar</div><div><b>Right-click</b> aim</div><div><b>R</b> reload</div><div><b>Click / J</b> use the held item</div><div><b>Tab</b> open the sack</div><div><b>M</b> journal &amp; map</div><div><b>Esc</b> pause</div></div><p style="opacity:.7;font-size:13px">Phone: left side of the screen = walk, right side = look, buttons on the right. A game controller works too.</p></div>
@@ -106,6 +106,19 @@ h2{margin:0 0 8px;font:700 22px Georgia,serif;color:#fde68a}
 <script src="../sj-gamekit/kit.js"></script>
 <script src="../sj-gamekit/look.js"></script>
 <script src="../sj-gamekit/gl3d.js"></script>
+<script src="../sj-gamekit/friends3d.js"></script>
+<script>
+/* Play with friends (SanjivramOS rooms): everyone sees everyone else's character live, with name tags */
+let F = null;
+const fTags = document.createElement('div'); fTags.style.cssText = 'position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:3'; document.body.appendChild(fTags);
+async function goOnline(game, gameName, then) {
+  if (!window.SJFriends || !(await SJFriends.available())) { alert('Playing with friends needs SanjivramOS (open this game from the SanjivramOS desktop).'); return; }
+  if (F) { then(); return; }
+  try { F = await SJFriends.join({ game, gameName }); } catch { return; }
+  then();
+}
+</script>
+
 <script>
 (() => {
 'use strict';
@@ -1077,6 +1090,7 @@ function render(now) {
   if (S.fishing) { const F = S.fishing, by = WATER_Y + 0.08 + (F.state === 'bite' ? -0.15 : Math.sin(now * 0.004) * 0.04), hx = P.x + dirOf(P.yaw)[0] * 0.8, hz = P.z + dirOf(P.yaw)[2] * 0.8, hy = P.y + 2.2, dx = F.x - hx, dy = by - hy, dz = F.z - hz, L = Math.hypot(dx, dy, dz); R.cube(M.chain(M.T((hx + F.x) / 2, (hy + by) / 2, (hz + F.z) / 2), M.RY(Math.atan2(-dx, -dz)), M.RX(Math.atan2(dy, Math.hypot(dx, dz))), M.S(0.015, 0.015, L)), '#e5e7eb', 0.8, 1); R.box(F.x - 0.08, by, F.z - 0.08, F.x + 0.08, by + 0.16, F.z + 0.08, '#ef4444', 1, 0.4); if (F.state === 'bite') R.glow([F.x, by + 0.1, F.z], 0.8, [1, 1, 1], 0.6); }
   // rain around the camera
   if ((S.weather === 'rain' || S.weather === 'storm') && S.wxK > 0.05 && !inCave) { if (!rainMesh) { const a = [], rr = G3.rng(3); for (let i = 0; i < 420; i++) { const x = (rr() - 0.5) * 30, y = rr() * 18, z = (rr() - 0.5) * 30; pushBox(a, x, y, z, x + 0.025, y + 0.6, z + 0.025, '#94a3b8'); } rainMesh = R.mesh(a); } const ry = -((now * 0.024) % 18); for (const [ox, oz] of [[0, 0], [15, 15]]) for (const off of [0, 18]) R.draw(rainMesh, M.T(Math.floor(eye[0] / 30) * 30 + ox, eye[1] - 8 + ry + off, Math.floor(eye[2] / 30) * 30 + oz), [0.75, 0.8, 0.9], 0.3 * S.wxK); }
+  if (F) F.draw(R);
   R.end();
   if (fp) { const lk = look() || {}, held = S.held, gun = held === 'revolver' || held === 'shotgun';
     R.viewModel(camObj, { walk: P.walk, speed: Math.min(1, Math.hypot(P.vx, P.vz) / 4), swing: P.swing, sleeve: lk.shirt || '#3b82f6', skin: lk.skin || '#f8c9a0', hold, holdGlow: hold === '#fbbf24' ? 1 : 0,
@@ -1185,6 +1199,7 @@ function frame(now) {
   if (!running) { drawMe(now); return; }
   if (!paused) update(dt); else IN.frame(), IN.endFrame();
   render(now); hud(dt);
+  if (F && R) { F.send({ x: P.x, y: P.y, z: P.z, gy: groundH(P.x, P.z), yaw: P.yaw, spd: Math.min(1, Math.hypot(P.vx, P.vz) / 4), label: S && S.isNight ? 'night' : '' }); F.update(dt); F.tags(R, fTags); }
 }
 function startGame(m, cont) {
   if (!R && !TEST) return;
@@ -1199,6 +1214,8 @@ function toMenu() { running = false; $('menu').hidden = false; $('hotbar').hidde
 $('bStory').onclick = () => { if (localStorage.getItem(SAVE) && !confirm('Start a new story? Your saved game will be replaced.')) return; startGame('story'); };
 $('bCont').onclick = () => startGame('story', true);
 $('bEndless').onclick = () => startGame('endless');
+$('bOnline').onclick = () => goOnline('lantern', 'Lantern Woods', () => startGame('story', !!localStorage.getItem(SAVE)));
+if (/[?&](join|online)=/.test(location.search)) setTimeout(() => $('bOnline').click(), 600);
 $('bKeys').onclick = () => { $('keys').hidden = !$('keys').hidden; };
 $('bLook').onclick = () => { if (window.parent !== window) window.parent.postMessage({ sjg: 1, type: 'open', app: 'html-avatar' }, location.origin); location.href = '../sj-avatar/'; };
 $('lowq').checked = localStorage.getItem('sj-lantern-low') === '1';

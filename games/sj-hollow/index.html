@@ -39,7 +39,7 @@ h2{margin:0 0 10px;font:400 28px Georgia,serif;color:#e4e4e7}
 <div class="panel" id="menu"><div class="card">
   <h1>HOLLOW HALLS</h1>
   <p class="sub">The night nurse at Greywater Hospital left a message on your phone: <i>“The pages. Find all eight pages and it can’t follow you out.”</i><br>The lights are out. Something tall is walking the halls. It hears you run. It sees your light.</p>
-  <div class="btns"><button class="btn pri" data-d="1">Enter</button><button class="btn" data-d="0">Easier (2 chances)</button><button class="btn" data-d="2">Nightmare</button></div>
+  <div class="btns"><button class="btn pri" data-d="1">Enter</button><button class="btn" data-d="0">Easier (2 chances)</button><button class="btn" data-d="2">Nightmare</button><button class="btn" id="bOnline">🌐 Play with friends</button></div>
   <p class="keys">WASD move · mouse look (click to lock) · Shift run · C / Ctrl crouch (quiet) · F flashlight · E hide in lockers, pick up pages, open the exit · phone: left = walk, right = look</p>
   <p class="keys" id="best"></p>
 </div></div>
@@ -47,6 +47,19 @@ h2{margin:0 0 10px;font:400 28px Georgia,serif;color:#e4e4e7}
 
 <script src="../sj-gamekit/kit.js"></script>
 <script src="../sj-gamekit/gl3d.js"></script>
+<script src="../sj-gamekit/friends3d.js"></script>
+<script>
+/* Play with friends (SanjivramOS rooms): everyone sees everyone else's character live, with name tags */
+let F = null;
+const fTags = document.createElement('div'); fTags.style.cssText = 'position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:3'; document.body.appendChild(fTags);
+async function goOnline(game, gameName, then) {
+  if (!window.SJFriends || !(await SJFriends.available())) { alert('Playing with friends needs SanjivramOS (open this game from the SanjivramOS desktop).'); return; }
+  if (F) { then(); return; }
+  try { F = await SJFriends.join({ game, gameName }); } catch { return; }
+  then();
+}
+</script>
+
 <script>
 (() => {
 'use strict';
@@ -125,7 +138,7 @@ function bfs(from, goal) {
 let S, P, mon, running = false, paused = false, camYaw = 0, camPitch = 0, last = performance.now();
 function start(diff) {
   if (!R && !TEST) return;
-  build((Math.random() * 1e9) | 0);
+  build(F ? F.seed : (Math.random() * 1e9) | 0);   // friends in a room share one hospital
   S = { diff, pages: 0, battery: 100, light: true, stam: 100, crouch: false, hidden: null, lives: diff === 0 ? 2 : 1, t: 0, lightT: 0, noise: 0, over: false, hidT: 0 };
   const c = center(startTile); P = Object.assign(G3.Body(c[0], 0, c[1], 0.3, 1.7), { walk: 0 });
   camYaw = Math.PI; camPitch = 0;
@@ -239,6 +252,7 @@ function render(now) {
     R.cube(M.chain(b, M.T(0, 2.85, 0), M.S(0.3, 0.42, 0.28)), pale);
     for (const sx of [-0.07, 0.07]) R.cube(M.chain(b, M.T(sx, 2.9, -0.15), M.S(0.06, 0.04, 0.01)), [1, 0.15, 0.1], 1, 1);
     R.glow([mon.x + dirOf(mon.yaw)[0] * 0.2, 2.9, mon.z + dirOf(mon.yaw)[2] * 0.2], 0.25, [1, 0.1, 0.05], 0.8); }
+  if (F) F.draw(R);
   R.end();
 }
 let hudT = 0;
@@ -253,8 +267,11 @@ function frame(now) {
   if (!running) return;
   if (!S.over) update(dt);
   render(now); hud(dt);
+  if (F && R) { F.send({ x: P.x, y: 0, z: P.z, gy: 0, yaw: camYaw, spd: Math.min(1, Math.hypot(P.vx, P.vz) / 3), label: `${S.pages}/8 pages`, dead: S.over ? 1 : 0 }); F.update(dt); F.tags(R, fTags); }
 }
 document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => start(+b.dataset.d));
+$('bOnline').onclick = () => goOnline('hollow', 'Hollow Halls', () => start(1));
+if (/[?&](join|online)=/.test(location.search)) setTimeout(() => $('bOnline').click(), 600);
 $('again').onclick = () => start(S ? S.diff : 1);
 $('toMenu').onclick = () => { $('over').hidden = true; $('menu').hidden = false; $('touch').classList.remove('on'); };
 document.addEventListener('visibilitychange', () => { last = performance.now(); });
