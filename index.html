@@ -227,6 +227,15 @@ body.wm-busy iframe { pointer-events: none !important; }
   background: color-mix(in srgb, var(--lc-s) 18%, transparent) !important; -webkit-backdrop-filter: blur(10px) !important; backdrop-filter: blur(10px) !important; box-shadow: 0 0 0 1px rgba(255,255,255,.3), inset 0 1px 0 rgba(255,255,255,.22), 0 18px 44px rgba(0,0,0,.28) !important; }
 :root[data-icons="liquidclear"] .window[data-app="settings"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="linuxfiles"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="explorer"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="localfiles"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="notepad"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="calculator"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="terminal"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="clock"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="taskmgr"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="sysmon"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="lxmonitor"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="stickies"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="todo"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="calendar"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="forecast"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="markdown"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="units"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="passgen"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="colors"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="pomodoro"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="journal"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="habits"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="expenses"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="kanban"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="dictionary"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="currency"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="random"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="clipboard"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="metronome"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="shortcuts"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="store"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="extensions"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="voicerec"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="recorder"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="regex"] .titlebar, :root[data-icons="liquidclear"] .window[data-app="music"] .titlebar { background: transparent !important; border-bottom-color: rgba(255,255,255,.14) !important; }
 :root[data-icons="liquidclear"] .window[data-app="settings"] .win-body, :root[data-icons="liquidclear"] .window[data-app="linuxfiles"] .win-body, :root[data-icons="liquidclear"] .window[data-app="explorer"] .win-body, :root[data-icons="liquidclear"] .window[data-app="localfiles"] .win-body, :root[data-icons="liquidclear"] .window[data-app="notepad"] .win-body, :root[data-icons="liquidclear"] .window[data-app="calculator"] .win-body, :root[data-icons="liquidclear"] .window[data-app="terminal"] .win-body, :root[data-icons="liquidclear"] .window[data-app="clock"] .win-body, :root[data-icons="liquidclear"] .window[data-app="taskmgr"] .win-body, :root[data-icons="liquidclear"] .window[data-app="sysmon"] .win-body, :root[data-icons="liquidclear"] .window[data-app="lxmonitor"] .win-body, :root[data-icons="liquidclear"] .window[data-app="stickies"] .win-body, :root[data-icons="liquidclear"] .window[data-app="todo"] .win-body, :root[data-icons="liquidclear"] .window[data-app="calendar"] .win-body, :root[data-icons="liquidclear"] .window[data-app="forecast"] .win-body, :root[data-icons="liquidclear"] .window[data-app="markdown"] .win-body, :root[data-icons="liquidclear"] .window[data-app="units"] .win-body, :root[data-icons="liquidclear"] .window[data-app="passgen"] .win-body, :root[data-icons="liquidclear"] .window[data-app="colors"] .win-body, :root[data-icons="liquidclear"] .window[data-app="pomodoro"] .win-body, :root[data-icons="liquidclear"] .window[data-app="journal"] .win-body, :root[data-icons="liquidclear"] .window[data-app="habits"] .win-body, :root[data-icons="liquidclear"] .window[data-app="expenses"] .win-body, :root[data-icons="liquidclear"] .window[data-app="kanban"] .win-body, :root[data-icons="liquidclear"] .window[data-app="dictionary"] .win-body, :root[data-icons="liquidclear"] .window[data-app="currency"] .win-body, :root[data-icons="liquidclear"] .window[data-app="random"] .win-body, :root[data-icons="liquidclear"] .window[data-app="clipboard"] .win-body, :root[data-icons="liquidclear"] .window[data-app="metronome"] .win-body, :root[data-icons="liquidclear"] .window[data-app="shortcuts"] .win-body, :root[data-icons="liquidclear"] .window[data-app="store"] .win-body, :root[data-icons="liquidclear"] .window[data-app="extensions"] .win-body, :root[data-icons="liquidclear"] .window[data-app="voicerec"] .win-body, :root[data-icons="liquidclear"] .window[data-app="recorder"] .win-body, :root[data-icons="liquidclear"] .window[data-app="regex"] .win-body, :root[data-icons="liquidclear"] .window[data-app="music"] .win-body { background: transparent !important; }
+/* Terminal in Liquid Glass (any liquid icon style): frosted see-through window, xterm draws on a clear background */
+:root[data-icons^="liquid"]:not([data-icons="liquidclear"]) .window[data-app="terminal"] .win-frame { background: rgba(20,22,30,.28) !important; -webkit-backdrop-filter: blur(22px) saturate(1.6) !important; backdrop-filter: blur(22px) saturate(1.6) !important; box-shadow: 0 0 0 1px rgba(255,255,255,.22), inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.06), 0 22px 54px rgba(0,0,0,.4) !important; }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .titlebar { background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.02)) !important; border-bottom-color: rgba(255,255,255,.12) !important; color: #fff; }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .win-body { background: transparent !important; }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .mt-bar, :root[data-icons^="liquid"] .window[data-app="terminal"] .pshell-bar { background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.1); }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .mt-tab.on { background: rgba(255,255,255,.22); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 0 var(--accent); }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .term { background: color-mix(in srgb, var(--t-bg, #1e1c1b) 40%, transparent) !important; }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .xterm .xterm-viewport, :root[data-icons^="liquid"] .window[data-app="terminal"] .xterm-screen canvas { background-color: transparent !important; }
+:root[data-icons^="liquid"] .window[data-app="terminal"] .xterm { text-shadow: 0 1px 2px rgba(0,0,0,.35); }
 /* Keep the glass layers out of other styles' previews while Liquid Glass is the active style */
 :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]) .app-tile::before, :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]) .app-tile::after { content: none; }
 :root[data-icons^="liquid"] .ic-prev[data-icons]:not([data-icons^="liquid"]):not([data-icons="frost"]) .app-tile { -webkit-backdrop-filter: none; backdrop-filter: none; isolation: auto; }
@@ -4177,6 +4186,7 @@ body { letter-spacing: var(--tw-letter, normal); }
 .cd-flash { outline: 2px solid #e8926b !important; outline-offset: 2px; }
 :root[data-hide-ws] #pn-workspaces, :root[data-hide-ws] #ws-btn, :root[data-hide-ws] #ws-dots { display: none !important; }
 .mt { display: flex; flex-direction: column; height: 100%; width: 100%; min-width: 0; align-self: stretch; }
+.pshell.mt { padding: 0; gap: 0; align-items: stretch; overflow: hidden; }   /* the Metronome's .mt rule used to inset the Terminal by 18px */
 .mt-bar { display: flex; align-items: center; width: 100%; gap: 4px; padding: 4px 6px; background: rgba(0,0,0,.25); flex: none; min-height: 34px; box-sizing: border-box; }
 .mt-tabs { display: flex; gap: 3px; overflow-x: auto; min-width: 0; scrollbar-width: none; }
 .mt-tabs::-webkit-scrollbar { display: none; }
@@ -5487,7 +5497,7 @@ const Theme = {
     root.dataset.scheme = scheme.id;
     SCHEME_VARS.forEach(k => root.style.removeProperty(k));
     Object.entries(schemeVars(scheme)).forEach(([k, v]) => root.style.setProperty(k, v));
-    root.dataset.icons = ICON_STYLES.some(x => x.id === Settings.get('iconStyle')) ? Settings.get('iconStyle') : 'pop';
+    { const ic = ICON_STYLES.some(x => x.id === Settings.get('iconStyle')) ? Settings.get('iconStyle') : 'pop'; if (root.dataset.icons !== ic) { root.dataset.icons = ic; if (typeof Bus !== 'undefined') queueMicrotask(() => Bus.emit('termprefs')); } }
     root.dataset.dock = ['s', 'm', 'l'].includes(Settings.get('dockSize')) ? Settings.get('dockSize') : 'm';
     const layout = LAYOUTS.some(l => l.id === Settings.get('layout')) ? Settings.get('layout') : 'pop';
     const layoutChanged = root.dataset.layout !== layout;
@@ -10049,7 +10059,7 @@ async function multiShell(win) {
   try { await loadScript(b + 'vendor/xterm/xterm.js'); await loadScript(b + 'vendor/xterm/addon-fit.js'); await loadScript(b + 'vendor/xterm/addon-image.js'); }
   catch (err) { bodyEl.textContent = err.message; return; }
   const theme = () => { const p = termPrefs(), t = TERM_THEMES[p.theme] || TERM_THEMES.default; return { p, t }; };
-  const paint = () => { root.style.background = theme().t.bg || ''; };
+  const paint = () => { root.style.background = termPaintBg(theme().t); root.classList.toggle('mt-glass', termGlass()); };
   paint();
   const tabs = []; let cur = null, seq = 0;
 
@@ -10057,7 +10067,7 @@ async function multiShell(win) {
     const { p, t } = theme();
     const el = h('<div class="mt-pane"><div class="mt-term"></div></div>');
     tab.panesEl.appendChild(el);
-    const term = new Terminal({ cursorBlink: true, fontSize: p.size, fontFamily: 'ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace', theme: { background: t.bg || '#1e1c1b', foreground: t.fg },
+    const term = new Terminal({ cursorBlink: true, fontSize: p.size, fontFamily: 'ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace', allowTransparency: true, theme: { background: termXBg(t), foreground: t.fg },
       windowOptions: { getWinSizePixels: true, getCellSizePixels: true, getWinSizeChars: true } });
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit); term.open($('.mt-term', el));
@@ -10184,7 +10194,7 @@ async function multiShell(win) {
       return act(() => movePane(k === 'arrowleft' ? -1 : k === 'arrowright' ? 1 : 0, k === 'arrowup' ? -1 : k === 'arrowdown' ? 1 : 0));
     return true;
   }
-  win.listen('termprefs', () => { const { p, t } = theme(); tabs.forEach(tb => tb.panes.forEach(pn => { pn.term.options.theme = { background: t.bg || '#1e1c1b', foreground: t.fg }; pn.term.options.fontSize = p.size; try { pn.fit.fit(); } catch {} })); paint(); });
+  win.listen('termprefs', () => { const { p, t } = theme(); tabs.forEach(tb => tb.panes.forEach(pn => { pn.term.options.theme = { background: termXBg(t), foreground: t.fg }; pn.term.options.fontSize = p.size; try { pn.fit.fit(); } catch {} })); paint(); });
   win.onFocus = () => setTimeout(() => { const pn = activePane(); pn && pn.term.focus(); }, 0);
   win.onClose = () => { tabs.slice().forEach(tb => tb.panes.forEach(pn => { pn.ro.disconnect(); if (pn.ws) { pn.ws.onclose = null; try { pn.ws.close(); } catch {} } pn.term.dispose(); })); tabs.length = 0; };
   win.receive = a => { if (a && a.newTab) newTab(); };
@@ -10202,10 +10212,10 @@ async function serverShell(win, opts = {}) {
   try { await loadScript(b + 'vendor/xterm/xterm.js'); await loadScript(b + 'vendor/xterm/addon-fit.js'); await loadScript(b + 'vendor/xterm/addon-image.js'); }
   catch (err) { el.textContent = err.message; return; }
   const pr = termPrefs(), th = TERM_THEMES[pr.theme] || TERM_THEMES.default;
-  const paint = t => { $('.pshell', win.body).style.background = t.bg || ''; };
+  const paint = t => { $('.pshell', win.body).style.background = termPaintBg(t); };
   paint(th);
   // Pixel-size reports let graphical terminal apps (like brow6el) size the images they draw.
-  const term = new Terminal({ cursorBlink: true, fontSize: pr.size, fontFamily: 'ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace', theme: { background: th.bg || '#1e1c1b', foreground: th.fg },
+  const term = new Terminal({ cursorBlink: true, fontSize: pr.size, fontFamily: 'ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace', allowTransparency: true, theme: { background: termXBg(th), foreground: th.fg },
     windowOptions: { getWinSizePixels: true, getCellSizePixels: true, getWinSizeChars: true } });
   const fit = new FitAddon.FitAddon(), enc = new TextEncoder();
   term.loadAddon(fit); term.open(el); fit.fit();
@@ -10229,7 +10239,7 @@ async function serverShell(win, opts = {}) {
   term.onResize(sendSize);
   const ro = new ResizeObserver(() => { try { fit.fit(); } catch {} });
   ro.observe(el);
-  win.listen('termprefs', () => { const p = termPrefs(), t = TERM_THEMES[p.theme] || TERM_THEMES.default; term.options.theme = { background: t.bg || '#1e1c1b', foreground: t.fg }; term.options.fontSize = p.size; paint(t); try { fit.fit(); } catch {} });
+  win.listen('termprefs', () => { const p = termPrefs(), t = TERM_THEMES[p.theme] || TERM_THEMES.default; term.options.theme = { background: termXBg(t), foreground: t.fg }; term.options.fontSize = p.size; paint(t); try { fit.fit(); } catch {} });
   win.onFocus = () => setTimeout(() => term.focus(), 0);
   win.onClose = () => { ro.disconnect(); if (ws) { ws.onclose = null; ws.close(); } term.dispose(); };
   connect();
@@ -17883,6 +17893,10 @@ const TERM_THEMES = {
   powershell: { bg: '#012456', fg: '#eeedf0', prompt: '#ffff00', path: '#ffffff' }, light: { bg: '#fdf6e3', fg: '#333333', prompt: '#2aa198', path: '#268bd2' },
   nord: { bg: '#2e3440', fg: '#d8dee9', prompt: '#a3be8c', path: '#88c0d0' }, monokai: { bg: '#272822', fg: '#f8f8f2', prompt: '#a6e22e', path: '#66d9ef' }
 };
+/** Liquid Glass icon styles make the Terminal see-through frosted glass */
+const termGlass = () => /^liquid/.test(document.documentElement.dataset.icons || '');
+const termXBg = t => termGlass() ? 'rgba(0,0,0,0)' : (t.bg || '#1e1c1b');
+const termPaintBg = t => termGlass() ? `color-mix(in srgb, ${t.bg || '#1e1c1b'} ${document.documentElement.dataset.icons === 'liquidclear' ? 18 : 42}%, transparent)` : (t.bg || '');
 const termPrefs = () => Object.assign({ theme: 'oled', size: 13.5, ps1: '\\u@\\h:\\w\\$', opacity: 100 }, Store.get('terminal.prefs', {}));
 const FIGLET = { A: ['▄▀█', '█▀█'], B: ['█▄▄', '█▄█'], C: ['█▀▀', '█▄▄'], D: ['█▀▄', '█▄▀'], E: ['█▀▀', '██▄'], F: ['█▀▀', '█▀ '], G: ['█▀▀', '█▄█'], H: ['█░█', '█▀█'], I: ['█', '█'], J: ['░░█', '█▄█'], K: ['█▄▀', '█░█'], L: ['█░░', '█▄▄'], M: ['█▀▄▀█', '█░▀░█'], N: ['█▄░█', '█░▀█'], O: ['█▀█', '█▄█'], P: ['█▀█', '█▀▀'], Q: ['█▀█', '▀▀█'], R: ['█▀█', '█▀▄'], S: ['█▀', '▄█'], T: ['▀█▀', '░█░'], U: ['█░█', '█▄█'], V: ['█░█', '▀▄▀'], W: ['█░█░█', '▀▄▀▄▀'], X: ['▀▄▀', '█░█'], Y: ['█▄█', '░█░'], Z: ['▀█', '█▄'], ' ': ['  ', '  '], '!': ['█', '▄'], '?': ['▀█', '░▄'], '0': ['█▀█', '█▄█'], '1': ['▄█', '░█'], '2': ['▀█', '█▄'], '3': ['▀▀█', '▄██'], '4': ['█░█', '▀▀█'], '5': ['█▀', '▄█'], '6': ['█▄▄', '█▄█'], '7': ['▀▀█', '░░█'], '8': ['█▀█', '███'], '9': ['█▀█', '▀▀█'], '.': [' ', '▄'], '-': ['▄▄', '  '] };
 const MORSE = { a: '.-', b: '-...', c: '-.-.', d: '-..', e: '.', f: '..-.', g: '--.', h: '....', i: '..', j: '.---', k: '-.-', l: '.-..', m: '--', n: '-.', o: '---', p: '.--.', q: '--.-', r: '.-.', s: '...', t: '-', u: '..-', v: '...-', w: '.--', x: '-..-', y: '-.--', z: '--..', 0: '-----', 1: '.----', 2: '..---', 3: '...--', 4: '....-', 5: '.....', 6: '-....', 7: '--...', 8: '---..', 9: '----.' };
@@ -20882,6 +20896,9 @@ const SJ_HTML_APPS = [
   ['sj-doodle', 'Doodle Guess', 'emoji:✏️', 'linear-gradient(135deg,#f59e0b,#ec4899)', 'Games', 1100, 720, 'Party drawing game: one player draws a secret word, everyone races to guess it. Online with 2–8 friends or pass & play.', 'draw guess drawing party pictionary sketch multiplayer online word'],
   ['sj-skybrawl', 'Sky Brawl Ultimate', 'emoji:💥', 'linear-gradient(135deg,#f97316,#7c3aed)', 'Games', 1200, 720, 'Platform fighter for 1–4: rack up damage %, launch rivals off the stage, grab items and break the Nova Core for a super. 8 fighters, 7 stages, Versus, Classic, Endless and Training. Local multiplayer on keyboard, gamepads or touch.', 'smash fighting fighter brawl platform fighter multiplayer local 4 player couch party versus'],
   ['sj-airouter', 'OpenRouter AI', 'emoji:✦', 'linear-gradient(135deg,#7c5cff,#22d3ee)', 'Productivity', 980, 700, 'Chat with hundreds of AI models (free ones included) through OpenRouter, Groq, OpenAI or any OpenAI-compatible API. Admins add the API keys under Providers; keys stay on the server.', 'ai chat openrouter groq openai llm gpt llama gemma deepseek assistant chatbot models'],
+  ['sj-music', 'Kush Music', 'emoji:🎵', 'linear-gradient(160deg,#ff5e72,#fa2d48 55%,#d90f2f)', 'Music', 1180, 760, 'Apple-style music player: charts, albums, artists and genre radio with full songs streamed through YouTube, time-synced lyrics, a queue, shuffle/repeat, playlists, favourites, a sleep timer and a gorgeous Now Playing screen.', 'music player songs spotify apple music lyrics playlist album artist radio stream youtube'],
+  ['sj-manor', 'Blackwood Manor', 'emoji:🕯️', 'linear-gradient(135deg,#1c1917,#581c87)', 'Games', 1100, 700, '3D story horror: search a haunted mansion for your missing sister, solve the safe code, restore the power and lay the Widow to rest. Hide in wardrobes. Online co-op with friends.', 'horror scary 3d story first person co-op online mansion ghost puzzle'],
+  ['sj-outpost', 'Signal Lost', 'emoji:📡', 'linear-gradient(135deg,#0ea5e9,#0f172a)', 'Games', 1100, 700, '3D sci-fi horror at a polar station in a blizzard: restart the generators, call for evac and survive the crawlers. Stun them with your flashlight, scare them off with flares. Split-screen 2-player co-op or online.', 'horror 3d survival split screen local multiplayer co-op online antarctic monsters'],
   ['sj-flashcards', 'Flashcards', 'emoji:🗂️', 'linear-gradient(135deg,#0ea5e9,#0369a1)', 'Education', 760, 680, 'Study with flashcards: spaced repetition boxes, quiz mode, your own decks and CSV import/export. Comes with 4 sample decks.', 'study flashcards learn quiz anki revise spaced repetition cards'],
 ];
 SJ_HTML_APPS.forEach(([dir, name, icon, color, cat, width, height, desc, kw = '']) => {

@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Blackwood Manor</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#e7e5e4;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hud{position:fixed;z-index:3;pointer-events:none;text-shadow:0 2px 6px #000}
+#obj{left:16px;top:14px;max-width:min(360px,60vw);font:600 14px Georgia,serif;line-height:1.45}
+#obj small{display:block;font:12px system-ui;opacity:.7;margin-top:4px}
+#inv{left:16px;bottom:16px;display:flex;gap:6px;font-size:22px}
+#inv span{width:38px;height:38px;border-radius:9px;background:rgba(0,0,0,.45);display:grid;place-items:center;border:1px solid rgba(255,255,255,.12)}
+#bars{right:16px;top:14px;width:150px;display:flex;flex-direction:column;gap:6px;font-size:12px;text-align:right}
+.bar{height:6px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}.bar i{display:block;height:100%}
+#prompt{left:50%;bottom:22%;transform:translateX(-50%);padding:7px 16px;border-radius:999px;background:rgba(0,0,0,.6);font-weight:600;white-space:nowrap}
+#prompt:empty{display:none}
+#msg{left:50%;top:26%;transform:translateX(-50%);font:600 19px Georgia,serif;text-align:center;opacity:0;transition:opacity .6s;max-width:80vw}
+#dot{left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:rgba(255,255,255,.45)}
+#vig{position:fixed;inset:0;z-index:2;pointer-events:none;box-shadow:inset 0 0 240px 70px #000}
+#fear{position:fixed;inset:0;z-index:2;pointer-events:none;transition:box-shadow .2s}
+#ward{position:fixed;inset:0;z-index:2;pointer-events:none;display:none;background:linear-gradient(90deg,#000 0 46%,transparent 46% 54%,#000 54%)}
+#scare{position:fixed;inset:0;z-index:8;pointer-events:none;display:none;background:#000}
+#scare canvas{width:100%;height:100%}
+.panel{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
+.panel[hidden]{display:none}
+.card{width:min(640px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:#0c0a09;border:1px solid #292524;border-radius:16px;padding:22px 24px;text-align:center}
+h1{margin:0;font:400 50px/1.05 Georgia,serif;letter-spacing:3px;color:#e7e5e4;text-shadow:0 0 34px rgba(168,85,247,.35)}
+h2{margin:0 0 10px;font:400 28px Georgia,serif}
+.sub{opacity:.8;line-height:1.65;margin:12px 0 16px;font-family:Georgia,serif}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.btn{padding:10px 20px;border-radius:10px;background:#1c1917;border:1px solid #44403c;font-weight:700}
+.btn.pri{background:#581c87;border-color:#7e22ce}
+.keys{font-size:13px;opacity:.65;line-height:1.8}
+#note .card{background:#e7dcc3;color:#292218;text-align:left;font:17px/1.6 Georgia,serif;border-color:#a8946b;box-shadow:0 20px 60px #000}
+#note h3{margin:0 0 8px;font:italic 400 22px Georgia,serif}
+#note .btn{background:#292218;color:#e7dcc3;border-color:#292218}
+#pad .card{width:min(320px,calc(100% - 24px))}
+#padShow{font:700 34px ui-monospace,monospace;letter-spacing:10px;padding:10px;border-radius:10px;background:#000;margin-bottom:12px;color:#a3e635}
+#padKeys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#padKeys button{height:52px;border-radius:10px;background:#1c1917;border:1px solid #44403c;font:700 20px system-ui}
+#touch{position:fixed;right:12px;bottom:14px;z-index:4;display:none;gap:8px}
+#touch.on{display:flex}
+#touch button{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.12);font-weight:800;font-size:12px;touch-action:none}
+#touch button.on{background:rgba(126,34,206,.6)}
+#tags{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+#journal{position:fixed;z-index:3;right:16px;bottom:16px;font-size:12px;opacity:.55;text-align:right;pointer-events:none}
+</style></head>
+<body>
+<canvas id="gl"></canvas><div id="vig"></div><div id="fear"></div><div id="ward"></div><div id="tags"></div>
+<div class="hud" id="obj"></div><div class="hud" id="bars"></div><div class="hud" id="inv"></div><div class="hud" id="dot"></div><div class="hud" id="prompt"></div><div class="hud" id="msg"></div><div id="journal"></div>
+<div id="scare"><canvas id="scareC" width="400" height="300"></canvas></div>
+<div id="touch"><button data-btn="crouch">Crouch</button><button data-btn="light">Lamp</button><button data-btn="use">Use</button><button data-btn="run">Run</button></div>
+<div class="panel" id="menu"><div class="card">
+  <h1>BLACKWOOD<br>MANOR</h1>
+  <p class="sub">Your sister Mira came to Blackwood Manor to photograph the old house. That was three days ago. Her car is still in the drive.<br>The front door closes behind you, and the lock turns by itself.</p>
+  <div class="btns"><button class="btn pri" data-d="1">Enter the manor</button><button class="btn" data-d="0">Story mode (easier)</button><button class="btn" data-d="2">Nightmare</button><button class="btn" id="bOnline">🌐 Co-op with friends</button></div>
+  <p class="keys">WASD move · mouse look (click to lock) · Shift run · C crouch (quiet) · F lamp · E use, read, hide · J journal · phone: left side walks, right side looks</p>
+  <p class="keys" id="best"></p>
+</div></div>
+<div class="panel" id="note" hidden><div class="card"><h3 id="noteT"></h3><div id="noteB"></div><div class="btns" style="justify-content:flex-end"><button class="btn" id="noteX">Close (E)</button></div></div></div>
+<div class="panel" id="pad" hidden><div class="card"><h2>Wall safe</h2><div id="padShow">____</div><div id="padKeys"></div><div class="btns"><button class="btn" id="padX">Step away</button></div></div></div>
+<div class="panel" id="over" hidden><div class="card"><div id="overText"></div><div class="btns"><button class="btn pri" id="again">Play again</button><button class="btn" id="toMenu">Menu</button></div></div></div>
+
+<script src="../sj-gamekit/kit.js"></script>
+<script src="../sj-gamekit/gl3d.js"></script>
+<script src="../sj-gamekit/friends3d.js"></script>
+<script>
+(() => {
+'use strict';
+const kit = window.SJG ? SJG.init('manor', { title: 'Blackwood Manor', vs: false, trophies: [
+  { id: 'note', name: 'Dear Reader', desc: 'Read a note', icon: '📜' },
+  { id: 'power', name: 'Let There Be Light', desc: 'Get the power back on', icon: '💡' },
+  { id: 'safe', name: 'Safecracker', desc: 'Open the study safe', icon: '🔐' },
+  { id: 'hide', name: 'Still as Stone', desc: 'Hide while the Widow passes by', icon: '🚪' },
+  { id: 'rest', name: 'Laid to Rest', desc: 'Place all five mementos on the altar', icon: '🕯️' },
+  { id: 'escape', name: 'Morning', desc: 'Escape Blackwood Manor', icon: '🌅' },
+  { id: 'nightmare', name: 'No Fear', desc: 'Escape on Nightmare', icon: '💀' },
+  { id: 'coop', name: 'Together', desc: 'Escape with a friend', icon: '🤝' },
+  { id: 'allnotes', name: 'The Whole Story', desc: 'Read every note in one game', icon: '📚' },
+] }) : null;
+const G3 = window.GL3D, { M, dirOf, pushBox } = G3, $ = id => document.getElementById(id);
+const TEST = /[?&]nogl\b/.test(location.search);
+let R = null; if (!TEST) try { R = G3.create($('gl'), { maxDpr: matchMedia('(pointer:coarse)').matches ? 1 : 1.25 }); } catch (e) { console.warn(e); }
+if (!R && !TEST) $('menu').querySelector('.sub').textContent = 'This browser can’t run WebGL, so Blackwood Manor can’t be drawn here.';
+const IN = G3.Input($('gl')); IN.bindButtons($('touch'));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const TS = 3, WH = 3.4, GW = 37, GH = 27;
+
+/* ================= the house ================= */
+// interiors (inclusive tile rects): name, floor colour, wall colour
+const ROOMS = [
+  { id: 'chapel', n: 'Chapel', r: [13, 1, 19, 4], f: '#2a2420', w: '#3a3436' },
+  { id: 'study', n: 'Study', r: [13, 6, 19, 9], f: '#3b2a1e', w: '#3d2f26' },
+  { id: 'corr', n: 'Hallway', r: [15, 11, 17, 14], f: '#30261f', w: '#33302c' },
+  { id: 'library', n: 'Library', r: [3, 3, 11, 13], f: '#3a2a1c', w: '#2f2a24' },
+  { id: 'gallery', n: 'Gallery', r: [21, 3, 29, 8], f: '#2c2a2e', w: '#3b2531' },
+  { id: 'nursery', n: 'Nursery', r: [21, 10, 29, 13], f: '#3a3328', w: '#45403a' },
+  { id: 'green', n: 'Greenhouse', r: [31, 3, 35, 13], f: '#28301f', w: '#2f4238' },
+  { id: 'hall', n: 'Great Hall', r: [3, 15, 29, 16], f: '#2f2620', w: '#3a2e2a' },
+  { id: 'dining', n: 'Dining Room', r: [3, 18, 9, 23], f: '#3a2418', w: '#4a2626' },
+  { id: 'foyer', n: 'Foyer', r: [13, 17, 19, 24], f: '#2e2a26', w: '#3b3530' },
+  { id: 'kitchen', n: 'Kitchen', r: [23, 18, 29, 23], f: '#3b3b36', w: '#3c3a33' },
+  { id: 'cellar', n: 'Cellar', r: [31, 15, 35, 23], f: '#1f1d1b', w: '#272422' },
+];
+// doorways between rooms (tile in the wall). lock: brass | iron | silver | power | exit
+const DOORS = [
+  { id: 'dChapel', t: [16, 5], lock: 'silver' }, { id: 'dStudy', t: [16, 10] }, { id: 'dLib', t: [7, 14], lock: 'brass' },
+  { id: 'dGal', t: [25, 9] }, { id: 'dNur', t: [25, 14] }, { id: 'dGreen', t: [30, 5], lock: 'power' },
+  { id: 'dDin', t: [6, 17] }, { id: 'dKit', t: [26, 17] }, { id: 'dCel', t: [30, 20], lock: 'iron' }, { id: 'dExit', t: [16, 25], lock: 'exit' },
+];
+const LOCKCOL = { brass: '#b8860b', iron: '#57534e', silver: '#cbd5e1', power: '#0ea5e9', exit: '#7f1d1d' };
+let grid, roomGrid, tileBoxes, mesh = null, staticLights = [];
+function buildHouse() {
+  grid = Array.from({ length: GH }, () => new Array(GW).fill(1));
+  roomGrid = Array.from({ length: GH }, () => new Array(GW).fill(null));
+  for (const rm of ROOMS) { const [x0, y0, x1, y1] = rm.r; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { grid[y][x] = 0; roomGrid[y][x] = rm; } }
+  for (const d of DOORS) { const [x, y] = d.t; grid[y][x] = 0; roomGrid[y][x] = { id: 'door', n: 'Doorway', f: '#2a211b', w: '#33302c' }; d.open = !d.lock; d.vert = grid[y][x - 1] === 1 && grid[y][x + 1] === 1; }
+  tileBoxes = new Map();
+  const a = [], addBox = (b) => { const tx0 = Math.floor(b[0] / TS), tx1 = Math.floor((b[3] - 0.001) / TS), tz0 = Math.floor(b[2] / TS), tz1 = Math.floor((b[5] - 0.001) / TS); for (let y = tz0; y <= tz1; y++) for (let x = tx0; x <= tx1; x++) { const k = y * GW + x; if (!tileBoxes.has(k)) tileBoxes.set(k, []); tileBoxes.get(k).push(b); } };
+  const wallCol = (x, y) => { for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { const r = roomGrid[y + dy] && roomGrid[y + dy][x + dx]; if (r && r.id !== 'door') return r.w; } return '#2b2622'; };
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const x0 = x * TS, z0 = y * TS, x1 = x0 + TS, z1 = z0 + TS, n = ((x * 7 + y * 13) % 5) * 0.012;
+    if (grid[y][x]) {
+      const c = G3.hex(wallCol(x, y)), cc = [c[0] - n, c[1] - n, c[2] - n];
+      pushBox(a, x0, 0, z0, x1, WH, z1, cc); pushBox(a, x0 - 0.02, 0, z0 - 0.02, x1 + 0.02, 0.28, z1 + 0.02, '#1c1410');
+      pushBox(a, x0 - 0.02, 2.55, z0 - 0.02, x1 + 0.02, 2.62, z1 + 0.02, '#4a3b2a');
+      addBox([x0, 0, z0, x1, WH, z1]);
+    } else {
+      const rm = roomGrid[y][x], fc = G3.hex(rm.f), k = (x + y) % 2 ? 0.02 : 0;
+      pushBox(a, x0, -0.2, z0, x1, 0, z1, [fc[0] + k, fc[1] + k, fc[2] + k]);
+      pushBox(a, x0, WH, z0, x1, WH + 0.2, z1, rm.id === 'green' ? '#1a2a22' : '#1d1714');
+    }
+  }
+  // door frames: posts + lintel, so every doorway is 1.8 m wide
+  for (const d of DOORS) {
+    const [x, y] = d.t, x0 = x * TS, z0 = y * TS;
+    const posts = d.vert ? [[x0, 0, z0 + 0.2, x0 + 0.6, WH, z0 + TS - 0.2], [x0 + TS - 0.6, 0, z0 + 0.2, x0 + TS, WH, z0 + TS - 0.2]] : [[x0 + 0.2, 0, z0, x0 + TS - 0.2, WH, z0 + 0.6], [x0 + 0.2, 0, z0 + TS - 0.6, x0 + TS - 0.2, WH, z0 + TS]];
+    for (const p of posts) { pushBox(a, ...p, '#3a2c22'); addBox(p); }
+    pushBox(a, ...(d.vert ? [x0, 2.5, z0 + 0.2, x0 + TS, WH, z0 + TS - 0.2] : [x0 + 0.2, 2.5, z0, x0 + TS - 0.2, WH, z0 + TS]), '#3a2c22');
+  }
+  // furniture (tile units): [x0, z0, x1, z1, y0, y1, colour, solid]
+  const FURN = [];
+  const fb = (x0, z0, x1, z1, y0, y1, col, solid = true) => FURN.push([x0 * TS, y0, z0 * TS, x1 * TS, y1, z1 * TS, col, solid]);
+  // foyer: rug, side tables, grandfather clock, stair to nowhere
+  fb(14.2, 19, 18.8, 23.6, 0, 0.02, '#5b1a1a', false); fb(14.5, 19.3, 18.5, 23.3, 0.02, 0.03, '#7f1d1d', false);
+  fb(13.1, 18.2, 13.8, 19.2, 0, 0.8, '#3f2a1c'); fb(19.2, 18.2, 19.9, 19.2, 0, 0.8, '#3f2a1c');
+  fb(19.3, 22, 19.9, 22.6, 0, 2.3, '#2b1d14'); fb(19.28, 22.1, 19.3, 22.5, 1.5, 1.9, '#d6d3d1', false);
+  // dining: long table, chairs, sideboard
+  fb(4.2, 20.2, 8.8, 21.6, 0.75, 0.85, '#4a2c1a'); for (const x of [4.4, 8.5]) for (const z of [20.3, 21.4]) fb(x, z, x + 0.1, z + 0.1, 0, 0.75, '#3a2216');
+  for (let x = 4.6; x < 8.6; x += 1.1) { fb(x, 19.6, x + 0.4, 19.9, 0, 1.3, '#2e1a10'); fb(x, 21.9, x + 0.4, 22.2, 0, 1.3, '#2e1a10'); }
+  fb(3.05, 18.2, 3.5, 20, 0, 1, '#3a2216');
+  // kitchen: counters, stove, hanging pots
+  fb(23, 23.4, 28.9, 24, 0, 0.95, '#6b6257'); fb(23, 23.4, 28.9, 24, 0.95, 1.0, '#a8a29e', false); fb(25.6, 23.35, 26.6, 24, 0, 1.0, '#27272a');
+  fb(24.5, 20.3, 27.5, 21.4, 0, 0.9, '#57534e'); fb(24.5, 20.3, 27.5, 21.4, 0.9, 0.96, '#d6d3d1', false);
+  // library: shelves in rows, reading desk
+  for (const z of [5, 7.6, 10.2]) { fb(4, z, 6.6, z + 0.5, 0, 2.6, '#3b2414'); fb(7.6, z, 10.4, z + 0.5, 0, 2.6, '#3b2414'); }
+  for (let z = 3.1; z < 13.9; z += 1.4) fb(3.0, z, 3.4, z + 1.2, 0, 2.8, '#33200f');
+  fb(9.4, 12, 11, 12.9, 0.7, 0.8, '#4a2c1a'); fb(9.5, 12.1, 9.6, 12.2, 0, 0.7, '#2e1a10'); fb(10.8, 12.7, 10.9, 12.8, 0, 0.7, '#2e1a10');
+  // study: desk, fireplace, armchair
+  fb(14, 7.6, 16, 8.4, 0.72, 0.82, '#4a2c1a'); fb(14.1, 7.7, 14.2, 7.8, 0, 0.72, '#2e1a10'); fb(15.8, 8.2, 15.9, 8.3, 0, 0.72, '#2e1a10');
+  fb(17.4, 9.4, 18.8, 10, 0, 1.4, '#57534e'); fb(17.6, 9.45, 18.6, 9.5, 0.1, 0.9, '#111', false);
+  fb(13.2, 6.2, 13.9, 6.9, 0, 0.5, '#5b1a1a');
+  // chapel: altar, pews
+  fb(15, 1.05, 18, 1.8, 0, 1.0, '#d6d3d1'); fb(14.8, 1.0, 18.2, 1.1, 1.0, 1.08, '#a8a29e', false);
+  for (const z of [2.6, 3.5]) { fb(13.6, z, 15.5, z + 0.4, 0, 0.5, '#3a2216'); fb(16.5, z, 18.4, z + 0.4, 0, 0.5, '#3a2216'); }
+  // gallery: benches, frames come later (they are interactive)
+  fb(23, 5.6, 25, 6.1, 0, 0.45, '#3a2216'); fb(26, 5.6, 28, 6.1, 0, 0.45, '#3a2216');
+  // nursery: cribs, rocking horse, toy chest
+  for (const x of [21.4, 23.4]) { fb(x, 12.2, x + 1.3, 13.6, 0, 0.9, '#d6c7a8'); fb(x + 0.08, 12.3, x + 1.22, 13.5, 0.4, 0.45, '#f5f5f4', false); }
+  fb(27, 10.3, 28.4, 10.9, 0, 0.6, '#7c2d12'); fb(26.2, 12.4, 26.9, 13.2, 0, 1.0, '#a16207');
+  // greenhouse: planters with plants
+  for (const z of [4.2, 7.2, 10.2]) { fb(32, z, 35, z + 0.8, 0, 0.8, '#5b4636'); for (let x = 32.2; x < 34.9; x += 0.6) fb(x, z + 0.2, x + 0.4, z + 0.6, 0.8, 1.2 + ((x * 7) % 1) * 0.6, '#166534', false); }
+  // cellar: crates and barrels
+  for (const [x, z] of [[31.2, 15.2], [32.1, 15.2], [31.2, 16.1], [34.6, 17.5], [34.6, 18.4], [31.3, 21.5]]) fb(x, z, x + 0.8, z + 0.8, 0, 0.8, '#4a3520');
+  for (const [x, z] of [[33.3, 22.8], [34.2, 22.8]]) fb(x, z, x + 0.7, z + 0.7, 0, 1.0, '#3f2a1c');
+  // great hall: portraits & benches
+  for (const x of [5, 11, 21, 27]) fb(x, 15.02, x + 1.2, 15.06, 1.2, 2.3, '#2b1d14', false);
+  for (const f of FURN) { pushBox(a, f[0], f[1], f[2], f[3], f[4], f[5], f[6]); if (f[7]) addBox(f.slice(0, 6)); }
+  // wardrobes (hiding spots): tile + wall side
+  for (const w of WARDS) {
+    const [x, y] = w.t, [dx, dy] = w.wall, cx = (x + 0.5) * TS + dx * 1.05, cz = (y + 0.5) * TS + dy * 1.05;
+    w.p = [cx - dx * 0.5, cz - dy * 0.5];
+    const b = [cx - (dx ? 0.45 : 0.65), 0, cz - (dy ? 0.45 : 0.65), cx + (dx ? 0.45 : 0.65), 2.3, cz + (dy ? 0.45 : 0.65)];
+    pushBox(a, ...b, '#2b1a10'); pushBox(a, cx - dx * 0.46 - (dx ? 0.005 : 0.02), 0.1, cz - dy * 0.46 - (dy ? 0.005 : 0.02), cx - dx * 0.46 + (dx ? 0.005 : 0.02), 2.2, cz - dy * 0.46 + (dy ? 0.005 : 0.02), '#0c0a09');
+    addBox(b);
+  }
+  // paintings in the gallery (north wall), lit later
+  for (const p of PAINTS) { const x = p.tx * TS; pushBox(a, x + 0.45, 1.05, 9 - 0.02, x + 2.55, 2.55, 9.08, '#a16207'); pushBox(a, x + 0.55, 1.15, 9.0, x + 2.45, 2.45, 9.1, p.col); }
+  if (R) { if (mesh) R.free(mesh); mesh = R.mesh(a); }
+  // candles that are always lit; room lamps need power
+  staticLights = [{ p: [13.5 * TS, 1.0, 18.7 * TS], c: [0.9, 0.5, 0.2], r: 7, candle: 1 }, { p: [19.5 * TS, 1.0, 18.7 * TS], c: [0.9, 0.5, 0.2], r: 7, candle: 1 }, { p: [15.4 * TS, 1.3, 1.3 * TS], c: [0.9, 0.45, 0.2], r: 8, candle: 1 }, { p: [17.6 * TS, 1.3, 1.3 * TS], c: [0.9, 0.45, 0.2], r: 8, candle: 1 }];
+  for (const rm of ROOMS) if (rm.id !== 'cellar' || true) { const [x0, y0, x1, y1] = rm.r; staticLights.push({ p: [(x0 + x1 + 1) / 2 * TS, WH - 0.4, (y0 + y1 + 1) / 2 * TS], c: rm.id === 'green' ? [0.5, 0.75, 0.6] : [0.95, 0.78, 0.5], r: Math.max(8, Math.max(x1 - x0, y1 - y0) * TS * 0.55), lamp: rm.id }); }
+}
+const WARDS = [
+  { t: [3, 16], wall: [-1, 0] }, { t: [12, 15], wall: [0, -1] }, { t: [20, 16], wall: [0, 1] }, { t: [29, 15], wall: [1, 0] },
+  { t: [9, 23], wall: [0, 1] }, { t: [29, 23], wall: [1, 0] }, { t: [11, 3], wall: [0, -1] }, { t: [19, 9], wall: [1, 0] },
+  { t: [29, 10], wall: [1, 0] }, { t: [21, 8], wall: [-1, 0] }, { t: [31, 23], wall: [-1, 0] }, { t: [35, 13], wall: [1, 0] }, { t: [17, 13], wall: [1, 0] },
+];
+let PAINTS = [];
+const tileOf = (x, z) => [Math.floor(x / TS), Math.floor(z / TS)];
+const center = t => [(t[0] + 0.5) * TS, (t[1] + 0.5) * TS];
+const doorAt = (x, y) => DOORS.find(d => d.t[0] === x && d.t[1] === y);
+const walkable = (x, y, ghost) => { if (x < 0 || y < 0 || x >= GW || y >= GH || grid[y][x]) return false; const d = doorAt(x, y); return !d || d.open || (ghost && d.lock !== 'exit'); };
+const roomAt = (x, z) => { const [tx, ty] = tileOf(x, z); return (roomGrid[ty] && roomGrid[ty][tx]) || null; };
+function boxesNear(x, z) {
+  const [tx, ty] = tileOf(x, z), out = [];
+  for (let y = ty - 1; y <= ty + 1; y++) for (let xx = tx - 1; xx <= tx + 1; xx++) {
+    const b = tileBoxes.get(y * GW + xx); if (b) out.push(...b);
+    const d = doorAt(xx, y); if (d && !d.open) out.push([xx * TS, 0, y * TS, (xx + 1) * TS, WH, (y + 1) * TS]);
+  }
+  return out;
+}
+function los(ax, az, bx, bz) { const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / 0.5); for (let i = 1; i < n; i++) { const [x, y] = tileOf(ax + (bx - ax) * i / n, az + (bz - az) * i / n); if (!walkable(x, y)) return false; } return true; }
+function bfs(from, goal, ghost = true) {
+  const prev = new Int32Array(GW * GH).fill(-2), q = [from[1] * GW + from[0]]; prev[q[0]] = -1;
+  for (let i = 0; i < q.length; i++) { const k = q[i], x = k % GW, y = (k / GW) | 0; if (x === goal[0] && y === goal[1]) { const path = []; let p = k; while (prev[p] !== -1) { path.unshift([p % GW, (p / GW) | 0]); p = prev[p]; } return path; }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (!walkable(nx, ny, ghost)) continue; const nk = ny * GW + nx; if (prev[nk] !== -2) continue; prev[nk] = k; q.push(nk); } }
+  return [];
+}
+
+/* ================= story: items, notes, puzzles ================= */
+const NOTES = {
+  n1: ['A note on the hall table', 'Ada —<br>If you are reading this, you came looking for me. I’m sorry. The door won’t open for me either.<br><br>There is a woman in this house. She walks when the lamps go out. I think she is looking for her things.<br><br>I hid in the wardrobes. She can’t find you in there if she doesn’t see you climb in.<br>The dining room — there was a key on the table.<br><br>— Mira'],
+  n2: ['Dinner invitation, 1891', '<i>Lord and Lady Blackwood request the pleasure of your company at the wedding feast of their daughter, Eleanor.</i><br><br>Someone has written across it in red ink:<br><b>SHE NEVER CAME DOWN TO DINNER.</b>'],
+  n3: ['Kitchen ledger', 'Coal — 2 sacks. Candles — 40. Lamp oil — 6 tins.<br><br>The fuse for the cellar box blew again. I keep the spare in the drawer by the stove. Lady Eleanor does not like the dark. Nor do I, any more.'],
+  n4: ['Torn diary page (Library)', 'Mother locked my things away so I would stop crying for him. The locket, my ring, the music box Father gave me. My diary she threw into the glasshouse soil.<br><br>If anyone finds them, bring them to the chapel. Bring them home to me and I can finally sleep.<br><br>— E.'],
+  n5: ['Mira’s note (Study)', 'The safe in the study has a four-number lock. Old Blackwood loved his puzzles. The paintings in the gallery are numbered I to IV — count what’s in each one.<br><br>She was in the nursery last time. She sings in there.'],
+  n6: ['Nursery rhyme', '<i>Hush now, Eleanor, close your eyes,<br>the lamps are low and the river is wide.<br>Count the roses, count the crows,<br>count the sails and the candle glows.</i>'],
+  n7: ['Electrician’s card (Cellar)', 'Main fuse box — cellar, far corner. Replace the fuse and the house lamps return.<br>The glasshouse door is electric. It will not open without power.'],
+  n8: ['Mira’s last note (Chapel)', 'Ada, she isn’t angry. She’s lost. Put her things on the altar.<br>When she remembers, the front door will open — but she will scream, and she will come. <b>Run for the front door and don’t look back.</b>'],
+};
+const MEM = { locket: ['Locket', '📿'], ring: ['Wedding ring', '💍'], musicbox: ['Music box', '🎶'], diary: ['Eleanor’s diary', '📔'], photo: ['Old photograph', '🖼️'] };
+function makeItems(rnd) {
+  const I = (id, kind, tx, tz, y, col, extra = {}) => Object.assign({ id, kind, x: tx * TS, z: tz * TS, y, col, taken: false }, extra);
+  return [
+    I('n1', 'note', 13.5, 18.7, 0.82, '#e7dcc3'), I('n2', 'note', 8.65, 20.5, 0.87, '#e7dcc3'), I('n3', 'note', 28.3, 23.7, 1.02, '#e7dcc3'),
+    I('n4', 'note', 10.2, 12.4, 0.82, '#e7dcc3'), I('n5', 'note', 15.85, 7.9, 0.84, '#e7dcc3'), I('n6', 'note', 22.6, 12.9, 0.92, '#e7dcc3'),
+    I('n7', 'note', 32.8, 15.6, 0.82, '#e7dcc3'), I('n8', 'note', 13.6, 3.0, 0.52, '#e7dcc3'),
+    I('brass', 'key', 4.35, 20.9, 0.87, '#d4a017'), I('iron', 'key', 9.7, 12.2, 0.82, '#78716c'),
+    I('fuse', 'fuse', 24.2, 23.7, 1.02, '#facc15'),
+    I('locket', 'mem', 4.8, 11.4, 0.05, '#e5c07b'), I('musicbox', 'mem', 28.9, 12.6, 0.05, '#f472b6'), I('ring', 'mem', 33.6, 21.3, 0.05, '#fde68a'), I('diary', 'mem', 34.4, 10.9, 0.82, '#7c3aed'),
+    ...[[3.6, 22.5], [22.2, 4.0], [12.5 + 3, 16.3], [34.6, 15.4], [10.6, 4.0], [27.6, 22.6]].map(([x, z], i) => I('oil' + i, 'oil', x, z, 0.05, '#a3e635')),
+  ];
+}
+const PAINT_CLUES = [n => `a pale woman holding <b>${n}</b> white roses`, n => `<b>${n}</b> crows on a bare black tree`, n => `a ship on a dark river with <b>${n}</b> torn sails`, n => `a birthday cake with <b>${n}</b> candles, none of them lit`];
+const ROMAN = ['I', 'II', 'III', 'IV'];
+
+/* ================= state ================= */
+let S, P, mon, items = [], running = false, camYaw = 0, camPitch = 0, last = performance.now(), F = null, uiOpen = null;
+function start(diff, seed) {
+  if (!R && !TEST) return;
+  seed = seed == null ? (F ? F.seed : (Math.random() * 1e9) | 0) : seed;
+  const rnd = G3.rng(seed);
+  const code = [0, 1, 2, 3].map(() => 1 + ((rnd() * 9) | 0));
+  const order = [0, 1, 2, 3].sort(() => rnd() - 0.5);
+  PAINTS = [22, 24, 26, 28].map((tx, k) => ({ tx, i: order[k], col: ['#4c1d95', '#1e293b', '#164e63', '#713f12'][order[k]] }));
+  buildHouse();
+  items = makeItems(rnd);
+  S = { diff, seed, code, t: 0, oil: 100, light: true, stam: 100, crouch: false, hidden: null, lives: [3, 2, 1][diff], over: false, noise: 0, keys: {}, fuse: false, mems: {}, placed: 0, power: false, safe: false, final: false, act: 1, read: new Set(), hidT: 0, flick: 0, downT: 0 };
+  const c = center([16, 22]); P = Object.assign(G3.Body(c[0], 0, c[1], 0.3, 1.7), { walk: 0 });
+  camYaw = 0; camPitch = 0;
+  const mc = center([25, 11]);
+  mon = { x: mc[0], z: mc[1], st: 'dormant', path: [], lastSeen: null, searchT: 0, yaw: 0, bob: 0, active: false, glimpse: 0, stepT: 0, tpT: 30 };
+  $('menu').hidden = true; $('over').hidden = true; running = true; $('touch').classList.toggle('on', IN.touch);
+  closeUI();
+  msg('The door is locked. Look around.', 4);
+  startAmbience();
+}
+let msgT = 0; function msg(t, s = 3) { $('msg').innerHTML = t; $('msg').style.opacity = 1; msgT = s; }
+const has = k => !!S.keys[k];
+const memCount = () => Object.keys(S.mems).length;
+function objective() {
+  if (S.final) return ['RUN. Get to the front door.', 'She remembers everything now.'];
+  if (!S.read.has('n1')) return ['Look around the foyer.', 'Something is on the side table.'];
+  if (!has('brass')) return ['Find the key Mira mentioned.', 'Try the dining room, west of the foyer.'];
+  if (!doorById('dLib').open) return ['Unlock the library.', 'The brass door off the west end of the Great Hall.'];
+  if (!has('iron')) return ['Search the library.', 'A reading desk in the far corner.'];
+  if (!S.power) return [S.fuse ? 'Fix the fuse box in the cellar.' : 'Find a spare fuse.', S.fuse ? 'The iron door in the kitchen leads down.' : 'The cook kept one by the stove.'];
+  if (!S.safe) return ['Open the safe in the study.', 'Count what’s in each painting in the gallery, I to IV.'];
+  if (memCount() + S.placed < 5) return [`Find Eleanor’s things (${memCount() + S.placed}/5).`, Object.keys(MEM).filter(k => !S.mems[k] && !S.placedSet?.has(k)).map(k => MEM[k][0]).join(', ') + ' are still missing.'];
+  return ['Bring her things to the chapel altar.', 'North of the study. The silver key opens it.'];
+}
+const doorById = id => DOORS.find(d => d.id === id);
+
+/* ================= co-op ================= */
+// progress events are shared by everyone in the room (idempotent); the host runs the Widow
+function ev(e, local = true) {
+  if (!S) return;
+  const it = e.id && items.find(i => i.id === e.id);
+  if (e.t === 'take' && it && !it.taken) {
+    it.taken = true;
+    if (it.kind === 'key') { S.keys[it.id] = true; if (it.id === 'brass') { S.act = Math.max(S.act, 2); glimpse(); } }
+    else if (it.kind === 'mem') { S.mems[it.id] = true; if (S.act < 3) S.act = 3; }
+    else if (it.kind === 'fuse') S.fuse = true;
+    else if (it.kind === 'oil' && local) S.oil = Math.min(100, S.oil + 55);
+    if (!local) msg(`${e.who || 'A friend'} found ${it.kind === 'mem' ? MEM[it.id][0] : it.kind === 'key' ? 'the ' + it.id + ' key' : it.kind === 'fuse' ? 'the fuse' : 'lamp oil'}`, 2.5);
+  }
+  if (e.t === 'door') { const d = doorById(e.id); if (d && !d.open) { d.open = true; creak(); } }
+  if (e.t === 'power' && !S.power) { S.power = true; S.fuse = true; doorById('dGreen').open = true; kit && kit.unlock('power'); msg('The lamps flicker on all over the house.', 3); G3.tone(60, 1.2, 'sawtooth', 0.05, 120); }
+  if (e.t === 'safe' && !S.safe) { S.safe = true; S.keys.silver = true; S.mems.photo = true; kit && kit.unlock('safe'); if (!local) msg('The safe is open: a silver key and an old photograph.', 3); }
+  if (e.t === 'place' && !S.final) { S.placedSet = S.placedSet || new Set(); for (const k of e.ids || []) { if (S.placedSet.has(k)) continue; S.placedSet.add(k); delete S.mems[k]; S.placed++; } if (S.placed >= 5) finale(); }
+  if (e.t === 'win' && !S.over) end(true, e.who);
+  if (local && F) F.shout({ ev: Object.assign({ who: F.me && (F.me.display || F.me.name) }, e) });
+}
+function snapshot() { return { taken: items.filter(i => i.taken && i.kind !== 'oil').map(i => i.id), doors: DOORS.filter(d => d.open).map(d => d.id), power: S.power, safe: S.safe, placed: S.placedSet ? [...S.placedSet] : [], fin: S.final }; }
+function merge(s) {
+  for (const id of s.taken || []) if (!(S.placedSet && S.placedSet.has(id))) ev({ t: 'take', id }, false);
+  for (const id of s.doors || []) ev({ t: 'door', id }, false);
+  if (s.power) ev({ t: 'power' }, false); if (s.safe) ev({ t: 'safe' }, false);
+  if (s.placed && s.placed.length) ev({ t: 'place', ids: s.placed }, false);
+}
+async function goOnline() {
+  if (!window.SJFriends || !(await SJFriends.available())) { alert('Co-op needs SanjivramOS (open Blackwood Manor from the SanjivramOS desktop).'); return; }
+  if (!F) {
+    try { F = await SJFriends.join({ game: 'manor', gameName: 'Blackwood Manor' }); } catch { return; }
+    F.on('shout', (d, from, who) => {
+      if (!S) return;
+      if (d.ev) ev(Object.assign({}, d.ev, { who: d.ev.who || who.display }), false);
+      if (d.full && !F.isHost) merge(d.full);
+      if (d.w && !F.isHost) { const [x, z, yaw, st, act] = d.w; mon.tx = x; mon.tz = z; mon.yaw = yaw; mon.st = st; mon.active = !!act; if (mon.x == null || Math.hypot(mon.x - x, mon.z - z) > 6) { mon.x = x; mon.z = z; } }
+      if (d.n && F.isHost && mon.active && mon.st !== 'chase') { mon.st = 'investigate'; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(d.n[0], d.n[1])); }
+      if (d.hello && F.isHost) F.shout({ full: snapshot() });
+    });
+    F.on('start', seed => { if (running) start(S ? S.diff : 1, seed); });
+  }
+  start(1, F.seed);
+  F.shout({ hello: 1 });
+}
+
+/* ================= the Widow ================= */
+function glimpse() {
+  // she shows herself at the far end of the hall for a moment, then the hunt starts
+  const spots = [[3, 16], [29, 16], [16, 13]].map(center).sort((a, b) => Math.hypot(b[0] - P.x, b[1] - P.z) - Math.hypot(a[0] - P.x, a[1] - P.z));
+  const s = spots[0]; mon.x = s[0]; mon.z = s[1]; mon.active = true; mon.st = 'glimpse'; mon.glimpse = 2.6; S.flick = 2.6;
+  G3.tone(880, 1.6, 'sine', 0.025, 860); G3.noise(1.2, 0.05, 2400);
+  msg('<i>…is someone there?</i>', 2.5);
+}
+function finale() {
+  if (S.final) return; S.final = true; kit && kit.unlock('rest');
+  doorById('dExit').open = true;
+  S.flick = 4; G3.noise(2.2, 0.3, 300); G3.tone(220, 2.2, 'sawtooth', 0.12, 55);
+  mon.active = true; mon.st = 'chase';
+  const c = center([16, 11]); mon.x = c[0]; mon.z = c[1];
+  msg('A scream shakes the house. The front door bangs open.', 4);
+}
+function monSpeed() { const base = [2.0, 2.5, 3.0][S.diff] + memCount() * 0.08 + (S.final ? 1.4 : 0); return mon.st === 'chase' ? base * 1.3 + 0.5 : mon.st === 'investigate' ? base * 1.05 : base * 0.65; }
+function players() {
+  const me = { x: P.x, z: P.z, hidden: !!S.hidden, light: S.light && S.oil > 0, crouch: S.crouch, me: true };
+  const out = [me];
+  if (F) for (const o of F.list()) if (!o.t.dead) out.push({ x: o.x, z: o.z, hidden: !!o.t.hid, light: !!o.t.lit, crouch: !!o.t.cr });
+  return out;
+}
+function updMonster(dt) {
+  if (F && !F.isHost) { // guests just follow the host's Widow
+    if (mon.tx != null) { const k = Math.min(1, dt * 8); mon.x += (mon.tx - mon.x) * k; mon.z += (mon.tz - mon.z) * k; }
+    mon.bob += dt * 3; catchCheck(); feel(dt); return;
+  }
+  if (!mon.active) { feel(dt); return; }
+  if (mon.st === 'glimpse') { mon.glimpse -= dt; mon.yaw = Math.atan2(-(P.x - mon.x), -(P.z - mon.z)); if (mon.glimpse <= 0) { mon.st = 'gone'; mon.goneT = S.diff === 0 ? 30 : 18; const far = center([25, 11]); mon.x = far[0]; mon.z = far[1]; } feel(dt); return; }
+  if (mon.st === 'gone') { mon.goneT -= dt; if (mon.goneT <= 0) mon.st = 'wander'; feel(dt); return; }
+  // who can she see?
+  let target = null, bestD = 1e9;
+  for (const p of players()) {
+    if (p.hidden) continue;
+    const d = Math.hypot(p.x - mon.x, p.z - mon.z), sight = (p.light ? 18 : p.crouch ? 4.5 : 8) * (S.diff === 2 ? 1.3 : 1) * (S.power && litAt(p.x, p.z) ? 1.25 : 1);
+    if (S.final || (d < sight && los(mon.x, mon.z, p.x, p.z) && (d < 3.5 || facing(p.x, p.z) > -0.25 || p.light))) { if (d < bestD) { bestD = d; target = p; } }
+  }
+  if (target) { if (mon.st !== 'chase') { G3.tone(110, 0.9, 'sawtooth', 0.08, 45); G3.noise(0.7, 0.1, 300); } mon.st = 'chase'; mon.lastSeen = [target.x, target.z]; mon.seeT = 0; }
+  else if (mon.st === 'chase') { mon.seeT = (mon.seeT || 0) + dt; if (mon.seeT > 0.8) { mon.st = 'search'; mon.searchT = 8; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(...mon.lastSeen)); } }
+  if (S.noise > 0 && mon.st !== 'chase' && Math.hypot(P.x - mon.x, P.z - mon.z) < S.noise) { mon.st = 'investigate'; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(P.x, P.z)); }
+  // a hiding player she watched climb in gets pulled out
+  for (const p of players()) if (p.hidden && p.me && mon.st === 'chase' && mon.lastSeen && Math.hypot(p.x - mon.x, p.z - mon.z) < 3.5 && S.hidSeen) { caught(); return; }
+  let tx, tz;
+  if (mon.st === 'chase' && target) { tx = target.x; tz = target.z; if (!los(mon.x, mon.z, target.x, target.z)) { if (!mon.path.length || (mon.rp = (mon.rp || 0) - dt) <= 0) { mon.rp = 0.4; mon.path = bfs(tileOf(mon.x, mon.z), tileOf(target.x, target.z)); } } else mon.path = []; }
+  if (mon.path.length) { const c = center(mon.path[0]); tx = c[0]; tz = c[1]; if (Math.hypot(tx - mon.x, tz - mon.z) < 0.4) mon.path.shift(); }
+  else if (mon.st === 'search') { mon.searchT -= dt; if (mon.searchT <= 0) mon.st = 'wander'; else { const [mx, my] = tileOf(mon.x, mon.z), r = []; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (walkable(mx + dx, my + dy, true)) r.push([mx + dx, my + dy]); mon.path = bfs([mx, my], r[(Math.random() * r.length) | 0]); } }
+  else if (mon.st !== 'chase') {
+    // wander between rooms, drifting toward a player now and then; sometimes she simply appears nearby
+    mon.tpT -= dt;
+    const ps = players().filter(p => !p.hidden), p = ps[(Math.random() * ps.length) | 0] || players()[0];
+    if (mon.tpT <= 0 && Math.hypot(p.x - mon.x, p.z - mon.z) > 25) {
+      mon.tpT = [60, 40, 28][S.diff];
+      const pt = tileOf(p.x, p.z), cand = []; for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) { const d = Math.abs(x - pt[0]) + Math.abs(y - pt[1]); if (d > 5 && d < 9 && walkable(x, y, true) && !los(center([x, y])[0], center([x, y])[1], p.x, p.z)) cand.push([x, y]); }
+      if (cand.length) { const c = center(cand[(Math.random() * cand.length) | 0]); mon.x = c[0]; mon.z = c[1]; G3.noise(0.5, 0.04, 4000); }
+    }
+    const rms = ROOMS.filter(r => r.id !== 'chapel' || S.final);
+    let rm = rms[(Math.random() * rms.length) | 0];
+    if (Math.random() < 0.4 + memCount() * 0.06) rm = roomAt(p.x, p.z) && ROOMS.includes(roomAt(p.x, p.z)) ? roomAt(p.x, p.z) : rm;
+    const goal = [rm.r[0] + ((Math.random() * (rm.r[2] - rm.r[0] + 1)) | 0), rm.r[1] + ((Math.random() * (rm.r[3] - rm.r[1] + 1)) | 0)];
+    mon.path = bfs(tileOf(mon.x, mon.z), goal); mon.st = 'wander';
+  }
+  if (tx !== undefined) { const dx = tx - mon.x, dz = tz - mon.z, l = Math.hypot(dx, dz); if (l > 0.05) { const sp = monSpeed(); mon.x += dx / l * Math.min(l, sp * dt); mon.z += dz / l * Math.min(l, sp * dt); mon.yaw = Math.atan2(-dx, -dz); } }
+  mon.bob += dt * 3;
+  if (F && (mon.sendT = (mon.sendT || 0) - dt) <= 0) { mon.sendT = 0.1; F.shout({ w: [Math.round(mon.x * 100) / 100, Math.round(mon.z * 100) / 100, Math.round(mon.yaw * 100) / 100, mon.st, mon.active ? 1 : 0] }); }
+  if (F && (mon.fullT = (mon.fullT || 0) - dt) <= 0) { mon.fullT = 3; F.shout({ full: snapshot() }); }
+  catchCheck(); feel(dt);
+}
+function catchCheck() { if (!mon.active || mon.st === 'glimpse' || mon.st === 'gone' || S.hidden || S.downT > 0) return; if (Math.hypot(P.x - mon.x, P.z - mon.z) < 1.15) caught(); }
+function litAt(x, z) { const r = roomAt(x, z); return r && staticLights.some(l => l.lamp === r.id); }
+function facing(x, z) { const f = dirOf(mon.yaw), dx = x - mon.x, dz = z - mon.z, l = Math.hypot(dx, dz) || 1; return (dx * f[0] + dz * f[2]) / l; }
+function feel(dt) {
+  const d = mon.active && mon.st !== 'gone' ? Math.hypot(P.x - mon.x, P.z - mon.z) : 99, near = clamp(1 - d / 15, 0, 1);
+  $('fear').style.boxShadow = `inset 0 0 ${90 + near * 170}px ${near * 46}px rgba(88,28,135,${near * 0.6})`;
+  if (near > 0.15 && (S.beatT = (S.beatT || 0) - dt) <= 0) { S.beatT = 1.1 - near * 0.7; G3.tone(68, 0.08, 'sine', 0.05 + near * 0.08, 48); setTimeout(() => G3.tone(58, 0.08, 'sine', 0.04 + near * 0.06, 44), 140); }
+  // she hums when close; lamps flicker near her
+  if (near > 0.35 && (S.humT = (S.humT || 0) - dt) <= 0) { S.humT = 2.4; const n = [392, 440, 349, 330][(Math.random() * 4) | 0]; G3.tone(n, 1.1, 'triangle', 0.018 * near, n * 0.98); }
+  if (S.hidden && mon.active && mon.st !== 'chase' && d < 4.5) S.hidT += dt;
+  if (S.hidT > 2 && d > 7) { kit && kit.unlock('hide'); S.hidT = -999; }
+}
+function caught() {
+  if (S.over || S.downT > 0) return;
+  scare();
+  if (F) { // co-op: you wake up in the foyer
+    S.downT = 3; setTimeout(() => { $('scare').style.display = 'none'; const c = center([16, 22]); P.x = c[0]; P.z = c[1]; S.hidden = null; msg('You wake up on the foyer floor.', 3); }, 1300);
+    if (F.isHost) { mon.st = 'gone'; mon.goneT = 8; const far = center([3, 15]); mon.x = far[0]; mon.z = far[1]; }
+    return;
+  }
+  S.lives--;
+  if (S.lives > 0) { setTimeout(() => { $('scare').style.display = 'none'; const c = center([16, 22]); P.x = c[0]; P.z = c[1]; S.hidden = null; mon.st = 'gone'; mon.goneT = 10; const far = center([25, 11]); mon.x = far[0]; mon.z = far[1]; mon.path = []; msg(S.lives === 1 ? 'She let you go. She won’t again.' : 'You wake up in the foyer, cold to the bone.', 3); }, 1300); return; }
+  S.over = true; setTimeout(() => { $('scare').style.display = 'none'; end(false); }, 1500);
+}
+function scare() {
+  const c = $('scareC'), g = c.getContext('2d'); $('scare').style.display = 'block';
+  g.fillStyle = '#000'; g.fillRect(0, 0, 400, 300);
+  const rg = g.createRadialGradient(200, 150, 10, 200, 150, 160); rg.addColorStop(0, '#e7e5e4'); rg.addColorStop(1, '#000'); g.fillStyle = rg; g.beginPath(); g.ellipse(200, 150, 92, 128, 0, 0, 7); g.fill();
+  g.fillStyle = '#0a0a0a'; for (const x of [165, 235]) { g.beginPath(); g.ellipse(x, 125, 22, 30, 0, 0, 7); g.fill(); }
+  g.fillStyle = '#c4b5fd'; for (const x of [165, 235]) { g.beginPath(); g.arc(x, 128, 4, 0, 7); g.fill(); }
+  g.fillStyle = '#0a0a0a'; g.beginPath(); g.ellipse(200, 215, 26, 44, 0, 0, 7); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.85)'; g.fillRect(0, 0, 400, 40); g.fillRect(0, 0, 70, 300); g.fillRect(330, 0, 70, 300);
+  G3.noise(1.4, 0.35, 90); G3.tone(240, 1.1, 'sawtooth', 0.13, 60); G3.tone(400, 0.9, 'square', 0.05, 90);
+}
+function end(won, who) {
+  running = false; S.over = true; if (document.pointerLockElement) document.exitPointerLock(); stopAmbience();
+  if (won) {
+    kit && kit.unlock('escape'); if (S.diff === 2) kit && kit.unlock('nightmare'); if (F && F.list().length) kit && kit.unlock('coop');
+    if (S.read.size >= Object.keys(NOTES).length) kit && kit.unlock('allnotes');
+    kit && kit.score(Math.round(S.t), ['story', 'normal', 'nightmare'][S.diff]);
+  }
+  const tm = `${Math.floor(S.t / 60)}:${String(Math.floor(S.t % 60)).padStart(2, '0')}`;
+  $('overText').innerHTML = won ? `<h2>Morning.</h2><p class="sub">${who ? esc(who) + ' made it through the door — and you follow, into grey dawn light.<br><br>' : ''}Behind you the manor is quiet at last. On the steps, Mira is sitting with her camera in her lap, blinking at the sun like she’s been asleep for three days.<br><br>“Ada? I had the strangest dream. There was a lady — she said <i>thank you</i>.”<br><br>Escaped in ${tm} · notes read ${S.read.size}/${Object.keys(NOTES).length}</p>` : `<h2>She found you.</h2><p class="sub">The lamps go out one by one. Somewhere upstairs a music box starts to play.<br><br>Mementos placed: ${S.placed}/5 · time ${tm}</p>`;
+  $('over').hidden = false;
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ================= ambience ================= */
+let amb = null;
+function startAmbience() {
+  try {
+    stopAmbience();
+    const ac = new (window.AudioContext || window.webkitAudioContext)(), o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+    o.type = 'sine'; o.frequency.value = 46; o2.type = 'triangle'; o2.frequency.value = 69.3; g.gain.value = 0.025; lfo.frequency.value = 0.07; lg.gain.value = 0.018;
+    lfo.connect(lg); lg.connect(g.gain); o.connect(g); o2.connect(g); g.connect(ac.destination); o.start(); o2.start(); lfo.start();
+    amb = { ac, g };
+  } catch {}
+}
+function stopAmbience() { if (amb) { try { amb.ac.close(); } catch {} amb = null; } }
+function creak() { G3.tone(140, 0.5, 'sawtooth', 0.03, 90); G3.noise(0.25, 0.04, 600); }
+
+/* ================= player ================= */
+function openNote(id) {
+  const [t, b] = NOTES[id]; $('noteT').textContent = t; $('noteB').innerHTML = b; $('note').hidden = false; uiOpen = 'note';
+  if (!S.read.has(id)) { S.read.add(id); kit && kit.unlock('note'); }
+  if (document.pointerLockElement) document.exitPointerLock();
+  G3.noise(0.25, 0.03, 3500);
+}
+let padVal = '';
+function openPad() {
+  padVal = ''; $('padShow').textContent = '____'; $('pad').hidden = false; uiOpen = 'pad'; if (document.pointerLockElement) document.exitPointerLock();
+}
+function padKey(k) {
+  if (k === '⌫') padVal = padVal.slice(0, -1); else if (k === 'OK') {
+    if (padVal === S.code.join('')) { $('pad').hidden = true; uiOpen = null; IN.pressed.clear(); ev({ t: 'safe' }); msg('Click. Inside: a <b>silver key</b> and an <b>old photograph</b>.', 4); G3.tone(880, 0.1, 'square', 0.04); }
+    else { padVal = ''; G3.tone(120, 0.25, 'square', 0.05); S.noise = 6; }
+  } else if (padVal.length < 4) { padVal += k; G3.tone(600 + +k * 40, 0.05, 'square', 0.03); }
+  $('padShow').textContent = (padVal + '____').slice(0, 4);
+}
+$('padKeys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK'].map(k => `<button data-k="${k}">${k}</button>`).join('');
+$('padKeys').onclick = e => { const b = e.target.closest('[data-k]'); if (b) padKey(b.dataset.k); };
+$('padX').onclick = () => { $('pad').hidden = true; uiOpen = null; IN.pressed.clear(); };
+$('noteX').onclick = () => { $('note').hidden = true; uiOpen = null; IN.pressed.clear(); };
+function closeUI() { $('note').hidden = true; $('pad').hidden = true; uiOpen = null; }
+addEventListener('keydown', e => {
+  if (uiOpen === 'pad') { if (/^[0-9]$/.test(e.key)) padKey(e.key); else if (e.key === 'Backspace') padKey('⌫'); else if (e.key === 'Enter') padKey('OK'); else if (e.key === 'Escape') $('padX').click(); e.stopPropagation(); }
+  else if (uiOpen === 'note' && (e.code === 'KeyE' || e.key === 'Escape' || e.key === 'Enter')) { setTimeout(() => $('noteX').click(), 0); }
+  else if (running && e.code === 'KeyJ' && S) journal();
+}, true);
+function journal() {
+  const rs = [...S.read]; if (!rs.length) { msg('Your journal is empty.', 2); return; }
+  $('noteT').textContent = 'Journal'; $('noteB').innerHTML = rs.map(id => `<p><b>${NOTES[id][0]}</b><br>${NOTES[id][1]}</p>`).join('<hr>') + (PAINTS.length && S.paintSeen ? `<hr><p><b>Paintings</b><br>${[...S.paintSeen].sort().map(i => `${ROMAN[i]}: ${PAINT_CLUES[i](S.code[i])}`).join('<br>')}</p>` : '');
+  $('note').hidden = false; uiOpen = 'note'; if (document.pointerLockElement) document.exitPointerLock();
+}
+function interact() {
+  const f = dirOf(camYaw), near = (x, z, r) => { const dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz); return d < r && (d < 0.9 || (dx * f[0] + dz * f[2]) / d > 0.3); };
+  if (S.hidden) return { label: 'Climb out', run: () => { const w = S.hidden; S.hidden = null; S.hidSeen = false; P.x = w.p[0] - w.wall[0] * 0.75; P.z = w.p[1] - w.wall[1] * 0.75; S.noise = 7; creak(); } };
+  let best = null, bs = -9;
+  for (const it of items) if (!it.taken && near(it.x, it.z, 1.9)) { const dx = it.x - P.x, dz = it.z - P.z, d = Math.hypot(dx, dz) || 1, sc = (dx * f[0] + dz * f[2]) / d - d * 0.15; if (sc > bs) { bs = sc; best = it; } }
+  if (best) { const it = best;
+    if (it.kind === 'note') return { label: 'Read', run: () => openNote(it.id) };
+    const nm = it.kind === 'key' ? `Take the ${it.id} key` : it.kind === 'mem' ? (it.id === 'diary' ? 'Take Eleanor’s diary' : `Take the ${MEM[it.id][0].toLowerCase()}`) : it.kind === 'fuse' ? 'Take the fuse' : 'Take lamp oil';
+    return { label: nm, run: () => { ev({ t: 'take', id: it.id }); G3.tone(it.kind === 'mem' ? 660 : 520, 0.12, 'triangle', 0.05, it.kind === 'mem' ? 880 : 520); S.noise = 3; if (it.kind === 'mem') msg(`${MEM[it.id][1]} ${MEM[it.id][0]}. <i>She will want this back.</i>`, 3); if (it.kind === 'key') msg(`The ${it.id} key.`, 2); if (it.kind === 'fuse') msg('A spare fuse.', 2); } };
+  }
+  for (const d of DOORS) if (!d.open && d.lock !== 'exit') { const c = center(d.t); if (near(c[0], c[1], 2.4)) {
+    if (d.lock === 'power') return { label: S.power ? 'Open' : 'The electric door is dead. No power.', run: () => {} };
+    if (has(d.lock)) return { label: `Unlock with the ${d.lock} key`, run: () => { ev({ t: 'door', id: d.id }); S.noise = 6; } };
+    return { label: `Locked (${d.lock} key)`, run: () => { G3.tone(90, 0.15, 'square', 0.03); S.noise = 3; } };
+  } }
+  { const c = center([16, 25]); if (near(c[0], c[1] - 1.2, 2.4)) return S.final ? { label: 'Escape!', run: () => ev({ t: 'win' }) } : { label: 'The front door won’t open.', run: () => { G3.noise(0.3, 0.06, 400); S.noise = 8; msg('It won’t budge. Banging on it was loud.', 2); } }; }
+  if (near(35.5 * TS, 23.3 * TS, 2.3)) return S.power ? null : S.fuse ? { label: 'Put the fuse in the box', run: () => { ev({ t: 'power' }); S.noise = 10; } } : { label: 'A fuse box. The fuse is burnt out.', run: () => {} };
+  if (!S.safe && near(19.5 * TS, 6.6 * TS, 2.2)) return { label: 'Try the safe', run: openPad };
+  if (S.safe && false) return null;
+  if (near(16.5 * TS, 1.9 * TS, 2.4)) { const n = memCount(); return S.final ? null : n ? { label: `Place ${n} memento${n > 1 ? 's' : ''} on the altar`, run: () => { ev({ t: 'place', ids: Object.keys(S.mems) }); G3.tone(523, 0.6, 'sine', 0.05, 524); if (!S.final) msg(`${S.placed}/5 — the candles burn a little brighter.`, 3); } } : { label: `An altar (${S.placed}/5 mementos)`, run: () => {} }; }
+  for (const p of PAINTS) if (near((p.tx + 0.5) * TS, 9.6, 2.2)) return { label: `Look at painting ${ROMAN[p.i]}`, run: () => { S.paintSeen = S.paintSeen || new Set(); S.paintSeen.add(p.i); msg(`<b>${ROMAN[p.i]}</b> — ${PAINT_CLUES[p.i](S.code[p.i])}.`, 5); } };
+  for (const w of WARDS) if (Math.hypot(P.x - w.p[0], P.z - w.p[1]) < 1.5) return { label: 'Hide in the wardrobe', run: () => { S.hidden = w; S.hidSeen = mon.active && mon.st === 'chase' && Math.hypot(P.x - mon.x, P.z - mon.z) < 14 && los(mon.x, mon.z, P.x, P.z); S.noise = 5; creak(); } };
+  return null;
+}
+function update(dt) {
+  const inp = IN.frame();
+  if (uiOpen) { IN.endFrame(); if (!F) return; }
+  else { camYaw -= inp.lookX * 0.0038; camPitch = clamp(camPitch - inp.lookY * 0.0034, -1.3, 1.2); }
+  S.t += dt; S.noise = Math.max(0, S.noise - dt * 20); S.flick = Math.max(0, S.flick - dt); S.downT = Math.max(0, S.downT - dt);
+  if (!uiOpen) {
+    if (IN.hit('KeyF') || IN.hit('Btnlight')) { S.light = !S.light && S.oil > 0; G3.tone(700, 0.03, 'square', 0.02); }
+    if (IN.hit('KeyC') || IN.hit('ControlLeft') || IN.hit('Btncrouch')) S.crouch = !S.crouch;
+    const u = S.downT > 0 ? null : interact(); $('prompt').textContent = u ? (IN.touch ? '' : 'E: ') + u.label : '';
+    if (u && (IN.hit('KeyE') || IN.hit('Btnuse') || IN.hit('Tap'))) u.run();
+  } else $('prompt').textContent = '';
+  if (S.light) { S.oil = Math.max(0, S.oil - dt * [0.55, 0.75, 0.95][S.diff]); if (S.oil <= 0) { S.light = false; msg('The lamp sputters out. Find oil.', 2.5); } }
+  if (!S.hidden && !uiOpen && S.downT <= 0) {
+    const f = dirOf(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+    let mx = rx * inp.mx + f[0] * -inp.mz, mz = rz * inp.mx + f[2] * -inp.mz; const ml = Math.hypot(mx, mz);
+    const run = (inp.run || IN.down('run')) && S.stam > 5 && !S.crouch && ml > 0.1;
+    const sp = S.crouch ? 1.6 : run ? 5.2 : 3.0;
+    if (ml > 0.05) { mx /= Math.max(1, ml); mz /= Math.max(1, ml); P.walk += dt * (run ? 11 : 7); }
+    P.vx = mx * sp; P.vz = mz * sp;
+    S.stam = clamp(S.stam + (run ? -18 : 11) * dt, 0, 100);
+    if (run) S.noise = Math.max(S.noise, 14); else if (ml > 0.1 && !S.crouch) S.noise = Math.max(S.noise, 3.5);
+    if (ml > 0.1 && Math.floor(P.walk / Math.PI) !== Math.floor((P.walk - dt * 8) / Math.PI)) { G3.noise(0.05, S.crouch ? 0.004 : run ? 0.03 : 0.012, 1400); if (Math.random() < 0.04) creak(); }
+    G3.moveBody(P, dt, boxesNear(P.x, P.z), () => 0);
+  } else { P.vx = P.vz = 0; }
+  if (F && !F.isHost && S.noise > 10 && (S.nSend = (S.nSend || 0) - dt) <= 0) { S.nSend = 0.5; F.shout({ n: [P.x, P.z] }); }
+  updMonster(dt);
+  msgT -= dt; if (msgT <= 0) $('msg').style.opacity = 0;
+  $('ward').style.display = S.hidden ? 'block' : 'none';
+  IN.endFrame();
+}
+function render(now) {
+  if (!R) return;
+  const bob = Math.sin(P.walk) * (S.crouch ? 0.02 : 0.045), eyeY = S.hidden ? 1.6 : (S.crouch ? 0.95 : 1.62) + bob;
+  const eye = S.hidden ? [S.hidden.p[0], eyeY, S.hidden.p[1]] : [P.x, eyeY, P.z], yaw = S.hidden ? Math.atan2(S.hidden.wall[0], S.hidden.wall[1]) : camYaw, pitch = S.hidden ? 0 : camPitch;
+  const f = dirOf(yaw, pitch), md = mon.active ? Math.hypot(P.x - mon.x, P.z - mon.z) : 99;
+  const flickNow = S.flick > 0 || (md < 9 && Math.random() < 0.18);
+  const lights = [];
+  for (const l of staticLights) {
+    if (l.candle) { const k = 0.85 + Math.sin(now * 0.011 + l.p[0]) * 0.1 + Math.random() * 0.05; lights.push({ p: l.p, c: [l.c[0] * k, l.c[1] * k, l.c[2] * k], r: l.r }); }
+    else if (S.power && !flickNow) lights.push({ p: l.p, c: l.c, r: l.r });
+  }
+  if (S.placed) lights.push({ p: [16.5 * TS, 1.6, 1.5 * TS], c: [0.6 + S.placed * 0.1, 0.5, 0.9], r: 6 + S.placed });
+  if (S.final) { const c = center([16, 24]); lights.push({ p: [c[0], 2, c[1]], c: [1, 0.85, 0.6], r: 10 }); }
+  if (mon.active && mon.st !== 'gone') lights.push({ p: [mon.x, 2.2, mon.z], c: [0.25, 0.12, 0.4], r: 3 });
+  const lamp = S.light && S.oil > 0 && !S.hidden, lk = S.oil < 15 ? (Math.random() < 0.12 ? 0.3 : 1) : 1;
+  if (lamp) lights.push({ p: [eye[0] + f[0] * 0.4, eye[1] - 0.3, eye[2] + f[2] * 0.4], c: [1.0 * lk, 0.72 * lk, 0.4 * lk], r: 9 });
+  const dark = !S.power;
+  R.begin({ eye, yaw, pitch, fov: 1.2, far: 70 }, { sky: '#000000', fog: [1.5, lamp ? 20 : dark ? 8 : 16], fogCol: '#030205', sun: [0.3, 1, 0.2], sunCol: [0, 0, 0], amb: dark ? [0.03, 0.03, 0.045] : [0.06, 0.055, 0.06], hemi: [[1, 1, 1], [0.6, 0.6, 0.6]], spec: 0.25, rim: 0, lights,
+    flash: lamp ? { p: [eye[0] + f[0] * 0.2, eye[1] - 0.2, eye[2] + f[2] * 0.2], d: f, c: [0.9 * lk, 0.7 * lk, 0.45 * lk], range: 16 } : null });
+  R.draw(mesh);
+  // doors
+  for (const d of DOORS) {
+    const [x, y] = d.t, x0 = x * TS, z0 = y * TS, col = d.lock ? LOCKCOL[d.lock] : '#4a3020';
+    if (!d.lock) continue;
+    if (!d.open) {
+      const b = d.vert ? [x0 + 0.6, 0, z0 + TS / 2 - 0.08, x0 + TS - 0.6, 2.5, z0 + TS / 2 + 0.08] : [x0 + TS / 2 - 0.08, 0, z0 + 0.6, x0 + TS / 2 + 0.08, 2.5, z0 + TS - 0.6];
+      R.box(...b, d.lock === 'exit' ? '#3f1d1d' : '#4a3020');
+      const cx = x0 + TS / 2, cz = z0 + TS / 2; R.box(cx - 0.12, 1.05, cz - 0.12, cx + 0.12, 1.3, cz + 0.12, col, 1, d.lock === 'power' ? 0.6 : 0.25);
+    } else { // swung open against the frame
+      const b = d.vert ? [x0 + 0.6, 0, z0 + 0.6, x0 + 0.76, 2.5, z0 + TS / 2 + 0.1] : [x0 + 0.6, 0, z0 + 0.6, x0 + TS / 2 + 0.1, 2.5, z0 + 0.76];
+      R.box(...b, d.lock === 'exit' ? '#3f1d1d' : '#4a3020');
+    }
+  }
+  // items
+  for (const it of items) if (!it.taken) {
+    const sp = now * 0.001;
+    if (it.kind === 'note') R.cube(M.chain(M.T(it.x, it.y + 0.01, it.z), M.RY(0.4), M.S(0.22, 0.01, 0.3)), it.col, 1, 0.25);
+    else if (it.kind === 'key') { R.cube(M.chain(M.T(it.x, it.y + 0.03, it.z), M.RY(sp), M.S(0.22, 0.03, 0.05)), it.col, 1, 0.5); R.glow([it.x, it.y + 0.1, it.z], 0.35, G3.hex(it.col), 0.35); }
+    else if (it.kind === 'mem') { const y = it.y + 0.12 + Math.sin(sp * 2) * 0.03; R.cube(M.chain(M.T(it.x, y, it.z), M.RY(sp * 0.8), M.S(0.16, 0.16, 0.16)), it.col, 1, 0.6); R.glow([it.x, y, it.z], 0.7, [0.7, 0.55, 1], 0.4); }
+    else if (it.kind === 'fuse') { R.cube(M.chain(M.T(it.x, it.y + 0.05, it.z), M.RY(0.7), M.S(0.09, 0.09, 0.24)), it.col, 1, 0.4); }
+    else if (it.kind === 'oil') { R.box(it.x - 0.12, 0, it.z - 0.08, it.x + 0.12, 0.32, it.z + 0.08, '#65a30d', 1, 0.15); R.box(it.x - 0.03, 0.32, it.z - 0.03, it.x + 0.03, 0.4, it.z + 0.03, '#3f3f46'); }
+  }
+  // fixtures: fuse box, safe, candles
+  R.box(35.85 * TS, 1.1, 23.1 * TS, 36 * TS, 1.9, 23.6 * TS, S.power ? '#16a34a' : '#52525b', 1, S.power ? 0.5 : 0);
+  R.box(19.85 * TS, 0.9, 6.3 * TS, 20 * TS, 1.6, 6.9 * TS, S.safe ? '#1c1917' : '#3f3f46');
+  for (const l of staticLights) if (l.candle) { R.box(l.p[0] - 0.03, l.p[1] - 0.25, l.p[2] - 0.03, l.p[0] + 0.03, l.p[1] - 0.05, l.p[2] + 0.03, '#f5f5f4'); R.glow([l.p[0], l.p[1], l.p[2]], 0.35, [1, 0.6, 0.25], 0.8); }
+  for (const p of PAINTS) if (S.power) R.glow([(p.tx + 0.5) * TS, 2.7, 8.9], 0.5, [1, 0.85, 0.6], 0.3);
+  if (S.placedSet) [...S.placedSet].forEach((k, i) => { const x = (15.4 + i * 0.55) * TS, y = 1.15; R.cube(M.chain(M.T(x, y, 1.4 * TS), M.S(0.14, 0.14, 0.14)), items.find(it => it.id === k) ? items.find(it => it.id === k).col : '#e5e7eb', 1, 0.8); R.glow([x, y, 1.4 * TS], 0.5, [0.8, 0.7, 1], 0.5); });
+  // the Widow: floating black dress, veil, long pale hands
+  if (mon.active && mon.st !== 'gone') {
+    const fl = 0.15 + Math.sin(mon.bob) * 0.08, b = M.chain(M.T(mon.x, fl, mon.z), M.RY(mon.yaw)), dress = [0.06, 0.05, 0.08], pale = [0.85, 0.83, 0.86];
+    for (let i = 0; i < 5; i++) { const w = 0.75 - i * 0.1; R.cube(M.chain(b, M.T(0, 0.25 + i * 0.32, 0), M.RY(Math.sin(mon.bob + i) * 0.08), M.S(w, 0.34, w * 0.8)), dress); }
+    R.cube(M.chain(b, M.T(0, 1.95, 0), M.S(0.42, 0.5, 0.3)), dress);
+    for (const sx of [-0.27, 0.27]) { const a = mon.st === 'chase' ? -1.25 : -0.15; R.cube(M.chain(b, M.T(sx, 2.1, 0), M.RX(a), M.T(0, -0.55, 0), M.S(0.09, 1.1, 0.09)), dress); R.cube(M.chain(b, M.T(sx, 2.1, 0), M.RX(a), M.T(0, -1.18, 0), M.S(0.1, 0.22, 0.06)), pale); }
+    R.cube(M.chain(b, M.T(0, 2.45, 0), M.S(0.3, 0.36, 0.28)), pale);
+    R.cube(M.chain(b, M.T(0, 2.5, 0.02), M.S(0.38, 0.5, 0.34)), [0.08, 0.07, 0.1], 0.75);
+    for (const sx of [-0.07, 0.07]) R.cube(M.chain(b, M.T(sx, 2.48, -0.16), M.S(0.06, 0.03, 0.01)), [0.75, 0.6, 1], 1, 1);
+    R.glow([mon.x, 2.5 + fl, mon.z], 0.6, [0.5, 0.3, 0.9], mon.st === 'chase' ? 0.6 : 0.3);
+  }
+  if (F) F.draw(R, o => ({ hold: o.t.lit ? '#f59e0b' : null }), o => !o.t.hid);
+  R.end();
+  if (!S.hidden && lamp) R.viewModel({ eye, yaw, pitch }, { walk: P.walk, speed: Math.hypot(P.vx, P.vz) / 3, hold: '#3f3f46', holdLen: 0.18, holdHead: [0.16, 0.2, 0.16], holdHeadCol: [1, 0.7, 0.3], holdGlow: 0.9 });
+}
+let hudT = 0;
+function hud(dt) {
+  if ((hudT -= dt) > 0) return; hudT = 0.15;
+  const [o, h] = objective(), rm = roomAt(P.x, P.z);
+  $('obj').innerHTML = `${o}<small>${h}${rm && rm.n && rm.id !== 'door' ? ' · ' + rm.n : ''}</small>`;
+  const bar = (v, c) => `<div class="bar"><i style="width:${v}%;background:${c}"></i></div>`;
+  $('bars').innerHTML = `🪔 lamp oil${bar(S.oil, '#f59e0b')}stamina${bar(S.stam, '#a8a29e')}${S.crouch ? 'crouching' : ''}${!F && S.lives > 1 ? `<div>❤ ${S.lives}</div>` : ''}${F ? `<div>🌐 ${F.list().length + 1} in the house</div>` : ''}`;
+  const inv = []; for (const k of ['brass', 'iron', 'silver']) if (has(k) && !(DOORS.find(d => d.lock === k) || {}).open) inv.push(`<span title="${k} key">🗝️</span>`);
+  if (S.fuse && !S.power) inv.push('<span title="fuse">🔌</span>');
+  for (const k in S.mems) inv.push(`<span title="${MEM[k][0]}">${MEM[k][1]}</span>`);
+  $('inv').innerHTML = inv.join('');
+  $('journal').textContent = S.read.size ? `J: journal (${S.read.size}/${Object.keys(NOTES).length} notes)` : '';
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!running) return;
+  if (!S.over) update(dt);
+  render(now); hud(dt);
+  if (F && R) { F.send({ x: P.x, y: 0, z: P.z, gy: 0, yaw: camYaw, spd: Math.min(1, Math.hypot(P.vx, P.vz) / 3), label: memCount() ? MEM[Object.keys(S.mems)[0]][1] : '', hid: S.hidden ? 1 : 0, lit: S.light ? 1 : 0, cr: S.crouch ? 1 : 0, dead: S.over ? 1 : 0 }); F.update(dt); F.tags(R, $('tags'), o => !o.t.hid); }
+}
+document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => start(+b.dataset.d));
+$('bOnline').onclick = goOnline;
+if (/[?&](join|online)=/.test(location.search)) setTimeout(goOnline, 600);
+$('again').onclick = () => start(S ? S.diff : 1);
+$('toMenu').onclick = () => { $('over').hidden = true; $('menu').hidden = false; $('touch').classList.remove('on'); };
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
+requestAnimationFrame(frame);
+window.GL3D && GL3D.fullscreenButton();
+window.__manor = { boxesNear, start, ev, interact, update, bfs, los, walkable, center, tileOf, padKey, get S() { return S; }, get P() { return P; }, get mon() { return mon; }, get items() { return items; }, DOORS, WARDS, get PAINTS() { return PAINTS; }, setCam: (y, p) => { camYaw = y; camPitch = p; }, objective, render: () => render(performance.now()) };
+})();
+</script>
+</body></html>

@@ -151,7 +151,9 @@
       bannerT -= dt;
       o.hud && o.hud(`Level ${li + 1}/${game.levels.length} · 🪙 ${coins}${set.win === 'coins' ? '/' + totalCoins : ''}${keys ? ' · 🔑 ' + keys : ''}`, `${lives === Infinity ? '' : '❤️ ' + lives + ' · '}⏱ ${timeLeft ? Math.ceil(timeLeft) + 's' : Math.floor(levelT) + 's'}`, state === 'count' ? (countT > 0 ? Math.ceil(countT) : 'GO!') : bannerT > 0 ? bannerTxt : '');
       if (R) {
-        const th = SKIES[set.theme] || SKIES[0];
+        const lvd = game.levels[li] && game.levels[li].dark, dk = lvd != null && lvd !== '' ? +lvd : (+set.dark || 0);
+        let th = SKIES[set.theme] || SKIES[0];
+        if (dk > 0) { const f = GL3D.dirOf(cam.yaw || 0, cam.pitch || 0), k = [1, .55, .3, .14][dk]; th = Object.assign({}, th, { skyTop: '#020208', skyHorizon: '#0b0a18', sky: '#05040c', stars: 1, clouds: 0, amb: [.4 * k, .4 * k, .5 * k], sunCol: [.3 * k, .3 * k, .4 * k], fog: [3, [160, 60, 34, 20][dk]], fogCol: '#05040c', flash: { p: cam.eye, d: f, c: [1.2, 1.1, .9], range: 26 } }); }
         W.render(cam, Object.assign({ fog: [60, 160], view: 120 }, th), r => {
           for (const t of teles) { r.box(t.x - 0.7, 0.01, t.z - 0.7, t.x + 0.7, 0.08, t.z + 0.7, '#a78bfa', 1, 0.8); r.glow([t.x, 0.6, t.z], 1.4, [0.6, 0.4, 1], 0.5); }
           for (const d of doors) if (!d.open) r.glow([d.x, 2.2, d.z], 1.2, [1, 0.8, 0.3], 0.25);

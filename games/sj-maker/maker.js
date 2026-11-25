@@ -133,8 +133,15 @@ function levelMenu() {
     <div class="row"><button id="lAdd">＋ New level</button><button id="lDup">⧉ Duplicate</button><button id="lDel" class="warn" ${game.levels.length < 2 ? 'disabled' : ''}>🗑 Delete</button></div>
     <div class="row"><button id="lLeft" ${li === 0 ? 'disabled' : ''}>◀ Move earlier</button><button id="lRight" ${li === game.levels.length - 1 ? 'disabled' : ''}>Move later ▶</button></div>
     <h4>Size</h4><div class="row">Width <button data-rs="w-10">−10</button><button data-rs="w10">+10</button> &nbsp; Height <button data-rs="h-2">−2</button><button data-rs="h2">+2</button></div>
+    <h4>This level</h4>
+    <div class="row">Lighting <select id="lDark"><option value="">Same as game</option>${['☀️ Day', '🌆 Dusk', '🌙 Dark', '⚫ Pitch black'].map((n, i) => `<option value="${i}" ${String(lv.dark) === String(i) ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      Weather <select id="lWx"><option value="">Same as game</option>${[['none', 'Clear'], ['rain', '🌧 Rain'], ['snow', '❄️ Snow'], ['leaves', '🍂 Leaves'], ['embers', '🔥 Embers'], ['fog', '🌫 Fog']].map(([v, n]) => `<option value="${v}" ${lv.weather === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="row"><button id="lStory">📖 Story before this level${lv.story ? ' ✓' : ''}</button></div>
     <div class="row"><button id="lClear">Clear level</button><span class="sp"></span><button id="lX" class="pri">Done</button></div>`);
   $('lX').onclick = closeDialog;
+  $('lDark').onchange = e => { if (e.target.value === '') delete L().dark; else L().dark = +e.target.value; persist(); };
+  $('lWx').onchange = e => { const v = e.target.value; if (v === '') delete L().weather; else L().weather = v === 'none' ? '' : v; if (v === 'none') L().weather = 'none'; persist(); };
+  $('lStory').onclick = () => textDialog(`Level ${li + 1} story`, 'Shown before this level starts.', L().story || '', v => { L().story = v; persist(); levelMenu(); });
   $('lAdd').onclick = () => { if (game.levels.length >= 30) return toast('30 levels max'); game.levels.splice(li + 1, 0, E.blankLevel(40, game.template === 'topdown' ? 14 : 15, game.template)); li++; done(); if (game.levels.length >= 5) kit && kit.unlock('levels5'); };
   $('lDup').onclick = () => { if (game.levels.length >= 30) return toast('30 levels max'); game.levels.splice(li + 1, 0, JSON.parse(JSON.stringify(L()))); li++; done(); };
   $('lDel').onclick = () => { if (game.levels.length < 2 || !confirm('Delete this level?')) return; game.levels.splice(li, 1); li = Math.max(0, li - 1); done(); };
@@ -165,8 +172,12 @@ function drawEditor() {
   E.drawBackground(eg, game.settings.theme, ed.width, ed.height, 0, 0);
   if (game.template === 'topdown') { eg.fillStyle = 'rgba(0,0,0,.25)'; eg.fillRect(0, 0, ed.width, ed.height); }
   for (let y = 0; y < lv.h; y++) for (let x = 0; x < lv.w; x++) { const c = lv.tiles[y * lv.w + x]; if (c !== '.') E.drawTile(eg, c, x * s, y * s, s, game.sprites, 0); if (c !== 'N' && E.TALK.has(c) && (lv.signs || {})[y * lv.w + x]) { eg.font = `${Math.round(s * .45)}px system-ui`; eg.fillText('💬', x * s + s * .55, y * s + s * .35); } }
-  eg.strokeStyle = 'rgba(255,255,255,.12)'; eg.lineWidth = 1;
+  eg.strokeStyle = showGrid ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,0)'; eg.lineWidth = 1;
   eg.beginPath(); for (let x = 0; x <= lv.w; x++) { eg.moveTo(x * s + .5, 0); eg.lineTo(x * s + .5, ed.height); } for (let y = 0; y <= lv.h; y++) { eg.moveTo(0, y * s + .5); eg.lineTo(ed.width, y * s + .5); } eg.stroke();
+  if (!showGrid) { /* grid hidden: redraw tiles area without lines is handled by skipping the stroke above */ }
+  if (sel) { eg.save(); eg.setLineDash([6, 4]); eg.strokeStyle = '#22d3ee'; eg.lineWidth = 2; eg.strokeRect(sel[0] * s + 1, sel[1] * s + 1, (sel[2] - sel[0] + 1) * s - 2, (sel[3] - sel[1] + 1) * s - 2); eg.fillStyle = 'rgba(34,211,238,.08)'; eg.fillRect(sel[0] * s, sel[1] * s, (sel[2] - sel[0] + 1) * s, (sel[3] - sel[1] + 1) * s); eg.restore(); }
+  if (tool === 'paste' && clip && hoverCell) { eg.globalAlpha = .55; for (let y = 0; y < clip.h; y++) for (let x = 0; x < clip.w; x++) { const c = clip.t[y * clip.w + x]; if (c !== '.' && c !== 'P') E.drawTile(eg, c, (hoverCell[0] + x) * s, (hoverCell[1] + y) * s, s, game.sprites, 0); } eg.globalAlpha = 1; eg.strokeStyle = '#22d3ee'; eg.lineWidth = 2; eg.strokeRect(hoverCell[0] * s, hoverCell[1] * s, clip.w * s, clip.h * s); }
+  if (lineStart && hoverCell) { eg.fillStyle = lineErase ? 'rgba(248,113,113,.4)' : 'rgba(253,224,71,.35)'; for (const [x, y] of lineCells(lineStart, hoverCell)) eg.fillRect(x * s, y * s, s, s); }
   if (rectStart && hoverCell) { const [ax, ay] = rectStart, [bx, by] = hoverCell; eg.strokeStyle = '#fde047'; eg.lineWidth = 2; eg.strokeRect(Math.min(ax, bx) * s, Math.min(ay, by) * s, (Math.abs(bx - ax) + 1) * s, (Math.abs(by - ay) + 1) * s); }
   else if (hoverCell && tool !== 'pan') { eg.strokeStyle = tool === 'erase' ? '#f87171' : '#fde047'; eg.lineWidth = 2; eg.strokeRect(hoverCell[0] * s + 1, hoverCell[1] * s + 1, s - 2, s - 2); }
 }
@@ -189,6 +200,10 @@ ed.addEventListener('pointerdown', e => {
   try { ed.setPointerCapture(e.pointerId); } catch {}
   const cell = cellOf(e), erase = e.button === 2 || tool === 'erase';
   if (tool === 'pan' || e.button === 1 || spaceDown) { panning = { x: e.clientX, y: e.clientY, sl: $('editWrap').scrollLeft, st: $('editWrap').scrollTop }; return; }
+  if ((tool === 'pick' || e.altKey) && !erase) { const c = L().tiles[cell[1] * L().w + cell[0]]; if (c && c !== '.') { brush = c; renderPalette(); toast('Picked: ' + (E.TILES[c] ? E.TILES[c][0] : c)); } if (tool === 'pick') setTool('pen'); return; }
+  if (tool === 'paste' && clip) { if (erase) { setTool('select'); drawEditor(); return; } snapshot(); pasteAt(cell); afterEdit(); return; }
+  if (tool === 'select') { selStart = cell; sel = null; selBar(); return; }
+  if (tool === 'line') { lineStart = cell; lineErase = erase; return; }
   if (tool === 'fill' && !erase) { snapshot(); bucket(cell, brush); afterEdit(); return; }
   if (tool === 'rect') { rectStart = cell; rectErase = erase; return; }
   snapshot(); painting = erase ? '.' : brush; lastCell = null; paintAt(cell);
@@ -197,11 +212,13 @@ let rectErase = false;
 ed.addEventListener('pointermove', e => {
   const cell = cellOf(e);
   if (panning) { $('editWrap').scrollLeft = panning.sl - (e.clientX - panning.x); $('editWrap').scrollTop = panning.st - (e.clientY - panning.y); return; }
-  if (!hoverCell || hoverCell[0] !== cell[0] || hoverCell[1] !== cell[1]) { hoverCell = cell; if (painting) paintAt(cell); drawEditor(); }
+  if (!hoverCell || hoverCell[0] !== cell[0] || hoverCell[1] !== cell[1]) { hoverCell = cell; if (painting) paintAt(cell); if (selStart) sel = normRect(selStart, cell); drawEditor(); }
 });
 ed.addEventListener('pointerleave', () => { hoverCell = null; drawEditor(); });
 addEventListener('pointerup', () => {
   if (panning) { panning = null; return; }
+  if (selStart) { sel = normRect(selStart, hoverCell || selStart); selStart = null; selBar(); drawEditor(); return; }
+  if (lineStart) { const end = hoverCell || lineStart; snapshot(); const ch = lineErase ? '.' : brush; for (const [x, y] of lineCells(lineStart, end)) setCell(x, y, ch === 'P' ? '.' : ch); if (ch === 'P') setCell(end[0], end[1], 'P'); lineStart = null; afterEdit(); return; }
   if (rectStart && hoverCell) {
     snapshot(); const [ax, ay] = rectStart, [bx, by] = hoverCell, ch = rectErase ? '.' : brush;
     for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) setCell(x, y, ch === 'P' ? '.' : ch);
@@ -235,7 +252,7 @@ function bucket([x, y], ch) {
   lv.tiles = t.join('');
 }
 function afterEdit() { persist(); drawEditor(); }
-function setTool(t) { tool = t; document.querySelectorAll('.tool').forEach(b => b.classList.toggle('on', b.dataset.tool === t)); ed.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; }
+function setTool(t) { tool = t; if (t !== 'select' && t !== 'paste') { sel = null; selStart = null; } selBar(); document.querySelectorAll('.tool').forEach(b => b.classList.toggle('on', b.dataset.tool === t)); ed.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; }
 document.querySelectorAll('.tool').forEach(b => b.onclick = () => setTool(b.dataset.tool));
 $('undo').onclick = () => { if (!undo.length) return; redo.push(JSON.stringify(L())); game.levels[li] = JSON.parse(undo.pop()); afterEdit(); };
 $('redo').onclick = () => { if (!redo.length) return; undo.push(JSON.stringify(L())); game.levels[li] = JSON.parse(redo.pop()); afterEdit(); };
@@ -248,9 +265,122 @@ addEventListener('keydown', e => {
   if (e.code === 'Space') { spaceDown = true; e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); $('undo').click(); }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); $('redo').click(); }
-  const k = { b: 'pen', e: 'erase', r: 'rect', f: 'fill' }[e.key]; if (k && !e.ctrlKey) setTool(k);
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key === 'c' && sel) { e.preventDefault(); copySel(false); return; }
+  if (mod && e.key === 'x' && sel) { e.preventDefault(); copySel(true); return; }
+  if (mod && e.key === 'v' && clip) { e.preventDefault(); setTool('paste'); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); clearSel(); return; }
+  if (e.key === 'Escape') { sel = null; if (tool === 'paste') setTool('select'); selBar(); drawEditor(); return; }
+  if (!mod && e.key === 'g') { showGrid = !showGrid; drawEditor(); return; }
+  if (!mod && e.key === 't') { playHere(); return; }
+  const k = { b: 'pen', e: 'erase', r: 'rect', f: 'fill', l: 'line', s: 'select', i: 'pick' }[e.key]; if (k && !mod) setTool(k);
 });
 addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
+
+/* ---------------- v3 editor tools: line, select / copy / paste / flip, eyedropper, grid, play from here ---------------- */
+let sel = null, selStart = null, clip = null, lineStart = null, lineErase = false, showGrid = true;
+const normRect = (a, b) => { const lv = L(), cl = (v, m) => Math.max(0, Math.min(m - 1, v)); return [cl(Math.min(a[0], b[0]), lv.w), cl(Math.min(a[1], b[1]), lv.h), cl(Math.max(a[0], b[0]), lv.w), cl(Math.max(a[1], b[1]), lv.h)]; };
+function lineCells(a, b) { const out = []; let [x0, y0] = a; const [x1, y1] = b, dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy; for (let n = 0; n < 500; n++) { out.push([x0, y0]); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } } return out; }
+function copySel(cut) {
+  if (!sel) return; const lv = L(), [x0, y0, x1, y1] = sel, w = x1 - x0 + 1, h = y1 - y0 + 1; let t = '';
+  const signs = {}; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = y * lv.w + x; t += lv.tiles[k]; if (lv.signs && lv.signs[k]) signs[(y - y0) * w + (x - x0)] = lv.signs[k]; }
+  clip = { w, h, t, signs }; toast(`${cut ? 'Cut' : 'Copied'} ${w}×${h} — Ctrl+V or 📋 Paste, then click to place`);
+  if (cut) clearSel(); selBar();
+}
+function clearSel() { if (!sel) return; snapshot(); const [x0, y0, x1, y1] = sel; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (L().tiles[y * L().w + x] !== 'P') setCell(x, y, '.'); afterEdit(); }
+function fillSel() { if (!sel) return; snapshot(); const [x0, y0, x1, y1] = sel; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (L().tiles[y * L().w + x] !== 'P' && brush !== 'P') setCell(x, y, brush); afterEdit(); }
+function flipSel(horiz) {
+  if (!sel) return; snapshot(); const lv = L(), [x0, y0, x1, y1] = sel, t = lv.tiles.split(''), src = t.slice();
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const fx = horiz ? x1 - (x - x0) : x, fy = horiz ? y : y1 - (y - y0); let c = src[fy * lv.w + fx]; if (horiz) c = c === '>' ? '<' : c === '<' ? '>' : c; t[y * lv.w + x] = c; }
+  lv.tiles = t.join(''); afterEdit();
+}
+function pasteAt([cx, cy]) { const lv = L(); for (let y = 0; y < clip.h; y++) for (let x = 0; x < clip.w; x++) { const c = clip.t[y * clip.w + x]; if (c === 'P') continue; if (setCell(cx + x, cy + y, c) && clip.signs[y * clip.w + x] != null) { lv.signs = lv.signs || {}; lv.signs[(cy + y) * lv.w + cx + x] = clip.signs[y * clip.w + x]; } } }
+function selBar() {
+  const hb = $('hintBar'); if (!hb) return;
+  if (tool === 'paste' && clip) { hb.className = 'selbar'; hb.innerHTML = `📋 Click to stamp the ${clip.w}×${clip.h} copy (as many times as you like). <button data-sb="done">Done</button>`; }
+  else if (sel) { const [x0, y0, x1, y1] = sel; hb.className = 'selbar'; hb.innerHTML = `<b>${x1 - x0 + 1}×${y1 - y0 + 1} selected</b> <button data-sb="copy">⧉ Copy</button><button data-sb="cut">✂ Cut</button><button data-sb="paste" ${clip ? '' : 'disabled'}>📋 Paste</button><button data-sb="fill">🪣 Fill with block</button><button data-sb="fh">↔ Flip</button><button data-sb="fv">↕ Flip</button><button data-sb="del">🗑 Clear</button><button data-sb="none">✕</button>`; }
+  else { hb.className = ''; hb.textContent = 'Pick a block on the left, then click or drag on the grid to place it. Right-click erases. Alt+click picks a block. ⬚ selects an area to copy or move. T plays from the mouse. Press ▶ to try it.'; }
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-sb]'); if (!b) return; const k = b.dataset.sb; if (k === 'copy') copySel(false); else if (k === 'cut') copySel(true); else if (k === 'paste') setTool('paste'); else if (k === 'fill') fillSel(); else if (k === 'fh') flipSel(true); else if (k === 'fv') flipSel(false); else if (k === 'del') clearSel(); else if (k === 'none') { sel = null; selBar(); drawEditor(); } else if (k === 'done') setTool('select'); });
+$('gridBtn').onclick = () => { showGrid = !showGrid; drawEditor(); };
+function playHere() {
+  const c = hoverCell || lastHover; if (!c) { toast('Point at a spot on the level first, then press T.'); return; }
+  const g2 = JSON.parse(JSON.stringify(game)), lv = g2.levels[li], k = c[1] * lv.w + c[0];
+  if (c[0] < 0 || c[1] < 0 || c[0] >= lv.w || c[1] >= lv.h) return;
+  if (E.SOLID.has(lv.tiles[k])) { toast('That spot is inside a block — pick an empty one.'); return; }
+  lv.tiles = lv.tiles.replace(/P/g, '.'); lv.tiles = lv.tiles.slice(0, k) + 'P' + lv.tiles.slice(k + 1); delete lv.story;
+  startPlay(g2, { test: true, startLevel: li });
+}
+let lastHover = null; ed.addEventListener('pointermove', () => { if (hoverCell) lastHover = hoverCell; });
+$('hereBtn').onclick = () => { if (!lastHover) { const lv = L(); lastHover = [Math.floor(($('editWrap').scrollLeft + $('editWrap').clientWidth / 2) / (TS * zoom)), Math.floor(lv.h / 2)]; } playHere(); };
+
+/* ---------------- v3: check my game ---------------- */
+function checkGame() {
+  const out = [], s = game.settings, add = (lvl, txt) => out.push([lvl, txt]);
+  game.levels.forEach((lv, i) => {
+    const n = ch => lv.tiles.split(ch).length - 1, tag = `Level ${i + 1}: `;
+    if (s.win === 'goal' && !n('G') && game.template !== '3d') add('bad', tag + 'there is no 🚩 goal flag, so it can’t be finished.');
+    if (s.win === 'goal' && game.template === '3d' && !n('G')) add('bad', tag + 'no goal flag.');
+    if (s.win === 'coins' && !n('C') && !n('?')) add('bad', tag + 'you win by collecting coins, but there are none.');
+    if (s.win === 'enemies' && !['E', 'F', 'Z', 'e', 'Y', 'Q', '%', 'ï', 'Ç', 'Ø', 'Ü', 'Ö', 'ð'].some(c => n(c))) add('bad', tag + 'you win by beating enemies, but there are none.');
+    if (n('D') > n('K')) add('warn', tag + `${n('D')} locked doors but only ${n('K')} keys.`);
+    if (n('T') === 1) add('warn', tag + 'only one teleporter — they need a partner.');
+    if (n(']') === 1) add('warn', tag + 'only one warp pipe — it needs a partner.');
+    if (n('!') === 0 && (n('U') || n('R'))) add('warn', tag + 'red/blue blocks but no switch to swap them.');
+    if (n('ð') && !(lv.dark != null ? +lv.dark : +s.dark)) add('warn', tag + 'shadows are scarier with Lighting set to Dark.');
+    const P = lv.tiles.indexOf('P'), px = P % lv.w, py = Math.floor(P / lv.w);
+    if (game.template === 'platformer' && P >= 0) { let ok = false; for (let y = py + 1; y < lv.h; y++) { const c = lv.tiles[y * lv.w + px]; if (E.SOLID.has(c) || '-c_h|'.includes(c)) { ok = true; break; } if (c === 'L' || c === 'S') break; } if (!ok) add('warn', tag + 'the player starts above a pit — they’ll fall straight away.'); }
+    for (const [k, v] of Object.entries(lv.signs || {})) if (!String(v).trim()) add('warn', tag + 'a sign or character has no text.');
+    if (lv.w * lv.h > 4000 && game.template === '3d') add('warn', tag + 'very big for 3D — it may run slowly on phones.');
+  });
+  if (!game.title || game.title === 'My game') add('warn', 'Give your game a name.');
+  if (game.levels.length === 1) add('ok', 'Tip: games with 3+ levels get more plays.');
+  if (!+s.music && s.music !== 'custom') add('ok', 'Tip: add music under Settings → Mood.');
+  const bad = out.filter(o => o[0] === 'bad').length;
+  dialog(`<h2>${bad ? '⚠️ ' + bad + ' problem' + (bad > 1 ? 's' : '') : '✅ Looks good!'}</h2><ul class="chk">${out.length ? out.map(([l, t]) => `<li class="${l}">${l === 'bad' ? '❌' : l === 'warn' ? '⚠️' : '💡'} ${esc(t)}</li>`).join('') : '<li class="ok">No problems found. Ship it! 🚀</li>'}</ul><div class="row"><span class="sp"></span><button id="ckX" class="pri">OK</button></div>`);
+  $('ckX').onclick = closeDialog;
+}
+$('checkBtn').onclick = checkGame;
+
+/* ---------------- v3: text dialog + song maker ---------------- */
+function textDialog(title, help, val, done) {
+  dialog(`<h2>${esc(title)}</h2><p>${esc(help)}</p><textarea class="story" id="tdT" maxlength="600">${esc(val)}</textarea><div class="row"><button id="tdClr">Remove</button><span class="sp"></span><button id="tdX">Cancel</button><button id="tdOk" class="pri">Save</button></div>`);
+  $('tdT').focus(); $('tdX').onclick = closeDialog; $('tdClr').onclick = () => { closeDialog(); done(''); };
+  $('tdOk').onclick = () => { const v = $('tdT').value.trim().slice(0, 600); closeDialog(); done(v); };
+}
+function songMaker() {
+  const MM = window.MakerMusic; let m = MM.clean(game.music) || MM.blank();
+  const LEAD = 10, BASS = 7, DR = [['Hi-hat', 4], ['Snare', 2], ['Kick', 1]], names = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+  const render = () => {
+    const cell = (cls, on, i, data) => `<button class="c ${cls} ${on ? 'on' : ''} ${i % 4 === 0 ? 'beat' : ''}" ${data} data-i="${i}"></button>`;
+    let rows = '<div class="mm-sec">🎵 Melody</div><div class="mm-grid">';
+    for (let r = LEAD - 1; r >= 0; r--) { rows += `<span class="lab">${r >= 7 ? 'high ' + (r - 6) : 'note ' + (r + 1)}</span>`; for (let i = 0; i < 16; i++) rows += cell('', m.lead[i] === r, i, `data-l="${r}"`); }
+    rows += '</div><div class="mm-sec">🎸 Bass</div><div class="mm-grid">';
+    for (let r = BASS - 1; r >= 0; r--) { rows += `<span class="lab">bass ${r + 1}</span>`; for (let i = 0; i < 16; i++) rows += cell('b', m.bass[i] === r, i, `data-b="${r}"`); }
+    rows += '</div><div class="mm-sec">🥁 Drums</div><div class="mm-grid">';
+    for (const [n, bit] of DR) { rows += `<span class="lab">${n}</span>`; for (let i = 0; i < 16; i++) rows += cell('d', m.drums[i] & bit, i, `data-d="${bit}"`); }
+    rows += '</div>';
+    dialog(`<h2>🎹 Song maker</h2>
+      <div class="row"><input id="mmN" value="${esc(m.name)}" maxlength="40" style="width:150px"> Speed <input id="mmBpm" type="range" min="60" max="190" value="${m.bpm}" style="width:110px"> <b id="mmBv">${m.bpm}</b>
+      <select id="mmSc">${Object.keys(MM.SCALES).map(k => `<option value="${k}" ${m.scale === k ? 'selected' : ''}>${MM.SCALE_NAMES[k]}</option>`).join('')}</select>
+      <select id="mmW">${[['square', 'Retro'], ['triangle', 'Soft'], ['sine', 'Smooth'], ['sawtooth', 'Buzzy']].map(([v, n]) => `<option value="${v}" ${m.wave === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="row">Start from: ${MM.PRESETS.map((p, i) => `<button data-pre="${i}">${p.name}</button>`).join('')}<button data-pre="x">Empty</button></div>
+      ${rows}
+      <div class="row"><button id="mmPlay">${MM.playing ? '⏹ Stop' : '▶ Play'}</button><span class="sp"></span><button id="mmX">Cancel</button><button id="mmOk" class="pri">Use this song</button></div>`);
+    const live = () => { if (MM.playing) MM.play(Object.assign({}, m, { onStep: hi })); };
+    const hi = i => { document.querySelectorAll('.mm-grid .c').forEach(c => c.classList.toggle('now', +c.dataset.i === i)); };
+    $('dlgCard').onclick = e => {
+      const b = e.target.closest('.mm-grid .c'); if (b) { const i = +b.dataset.i; if (b.dataset.l != null) m.lead[i] = m.lead[i] === +b.dataset.l ? -1 : +b.dataset.l; else if (b.dataset.b != null) m.bass[i] = m.bass[i] === +b.dataset.b ? -1 : +b.dataset.b; else m.drums[i] ^= +b.dataset.d; delete m.leadB; render(); live(); return; }
+      const pr = e.target.closest('[data-pre]'); if (pr) { m = pr.dataset.pre === 'x' ? MM.blank() : MM.clean(MM.PRESETS[+pr.dataset.pre]); m.name = 'My song'; render(); live(); return; }
+    };
+    $('mmBpm').oninput = e => { m.bpm = +e.target.value; $('mmBv').textContent = m.bpm; live(); };
+    $('mmSc').onchange = e => { m.scale = e.target.value; live(); }; $('mmW').onchange = e => { m.wave = e.target.value; live(); }; $('mmN').oninput = e => { m.name = e.target.value; };
+    $('mmPlay').onclick = () => { if (MM.playing) MM.stop(); else MM.play(Object.assign({}, m, { onStep: hi })); render(); };
+    $('mmX').onclick = () => { MM.stop(); $('dlgCard').onclick = null; closeDialog(); renderSettings(); };
+    $('mmOk').onclick = () => { MM.stop(); game.music = MM.clean(m); game.settings.music = 'custom'; persist(); $('dlgCard').onclick = null; closeDialog(); renderSettings(); toast('🎵 Song saved to your game'); };
+  };
+  render();
+}
 
 /* ---------------- settings panel ---------------- */
 function renderSettings() {
@@ -258,7 +388,8 @@ function renderSettings() {
   const seg = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   $('settings').innerHTML = `
     <h4>Game type</h4>${`<div class="seg" data-key="template">${[['platformer', '🏃 Side view'], ['topdown', '🗺️ Top-down'], ['3d', '🧊 3D']].map(([v, l]) => `<button data-v="${v}" class="${game.template === v ? 'on' : ''}">${l}</button>`).join('')}</div>`}
-    <h4>How to win a level</h4>${seg('win', [['goal', '🚩 Reach flag'], ['coins', '🪙 All coins'], ['enemies', '👾 Beat enemies']])}
+    <h4>How to win a level</h4>${seg('win', [['goal', '🚩 Reach flag'], ['coins', '🪙 All coins'], ['enemies', '👾 Beat enemies'], ['survive', '⏳ Survive']])}
+    ${s.win === 'survive' ? '<p class="note" style="font-size:12px;opacity:.7;margin:4px 0">Stay alive until the timer runs out (Timer below; Off = 60 s).</p>' : ''}
     <h4>Player</h4>
     <div class="f"><label>Speed</label>${seg('speed', [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']])}</div>
     ${plat ? `<div class="f"><label>Jump</label>${seg('jump', [[1, 'Low'], [2, 'Normal'], [3, 'High']])}</div>
@@ -270,12 +401,23 @@ function renderSettings() {
     <div class="f"><label>Lives</label>${seg('lives', [[1, '1'], [3, '3'], [5, '5'], [0, '∞']])}</div>
     <div class="f"><label>Timer</label>${seg('timer', [[0, 'Off'], [30, '30s'], [60, '60s'], [120, '2m']])}</div>
     <div class="f"><label>Enemy speed</label>${seg('enemySpeed', [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']])}</div>
+    <h4>Mood</h4>
+    <div class="f"><label>Lighting</label>${seg('dark', [[0, '☀️ Day'], [1, '🌆 Dusk'], [2, '🌙 Dark'], [3, '⚫ Pitch black']])}</div>
+    <div class="f"><label for="sWeather">Weather</label><select id="sWeather">${[['', 'Clear'], ['rain', '🌧 Rain'], ['snow', '❄️ Snow'], ['leaves', '🍂 Falling leaves'], ['embers', '🔥 Embers'], ['fog', '🌫 Fog']].map(([v, l]) => `<option value="${v}" ${(s.weather || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div class="f"><label for="sMusic">Music</label><select id="sMusic"><option value="0">🔇 None</option>${window.MakerMusic.PRESETS.map((p, i) => `<option value="${i + 1}" ${String(s.music) === String(i + 1) ? 'selected' : ''}>🎵 ${p.name}</option>`).join('')}<option value="custom" ${s.music === 'custom' ? 'selected' : ''}>🎹 My song${game.music ? ': ' + esc(game.music.name) : ''}</option></select></div>
+    <div class="seg"><button id="musicEd">🎹 Song maker</button><button id="musicTry">${window.MakerMusic.playing ? '⏹ Stop' : '▶ Listen'}</button></div>
+    <h4>Story</h4><div class="seg"><button id="endTxt">🏁 Ending text${s.ending ? ' ✓' : ''}</button><button id="lvStory">📖 Level ${li + 1} story${(L().story ? ' ✓' : '')}</button></div>
     <h4>Background</h4><select id="sTheme">${E.THEMES.map((t, i) => `<option value="${i}" ${+s.theme === i ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
     <h4>File</h4><div class="seg"><button id="exportBtn">⬇ Export</button><button id="newFromHere">＋ New game</button></div>`;
 }
 $('settings').addEventListener('click', e => {
   const b = e.target.closest('.seg[data-key] button'); if (!b) {
-    if (e.target.id === 'exportBtn') exportGame(); if (e.target.id === 'newFromHere') newGameDialog(); return;
+    if (e.target.id === 'exportBtn') exportGame(); if (e.target.id === 'newFromHere') newGameDialog();
+    if (e.target.id === 'musicEd') songMaker();
+    if (e.target.id === 'musicTry') { if (window.MakerMusic.playing) window.MakerMusic.stop(); else { const sp = window.MakerMusic.specFor(game); if (sp) window.MakerMusic.play(sp); else toast('Pick a song first.'); } renderSettings(); }
+    if (e.target.id === 'endTxt') textDialog('Ending text', 'Shown when someone beats your game.', game.settings.ending || '', v => { game.settings.ending = v; persist(); renderSettings(); });
+    if (e.target.id === 'lvStory') textDialog(`Level ${li + 1} story`, 'Shown before this level starts — set the scene, give a hint, tell your story.', L().story || '', v => { L().story = v; persist(); renderSettings(); });
+    return;
   }
   const key = b.parentElement.dataset.key, v = b.dataset.v;
   if (key === 'template') { if (game.template === v) return; if (!confirm('Switch the game type? Your levels stay, but they play differently.')) return; game.template = v; if (v === 'topdown') game.settings.stomp = false; renderPalette(); }
@@ -285,6 +427,8 @@ $('settings').addEventListener('click', e => {
 $('settings').addEventListener('change', e => {
   if (e.target.dataset.bool) game.settings[e.target.dataset.bool] = e.target.checked;
   if (e.target.id === 'sTheme') { game.settings.theme = +e.target.value; drawEditor(); }
+  if (e.target.id === 'sWeather') game.settings.weather = e.target.value;
+  if (e.target.id === 'sMusic') { const v = e.target.value; game.settings.music = v === 'custom' ? 'custom' : +v; if (v === 'custom' && !game.music) { songMaker(); } window.MakerMusic.stop(); const sp = window.MakerMusic.specFor(game); if (sp) window.MakerMusic.play(sp); setTimeout(renderSettings, 0); }
   persist();
 });
 
@@ -360,9 +504,10 @@ function play(gameData, ctx = {}) {
     ghosts: ctx.race ? () => ctx.race.ghosts() : null,
   });
   if (ctx.test) kit && kit.unlock('first');
+  try { window.MakerMusic.stop(); const sp = window.MakerMusic.specFor(gameData); if (sp && !(ctx.race && ctx.race.mute)) window.MakerMusic.play(Object.assign({}, sp, { vol: 0.16 })); } catch {}
   if (ctx.published && serverOk) api('play/' + ctx.published.id, { method: 'POST', body: '{}' }).catch(() => {});
 }
-function stopPlay() { if (runner) runner.stop(); runner = null; $('play').hidden = true; if (playCtx && playCtx.race) playCtx.race.leave(); playCtx = null; }
+function stopPlay() { try { window.MakerMusic.stop(); } catch {} if (runner) runner.stop(); runner = null; $('play').hidden = true; if (playCtx && playCtx.race) playCtx.race.leave(); playCtx = null; }
 $('exitPlay').onclick = stopPlay;
 async function finished(won, st) {
   const ctx = playCtx || {};
@@ -370,6 +515,8 @@ async function finished(won, st) {
   $('eTitle').textContent = won ? '🎉 You beat it!' : '💀 Game over';
   $('eInfo').textContent = won ? `Time ${(st.ms / 1000).toFixed(2)}s · ${st.coins} coins · ${st.deaths} hit${st.deaths === 1 ? '' : 's'}` : `You ran out of lives on level ${st.level + 1}.`;
   $('eBoard').innerHTML = '';
+  if (won && runnerData && runnerData.settings && runnerData.settings.ending) { const p = document.createElement('p'); p.className = 'ending'; p.style.cssText = 'font:16px/1.6 Georgia,serif;opacity:.9;max-width:420px;margin:8px auto'; p.textContent = runnerData.settings.ending; $('eBoard').appendChild(p); }
+  if (!won) try { window.MakerMusic.stop(); } catch {}
   const btns = [];
   if (!won) btns.push(['Try again', () => { $('endCard').hidden = true; runner.restartLevel(); }]);
   btns.push(['Play again', () => play(runnerData, ctx)]);
@@ -505,6 +652,78 @@ $('importFile').onchange = async e => {
   e.target.value = '';
 };
 $('newGame').onclick = newGameDialog;
+/* v3 starter templates */
+function rowsLevel(rows, talk = [], extra = {}) {
+  const w = Math.max(...rows.map(r => r.length)), tiles = rows.map(r => r.padEnd(w, '.')).join(''), signs = {}; let n = 0;
+  for (let k = 0; k < tiles.length; k++) if (E.TALK.has(tiles[k]) && talk[n] != null) signs[k] = talk[n++];
+  return Object.assign({ w, h: rows.length, tiles, signs }, extra);
+}
+const TEMPLATES = {
+  horror: () => ({ v: 1, title: 'Hollow Lane House', template: 'platformer', sprites: {},
+    settings: { ...E.DEFAULT_SETTINGS, theme: 3, dark: 3, music: 2, weather: '', lives: 3, ending: 'You burst out of the cellar door into the morning air. Behind you, the old house sighs and goes quiet. For now.' },
+    levels: [
+      rowsLevel([
+        '################################################',
+        '#......................................#.......#',
+        '#......................................#.......#',
+        '#.....ñ...........x.........ý..ñ.......#.......#',
+        '#...=====......=======.......=======...#.......#',
+        '#......................................#.......#',
+        '#.........ð............................#..ð....#',
+        '#......................................#.......#',
+        '#....ñ.........K............x..........#...ñ...#',
+        '#..=====....========.....========......#.......#',
+        '#......................................#.......#',
+        '#.P....ï.........C....ï......C...ñ.....D....G..#',
+        '################################################'],
+        ['A note pinned to the wall: “The key is upstairs. Don’t let the shadows catch you in the dark.”'],
+        { story: 'The old house at the end of Hollow Lane. Your torch died at the gate. Find the key, unlock the cellar door — and stay in the candlelight. Shadows hate the light.' }),
+      rowsLevel([
+        '########################################',
+        '#......................................#',
+        '#..Ç..........Ç..........Ç.............#',
+        '#......................................#',
+        '#.........x..........x.........x.......#',
+        '#....====....====....====....====......#',
+        '#......................................#',
+        '#..ñ...........9...........ñ...........#',
+        '#..==.......=====.......=====.....G....#',
+        '#................................===...#',
+        '#.P....ï.....ï.....LLL....ï.....ð......#',
+        '########################################'],
+        [], { story: 'The cellar goes deeper than the house. Bats hang from the beams. The TNT crate might clear a path… or bring the roof down.', weather: 'embers' }),
+    ] }),
+  story: () => ({ v: 1, title: 'The Lost Crown', template: 'platformer', sprites: {},
+    settings: { ...E.DEFAULT_SETTINGS, theme: 0, music: 1, weather: 'leaves', ending: 'The crown is home. The village throws a festival in your honour, and the wizard finally admits he lost it himself.' },
+    levels: [
+      rowsLevel([
+        '..................................................',
+        '..................................................',
+        '.........................~..............~.........',
+        '...........?..?...................................',
+        '.......................C.C.C......................',
+        '..........................................z.......',
+        '.....................=======.............====.....',
+        '..P...n.......E...................E...........k..G',
+        '##################################################',
+        '##################################################'],
+        ['Mira: “The king’s crown is gone! Please — follow the road east and ask the wizard.”', 'Wizard: “Crown? Ah… I may have, um, borrowed it. It rolled into the snowy hills. Off you go!”', 'Knight: “The hills are dangerous. Take the left path, jump on the walkers, and mind the boss.”'],
+        { story: 'Chapter 1 — The quiet village of Fernwood wakes up to terrible news: the royal crown has vanished.' }),
+      rowsLevel([
+        '........................................',
+        '........................................',
+        '.................ý......................',
+        '..............=====.....................',
+        '........................................',
+        '.......=====..............=====.........',
+        '........................................',
+        '..P..k.........E.......%...........C..G.',
+        '########################################',
+        '########################################'],
+        ['Knight: “Up ahead! The Snow Beast guards the crown. Jump on its head!”'],
+        { story: 'Chapter 2 — The Snowy Hills. Something big is guarding the crown.', weather: 'snow' }),
+    ] }),
+};
 function newGameDialog() {
   dialog(`<h2>New game</h2><p>Pick a starting point — you can change everything later.</p>
     <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
@@ -513,10 +732,12 @@ function newGameDialog() {
       <button class="gcard" data-new="platformer:0"><div class="th">⬜</div><div class="meta"><b>Blank side view</b><small>Just ground</small></div></button>
       <button class="gcard" data-new="3d:1"><div class="th">🧊</div><div class="meta"><b>3D example</b><small>Jump, keys, lava, a castle</small></div></button>
       <button class="gcard" data-new="claude:1"><div class="th">🤖</div><div class="meta"><b>Ask Claude</b><small>Describe it, Claude builds it</small></div></button>
+      <button class="gcard" data-new="horror:1"><div class="th">🕯️</div><div class="meta"><b>Horror house</b><small>Pitch dark, candles, zombies, shadows</small></div></button>
+      <button class="gcard" data-new="story:1"><div class="th">📖</div><div class="meta"><b>Story quest</b><small>Story cards, villagers, a wizard, music</small></div></button>
       <button class="gcard" data-new="topdown:0"><div class="th">🔲</div><div class="meta"><b>Blank top-down</b><small>Just walls</small></div></button>
     </div><div class="row"><span class="sp"></span><button id="nX">Cancel</button></div>`);
   $('nX').onclick = closeDialog;
-  $('dlgCard').querySelectorAll('[data-new]').forEach(b => b.onclick = e => { e.stopPropagation(); const [t, ex] = b.dataset.new.split(':'); closeDialog(); if (t === 'claude') { show('create'); claudeDialog('new'); return; } newDraft(t, ex === '1'); show('create'); });
+  $('dlgCard').querySelectorAll('[data-new]').forEach(b => b.onclick = e => { e.stopPropagation(); const [t, ex] = b.dataset.new.split(':'); closeDialog(); if (t === 'claude') { show('create'); claudeDialog('new'); return; } if (t === 'horror' || t === 'story') { draftId = uid(); game = TEMPLATES[t](); li = 0; undo = []; redo = []; persist(); renderEditor(); show('create'); return; } newDraft(t, ex === '1'); show('create'); });
 }
 
 /* ---------------- online races ---------------- */
@@ -705,5 +926,5 @@ refreshMe().then(() => {
   if (q.get('join')) race(null);
 });
 if (q.get('view')) show(q.get('view'));
-window.__maker = () => ({ cleanGame, cleanLevel, claudeDialog, race, get game() { return game; }, get runner() { return runner; }, setCell, newDraft, startPlay, api, refreshMe, loadDrafts, get me() { return me; }, show, openGame });
+window.__maker = () => ({ TEMPLATES, checkGame, songMaker, setTool, copySel, flipSel, pasteAt, lineCells, get sel() { return sel; }, set sel(v) { sel = v; }, get clip() { return clip; }, cleanGame, cleanLevel, claudeDialog, race, get game() { return game; }, get runner() { return runner; }, setCell, newDraft, startPlay, api, refreshMe, loadDrafts, get me() { return me; }, show, openGame });
 })();

@@ -81,3 +81,16 @@ h3{margin:6px 0 8px;font-size:15px}
 #tcA{width:80px;height:80px}
 #palette #palQ{width:100%;box-sizing:border-box;margin:0 0 4px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:#0b0e1a;color:inherit;font:inherit;font-size:12.5px}
 @media (max-width:760px){#palette #palQ{display:none}}
+
+/* v3 */
+#hintBar.selbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#hintBar.selbar button{padding:3px 10px;font-size:12px}
+.mm-grid{display:grid;grid-template-columns:70px repeat(16,1fr);gap:2px;margin:6px 0;user-select:none}
+.mm-grid .lab{font-size:11px;color:var(--dim);display:flex;align-items:center}
+.mm-grid .c{height:20px;border-radius:4px;background:rgba(255,255,255,.06);border:none;padding:0;cursor:pointer}
+.mm-grid .c.beat{background:rgba(255,255,255,.11)}
+.mm-grid .c.on{background:#a78bfa}.mm-grid .c.on.b{background:#38bdf8}.mm-grid .c.on.d{background:#f472b6}
+.mm-grid .c.now{outline:2px solid #fde047}
+.mm-sec{font-weight:700;margin:10px 0 2px;font-size:13px}
+.chk li{margin:4px 0;text-align:left}.chk .ok{color:#4ade80}.chk .warn{color:#fbbf24}.chk .bad{color:#f87171}
+textarea.story{width:100%;min-height:80px;box-sizing:border-box;border-radius:8px;padding:8px;font:14px/1.5 Georgia,serif;background:rgba(0,0,0,.25);color:inherit;border:1px solid var(--line)}

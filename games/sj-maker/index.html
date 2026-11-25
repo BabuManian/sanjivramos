@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Maker</title>
-<link rel="stylesheet" href="maker.css?v=2">
+<link rel="stylesheet" href="maker.css?v=3">
 </head><body>
 <div id="app">
   <header id="top">
@@ -22,12 +22,17 @@
         <button data-tool="erase" class="tool" title="Erase (E)">🧽</button>
         <button data-tool="rect" class="tool" title="Fill a box (R)">⬛</button>
         <button data-tool="fill" class="tool" title="Paint bucket (F)">🪣</button>
+        <button data-tool="line" class="tool" title="Straight line (L)">📏</button>
+        <button data-tool="select" class="tool" title="Select an area to copy, move, flip or delete (S)">⬚</button>
+        <button data-tool="pick" class="tool" title="Pick a block from the level (I, or Alt+click)">💧</button>
         <button data-tool="pan" class="tool" title="Move around (hold Space)">✋</button>
       </span>
-      <span class="grp"><button id="undo" title="Undo (Ctrl+Z)">↶</button><button id="redo" title="Redo (Ctrl+Y)">↷</button><button id="zoomOut" title="Zoom out">−</button><button id="zoomIn" title="Zoom in">+</button></span>
+      <span class="grp"><button id="undo" title="Undo (Ctrl+Z)">↶</button><button id="redo" title="Redo (Ctrl+Y)">↷</button><button id="zoomOut" title="Zoom out">−</button><button id="zoomIn" title="Zoom in">+</button><button id="gridBtn" title="Show / hide the grid (G)">#</button></span>
       <span class="sp"></span>
       <button id="aiBtn" title="AI helps you build (Claude, OpenRouter, Groq…) — describe a game or a change">🤖 AI</button>
-      <button id="onlineBtn" title="Play this game with friends online (race or together)">🌐 Online</button>
+      <button id="onlineBtn" title="Play this game with friends online (race or together)">🌐</button>
+      <button id="checkBtn" title="Check my game for problems">✅</button>
+      <button id="hereBtn" title="Play from the block under your mouse (T)">▶📍</button>
       <button id="testBtn" class="pri">▶ Play test</button>
       <button id="pubBtn" class="pub">🌐 Publish</button>
     </div>
@@ -72,7 +77,8 @@
 <script src="../sj-gamekit/look.js"></script>
 <script src="../sj-gamekit/gl3d.js"></script>
 <script src="../sj-gamekit/obby3d.js"></script>
-<script src="engine.js?v=2"></script>
-<script src="engine3d.js?v=2"></script>
-<script src="maker.js?v=2"></script>
+<script src="music.js?v=3"></script>
+<script src="engine.js?v=3"></script>
+<script src="engine3d.js?v=3"></script>
+<script src="maker.js?v=3"></script>
 </body></html>
