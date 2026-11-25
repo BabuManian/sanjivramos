@@ -82,6 +82,7 @@ export function initSocial(dataDir) {
   loadBans();
   setInterval(() => { try { db.prepare('DELETE FROM sessions WHERE last < ?').run(Date.now() - 90 * 864e5); } catch {} }, 3600e3).unref();
   try { initBots(); } catch (e) { log('bots off:', e.message); }
+  try { purgeMessages(q('SELECT id FROM messages WHERE deleted=1').map(r => r.id)); } catch (e) { log('purge:', e.message); }
   log('database ready', path.join(DIR, 'social.db'));
 }
 let hasFts = false;
@@ -128,7 +129,7 @@ function cleanLook(l) {
   }
   return Object.keys(o).length ? o : null;
 }
-const publicUser = u => { if (!u) return u; const p = prefsOf(u); return { id: u.id, username: u.username, display: u.display, avatar: u.avatar || null, bio: u.bio || '', look: p.look || null, online: u.role === 'bot' ? true : p.showOnline === false ? false : sockets.has(u.id), lastSeen: p.showOnline === false ? null : (u.last_seen || null), activity: p.showActivity === false ? null : (activity.get(u.id) || null) }; };
+const publicUser = u => { if (!u) return u; const p = prefsOf(u); return { id: u.id, username: u.username, display: u.display, avatar: u.avatar || null, bio: u.bio || '', look: p.look || null, online: u.role === 'bot' ? true : p.showOnline === false ? false : sockets.has(u.id), lastSeen: p.showOnline === false ? null : (u.last_seen || null), activity: p.showActivity === false ? null : (activity.get(u.id) || null), ...(u.id === botIds.sanjivramos ? { noText: true } : {}) }; };
 const userById = id => q1('SELECT * FROM users WHERE id=?', id);
 /* ---------------- IP addresses + IP bans ---------------- */
 const LOOP = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -677,6 +678,27 @@ function initBots() {
   }
 }
 const isBot = uid => Object.values(botIds).includes(uid);
+/** nobody can text the SanjivramOS account: it only posts updates */
+function noTextBot(me, cid) { if (botIds.sanjivramos && me.id !== botIds.sanjivramos && isMember(cid, botIds.sanjivramos)) throw new Error('You can’t text SanjivramOS'); }
+/** erase messages for good: no "deleted" placeholder, reactions, pins, thread replies or (unused) uploads left behind */
+function purgeMessages(ids) {
+  ids = [...new Set(ids.map(Number))]; if (!ids.length) return;
+  for (const r of q(`SELECT id FROM messages WHERE thread_root IN (${ids.map(() => '?').join(',')})`, ...ids)) if (!ids.includes(r.id)) ids.push(r.id);
+  const qs = ids.map(() => '?').join(','), fileIds = new Set();
+  for (const r of q(`SELECT convo_id, meta FROM messages WHERE id IN (${qs})`, ...ids)) {
+    let m; try { m = r.meta ? JSON.parse(r.meta) : null; } catch { m = null; }
+    for (const f of [...((m && m.files) || []), m && m.file].filter(Boolean)) if (f.id) fileIds.add(f.id);
+  }
+  run(`DELETE FROM reactions WHERE msg_id IN (${qs})`, ...ids); run(`DELETE FROM pins WHERE msg_id IN (${qs})`, ...ids);
+  run(`UPDATE reports SET msg_id=NULL WHERE msg_id IN (${qs})`, ...ids); run(`UPDATE messages SET reply_to=NULL WHERE reply_to IN (${qs})`, ...ids);
+  run(`DELETE FROM messages WHERE id IN (${qs})`, ...ids);
+  for (const id of fileIds) {
+    if (q('SELECT 1 FROM messages WHERE meta LIKE ? LIMIT 1', '%' + id + '%').length || q('SELECT 1 FROM users WHERE avatar LIKE ? LIMIT 1', '%' + id + '%').length || q('SELECT 1 FROM stickers WHERE file_id=? LIMIT 1', id).length) continue;
+    run('DELETE FROM file_access WHERE file_id=?', id); run('DELETE FROM files WHERE id=?', id);
+    try { fs.rmSync(path.join(FILES, id), { force: true }); } catch {}
+  }
+  return ids;
+}
 function botsHello(me) {
   if (!botIds.claude || isBot(me.id)) return;
   const fresh = k => !q1('SELECT 1 FROM convos WHERE dm_key=?', `${Math.min(me.id, botIds[k])}:${Math.max(me.id, botIds[k])}`);
@@ -763,7 +785,7 @@ const OPS = {
   },
   'convo.group'(me, a) {
     need(me, 'groups');
-    const ids = [...new Set((a.members || []).map(Number))].filter(id => id !== me.id && userById(id) && !blocked(me.id, id)).slice(0, 49);
+    const ids = [...new Set((a.members || []).map(Number))].filter(id => id !== me.id && id !== botIds.sanjivramos && userById(id) && !blocked(me.id, id)).slice(0, 49);
     if (!ids.length) throw new Error('Add at least one person');
     const name = String(a.name || '').trim().slice(0, 60) || null;
     const r = run('INSERT INTO convos(kind,name,created_by,created,last_msg) VALUES(?,?,?,?,?)', 'group', name, me.id, Date.now(), Date.now());
@@ -783,7 +805,7 @@ const OPS = {
   'convo.add'(me, a) {
     const c = needConvo(me, a.cid); if (c.kind !== 'group') throw new Error('Not a group');
     const added = [];
-    for (const id of (a.members || []).map(Number)) { const u = userById(id); if (u && !isMember(c.id, id) && !blocked(me.id, id)) { run('INSERT INTO members(convo_id,user_id,joined,last_read) VALUES(?,?,?,?)', c.id, id, Date.now(), 0); added.push(u.display); } }
+    for (const id of (a.members || []).map(Number)) { const u = userById(id); if (u && id !== botIds.sanjivramos && !isMember(c.id, id) && !blocked(me.id, id)) { run('INSERT INTO members(convo_id,user_id,joined,last_read) VALUES(?,?,?,?)', c.id, id, Date.now(), 0); added.push(u.display); } }
     if (added.length) addMessage(c.id, null, 'system', `${me.display} added ${added.join(', ')}`);
     pushConvo(c.id); return { ok: true };
   },
@@ -835,7 +857,7 @@ const OPS = {
     return { msgs: rows.map(m => msgOut(m, me.id)), more: !a.thread && rows.length === lim, root: a.thread ? msgOut(q1('SELECT * FROM messages WHERE id=?', +a.thread), me.id) : null };
   },
   'msg.send'(me, a) {
-    const c = needConvo(me, a.cid);
+    const c = needConvo(me, a.cid); noTextBot(me, c.id);
     if (c.kind === 'dm') { const other = memberIds(c.id).find(x => x !== me.id); if (other && blocked(me.id, other)) throw new Error('You can’t message this person'); }
     if (limited(attempts, 'msg' + me.id, 20, 10e3)) throw new Error('You’re sending messages too fast');
     need(me, 'chat');
@@ -871,8 +893,10 @@ const OPS = {
     const m = q1('SELECT * FROM messages WHERE id=?', +a.id); if (!m || !isMember(m.convo_id, me.id)) throw new Error('No such message');
     const mod = q1('SELECT role FROM members WHERE convo_id=? AND user_id=?', m.convo_id, me.id).role;
     if (m.user_id !== me.id && !['owner', 'admin'].includes(mod) && !isAdmin(me)) throw new Error('You can only delete your own messages');
-    run(`UPDATE messages SET deleted=1, body='', meta=NULL WHERE id=?`, m.id); run('DELETE FROM pins WHERE msg_id=?', m.id);
-    emitConvo(m.convo_id, { t: 'msg.update', msg: msgOut(q1('SELECT * FROM messages WHERE id=?', m.id), me.id) }); return { ok: true };
+    const ids = purgeMessages([m.id]);
+    emitConvo(m.convo_id, { t: 'msg.gone', cid: m.convo_id, ids });
+    if (m.thread_root && q1('SELECT 1 FROM messages WHERE id=?', m.thread_root)) emitConvo(m.convo_id, { t: 'msg.update', msg: msgOut(q1('SELECT * FROM messages WHERE id=?', m.thread_root), me.id) });
+    pushConvo(m.convo_id); return { ok: true };
   },
   'msg.react'(me, a) {
     const m = q1('SELECT * FROM messages WHERE id=?', +a.id); if (!m || !isMember(m.convo_id, me.id) || m.deleted) throw new Error('No such message');
@@ -891,7 +915,7 @@ const OPS = {
   'msg.forward'(me, a) {
     need(me, 'chat');
     const m = q1('SELECT * FROM messages WHERE id=?', +a.id); if (!m || !isMember(m.convo_id, me.id) || m.deleted) throw new Error('No such message');
-    const c = needConvo(me, a.cid);
+    const c = needConvo(me, a.cid); noTextBot(me, c.id);
     const meta = m.meta ? JSON.parse(m.meta) : null;
     if (meta && meta.files) for (const f of meta.files) run('INSERT OR IGNORE INTO file_access VALUES(?,?)', f.id, c.id);
     if (meta && meta.file) run('INSERT OR IGNORE INTO file_access VALUES(?,?)', meta.file.id, c.id);
@@ -1035,7 +1059,7 @@ const OPS = {
   // calls
   'call.start'(me, a) {
     need(me, 'calls');
-    const c = needConvo(me, a.cid);
+    const c = needConvo(me, a.cid); noTextBot(me, c.id);
     const existing = [...calls.values()].find(x => x.cid === c.id);
     if (existing) return OPS['call.join'](me, { id: existing.id });
     if (limited(attempts, 'call' + me.id, 10, 60e3)) throw new Error('Too many calls');
@@ -1104,8 +1128,7 @@ function deleteAccount(u) {
         run('DELETE FROM members WHERE convo_id=?', c.id); run('DELETE FROM file_access WHERE convo_id=?', c.id); run('DELETE FROM convos WHERE id=?', c.id);
         gone.push([c.id, others]);
       } else {
-        run(`UPDATE messages SET deleted=1, body='', meta=NULL WHERE convo_id=? AND user_id=?`, c.id, u.id);
-        run('DELETE FROM pins WHERE convo_id=? AND msg_id IN (SELECT id FROM messages WHERE user_id=?)', c.id, u.id);
+        purgeMessages(q('SELECT id FROM messages WHERE convo_id=? AND user_id=?', c.id, u.id).map(r => r.id));
         run('DELETE FROM members WHERE convo_id=? AND user_id=?', c.id, u.id);
         const left = memberIds(c.id);
         if (left.length && !q1(`SELECT 1 FROM members WHERE convo_id=? AND role='owner'`, c.id)) run(`UPDATE members SET role='owner' WHERE convo_id=? AND user_id=?`, c.id, left[0]);

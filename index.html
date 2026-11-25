@@ -21268,8 +21268,8 @@ const Social = {
   load(name) {
     this._mods = this._mods || {};
     return this._mods[name] = this._mods[name] || new Promise((res, rej) => {
-      if (name === 'messages' && !document.getElementById('sjm-css')) document.head.appendChild(Object.assign(document.createElement('link'), { id: 'sjm-css', rel: 'stylesheet', href: 'vendor/sj-social/messages.css?v=9' }));
-      const s = document.createElement('script'); s.src = `vendor/sj-social/${name}.js?v=12`; s.onload = () => res(window['SJ_' + name]); s.onerror = () => { this._mods[name] = null; rej(new Error('Couldn’t load ' + name)); }; document.head.appendChild(s);
+      if (name === 'messages' && !document.getElementById('sjm-css')) document.head.appendChild(Object.assign(document.createElement('link'), { id: 'sjm-css', rel: 'stylesheet', href: 'vendor/sj-social/messages.css?v=10' }));
+      const s = document.createElement('script'); s.src = `vendor/sj-social/${name}.js?v=13`; s.onload = () => res(window['SJ_' + name]); s.onerror = () => { this._mods[name] = null; rej(new Error('Couldn’t load ' + name)); }; document.head.appendChild(s);
     });
   },
   /** https address of this same server (self-signed), when this page is plain http on the network. */

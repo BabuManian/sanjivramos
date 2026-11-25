@@ -280,14 +280,15 @@
       if (!c) { main.innerHTML = `<div class="sjm-nochat"><div>${svg('chat')}<h3 style="margin:10px 0 4px;color:var(--text)">Your messages</h3><p>Pick a chat, or start a new one.</p><button class="sjm-btn pri" data-a="new3">New message</button></div></div>`; main.querySelector('[data-a=new3]').onclick = newChat; win.setTitle('Messages'); return; }
       win.setTitle(`${S.convoTitle(c)} — Messages`);
       const call = [...S.calls.values()].find(x => x.cid === c.id);
+      const noText = (c.members || []).some(u => u.noText && u.id !== S.me.id);
       main.innerHTML = `<header class="sjm-head"><button class="sjm-ib sjm-back" data-a="back" title="Back">${svg('back') || '‹'}</button>${convoAv(c)}<div class="who" data-a="info"><b>${esc(S.convoTitle(c))}${c.theme && c.theme.emoji && P().chatThemes ? ' ' + esc(c.theme.emoji) : ''}</b><span class="sjm-stl">${statusLine(c)}</span></div>
           ${call ? `<button class="sjm-btn pri" data-a="joincall">Join call</button>` : ''}
-          <button class="sjm-ib" data-a="voice" title="Voice call">${svg('phone')}</button><button class="sjm-ib" data-a="video" title="Video call">${svg('video')}</button>
+          ${noText ? '' : `<button class="sjm-ib" data-a="voice" title="Voice call">${svg('phone')}</button><button class="sjm-ib" data-a="video" title="Video call">${svg('video')}</button>`}
           <button class="sjm-ib" data-a="search" title="Search in chat">${svg('search')}</button><button class="sjm-ib" data-a="info" title="Details">${svg('info') || 'ⓘ'}</button></header>
         <div class="sjm-pinbar" hidden></div>
         <div class="sjm-msgs" role="log" aria-live="polite"></div><div class="sjm-typing"></div>
         <button class="sjm-jump" hidden title="Jump to latest">${svg('down') || '↓'}</button>
-        <div class="sjm-comp"><div class="sjm-ctx" hidden></div><div class="sjm-atts" hidden></div>
+        <div class="sjm-comp${noText ? ' sjm-ro' : ''}">${noText ? `<div class="sjm-ronote">You can’t text ${esc(S.convoTitle(c))}. It only posts updates.</div>` : ''}<div class="sjm-ctx" hidden></div><div class="sjm-atts" hidden></div>
           <div class="sjm-row"><button class="sjm-ib" data-a="attach" title="Attach photos, videos or files">${svg('paperclip')}</button><input type="file" multiple hidden class="sjm-file-in">
             <textarea class="sjm-ta" rows="1" placeholder="Message ${esc(S.convoTitle(c))}" aria-label="Message"></textarea>
             <button class="sjm-ib" data-a="pick" title="Emoji, GIFs & stickers">${svg('smile')}</button><button class="sjm-send" data-a="send" title="Send">${svg('mic')}</button></div>
@@ -437,7 +438,7 @@
         { label: 'Forward', icon: 'forward', action: () => forward(m) },
         '-',
         !mine ? { label: 'Report', icon: 'bell', action: () => report(m) } : null,
-        mine || admin ? { label: 'Delete', icon: 'trash', danger: true, action: async () => { if (await Dialog.confirm('Delete message?', 'It will be removed for everyone.', { okText: 'Delete', danger: true })) S.req('msg.delete', { id: m.id }); } } : null,
+        mine || admin ? { label: 'Delete', icon: 'trash', danger: true, action: async () => { if (await Dialog.confirm('Delete message?', 'It’s erased for everyone. No “deleted message” note is left behind.', { okText: 'Delete', danger: true })) S.req('msg.delete', { id: m.id }); } } : null,
       ].filter(x => x !== null));
       const t = document.querySelector('.ctx .ctx-title');
       if (t) { t.innerHTML = QUICK.map(e => `<button style="border:none;background:none;font-size:22px;cursor:pointer;padding:2px 4px;border-radius:8px" data-e="${e}">${e}</button>`).join(''); t.onclick = ev => { const b = ev.target.closest('[data-e]'); if (b) { react(m, b.dataset.e); ContextMenu.hide(); } }; }
@@ -1045,6 +1046,7 @@
         return;
       }
       if (d.t === 'msg.update') { const data = st.msgs.get(d.msg.cid); if (data) { const i = data.list.findIndex(m => m.id === d.msg.id); if (i >= 0) { data.list[i] = d.msg; if (d.msg.cid === st.cid) renderMsgs(false); } } if (d.msg.cid === st.cid) pinBar(); return; }
+      if (d.t === 'msg.gone') { const data = st.msgs.get(d.cid), gone = new Set(d.ids || []); if (data) data.list = data.list.filter(m => !gone.has(m.id)); if (d.cid === st.cid) { renderMsgs(false); pinBar(); if (st.drawer === 'thread' && gone.has(st.thread)) { st.drawer = null; st.thread = null; } if (st.drawer) renderDrawer(); } renderList(); return; }
       if (d.t === 'receipts' && d.cid === st.cid) return renderMsgs(false);
       if (d.t === 'typing') { if (!st.typing.has(d.cid)) st.typing.set(d.cid, new Map()); st.typing.get(d.cid).set(d.uid, Date.now()); typingUi(); setTimeout(typingUi, 5200); return; }
       if (d.t === 'presence') { renderList(); if (st.tab === 'chats') updateHead(); return; }
