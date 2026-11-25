@@ -5065,7 +5065,7 @@ const PERSONAL_DEFAULTS = {
   dockColor: '', dockAlpha: -1, dockIndicator: 'auto', dockMagnify: false, dockBounce: true,
   deskIconSize: 'm', deskIcons: true, deskLabel: 'shadow', cornerTL: 'workspaces', cornerTR: 'none', cornerBL: 'none', cornerBR: 'none',
   blur: true, scrollbars: 'auto', customScheme: null, autoDark: false, darkFrom: '19:00', darkTo: '07:00', nightAuto: false, nightFrom: '21:00', nightTo: '06:00',
-  liveWallpaper: 'off', liveOverlay: true, wpAnimate: 'auto', wpBlur: 0, wpDim: 0, wpSat: 100, wpFit: 'cover', widgetStyle: 'glass',
+  liveWallpaper: 'off', liveOverlay: true, wpAnimate: 'off', wpBlur: 0, wpDim: 0, wpSat: 100, wpFit: 'cover', widgetStyle: 'glass',
   soundTheme: 'soft', startupSound: true, windowSounds: false, clickSounds: false, toastPos: 'auto', toastTime: 'normal',
   clickRipple: false, cursorTrail: false, customKeys: [], osName: 'SanjivramOS', bootStyle: 'pop', lockMessage: '', lockClock: 'large', lockBlur: true, lockStyle: 'classic', lockWall: '', userPhoto: ''
 };
@@ -10919,7 +10919,6 @@ const SETTINGS_INDEX = [
   { label: 'Focus follows mouse', keys: 'focus hover mouse double-click', section: 'windows', icon: 'pointer' },
   { label: 'Desktop widgets', keys: 'widgets clock calendar notes weather quote countdown system', section: 'widgets', icon: 'tiles' },
   { label: 'Live wallpaper', keys: 'live animated wallpaper snow rain fireflies stars matrix', section: 'wallpaper', icon: 'image' },
-  { label: 'Animate every wallpaper', keys: 'animate animated every wallpaper motion particles moving auto live', section: 'wallpaper', icon: 'image' },
   { label: 'Wallpaper blur & dim', keys: 'wallpaper blur dim saturation fit tile stretch', section: 'wallpaper', icon: 'image' },
   { label: 'Custom colour scheme', keys: 'custom colors colours scheme editor palette', section: 'appearance', icon: 'palette' },
   { label: 'Automatic dark mode', keys: 'schedule auto dark night light sunset time', section: 'appearance', icon: 'moon' },
@@ -11430,8 +11429,7 @@ Apps.register({
         ${SettingsExtra.wallpaperExtra()}
         <h3 class="cust-h">Live wallpaper</h3>
         ${stack(
-          row('Animate every wallpaper', 'Each regular wallpaper gets its own animation in its colours — snow on winter scenes, rain on cities, fireflies in forests. Pick one to use it everywhere.', sels('wpAnimate', [['auto', 'Auto — match the wallpaper'], ['off', 'Off']].concat(LIVE_STYLES.map(([id, n]) => [id, 'Always: ' + n])))),
-          row('Animation', 'Overrides the wallpaper’s own animation. Paused automatically when a window is maximized or the tab is hidden.', sels('liveWallpaper', [['off', 'Wallpaper’s own']].concat(SCENES))),
+          row('Animation', 'Only Live wallpapers move. This replaces a Live wallpaper’s own animation. Paused automatically when a window is maximized or the tab is hidden.', sels('liveWallpaper', [['off', 'Wallpaper’s own']].concat(SCENES))),
           row('Over my wallpaper', 'Draw the animation on top of your wallpaper instead of replacing it.', sw('liveOverlay')))}
         <h3 class="cust-h">Effects</h3>
         ${stack(
@@ -16168,9 +16166,10 @@ const Personal = {
       wp.style.backgroundRepeat = fit === 'tile' ? 'repeat' : 'no-repeat';
       wp.style.backgroundPosition = fit === 'tile' ? 'top left' : 'center';
     }
-    // Which animation runs: a Live wallpaper's own → the one picked under "Live wallpaper" → the regular wallpaper's matching one (v21).
+    // Only wallpapers in the Live category animate (2026-11-25: regular wallpapers stay still). On a Live wallpaper the
+    // animation picked under "Animation" replaces its own.
     const curWp = WALLPAPERS.find(w => w.id === g('wallpaper')), picked = g('liveWallpaper') && g('liveWallpaper') !== 'off' ? g('liveWallpaper') : '';
-    const scene = g('powerSaver') ? 'off' : (curWp && curWp.live) || picked || AutoLive.sceneFor(g('wallpaper')) || 'off';
+    const scene = g('powerSaver') || !(curWp && curWp.live) || g('videoWallpaper') ? 'off' : picked || curWp.live;
     LiveWallpaper.set(scene, picked && scene === picked ? g('liveOverlay') !== false : true);
     // Boot & lock
     const name = (g('osName') || 'SanjivramOS').trim() || 'SanjivramOS';
