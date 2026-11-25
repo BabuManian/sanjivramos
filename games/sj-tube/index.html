@@ -288,6 +288,17 @@ function tasteQuery() {
   const seen = D.history.slice(0, 120).map(x => x.id);
   return `subs=${D.subs.slice(0, 80).map(x => x.id).join(',')}&aff=${aff.join(',')}&seeds=${seeds.join(',')}&seen=${seen.join(',')}&region=${D.set.region}`;
 }
+/** Shorts taste: channels whose Shorts you like/watch, then your subs, then "channels like yours" */
+function shortsTaste() {
+  const sc = new Map(), bump = (id, n) => { if (id) sc.set(id, (sc.get(id) || 0) + n); };
+  D.history.slice(0, 200).forEach(x => bump(x.authorId, x.short ? 2 : 0.5));
+  D.liked.slice(0, 80).forEach(x => bump(x.authorId, x.short ? 5 : 2));
+  const watched = [...sc.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const sim = ((local.get('foryou') || {}).similar || []).map(c => c.id);
+  const chans = [...new Set([...watched.slice(0, 12), ...D.subs.map(x => x.id), ...sim, ...watched.slice(12)])].filter(id => /^UC[\w-]{22}$/.test(id)).slice(0, 40);
+  return chans.length ? `chans=${chans.join(',')}&seen=${D.history.slice(0, 150).map(x => x.id).join(',')}` : '';
+}
+const shortsPage = (page, q) => { const t = !q && shortsTaste(); return t ? api(`shortsfy?page=${page}&${t}`).catch(() => api(`shorts?page=${page}`)) : api(`shorts?page=${page}${q ? '&q=' + encodeURIComponent(q) : ''}`); };
 function errBox(e, retry) { return `<div class="err"><span>⚠ ${esc(e.message)}</span>${retry ? '<button class="pill" id="retry">Try again</button>' : ''}</div>`; }
 const CATS = ['Trending', 'Music', 'Gaming', 'Minecraft', 'Roblox', 'Football', 'Basketball', 'Science', 'Coding', 'Funny', 'Animals', 'Cooking', 'Movies', 'News'];
 async function home() {
@@ -327,7 +338,7 @@ async function home() {
   $('#cats').onclick = e => { const b = e.target.closest('[data-cat]'); if (!b) return; $$('#cats button').forEach(x => x.classList.toggle('on', x === b)); $('#list').innerHTML = skel(12); load(b.dataset.cat); };
   if (personal) { if (fySnap && fySnap.items && fySnap.items.length) { paint(fySnap.items); paintSim(fySnap.similar); } load('For you'); }
   else { if (snap && snap.items && snap.items.length) paint(snap.items); load('Trending'); }
-  api('shorts?page=1').then(j => {
+  shortsPage(1).then(j => {
     if (view !== myView) return; shelfItems = j.items;
     $('#srow').innerHTML = j.items.slice(0, 20).map(v => `<div class="stile" data-v="${esc(v.id)}" data-short="1"><img loading="lazy" src="${pic(`https://i.ytimg.com/vi/${v.id}/oar2.jpg`)}" onerror="this.onerror=null;this.src='${esc(pic(v.thumb))}'" alt=""><b>${esc(v.title)}</b></div>`).join('');
   }).catch(() => { const s = $('.shelf'); if (s) s.remove(); });
@@ -592,7 +603,7 @@ async function shortsView(startId) {
   const add = list => { for (const v of list) if (v && !st.items.some(x => x.id === v.id)) st.items.push(v); };
   const more = async () => {
     if (st.loading || st.dead) return; st.loading = true;
-    try { const j = await api(`shorts?page=${st.page++}${q ? '&q=' + encodeURIComponent(q) : ''}`); add(j.items); }
+    try { const j = await shortsPage(st.page++, q); add(j.items); }
     catch (e) { if (!st.items.length && !st.dead) { root.innerHTML = `<div class="wrap">${errBox(e, true)}</div>`; $('#retry').onclick = () => go('shorts'); } }
     st.loading = false; if (!st.dead) layout();
   };

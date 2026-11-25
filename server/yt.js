@@ -5,7 +5,7 @@
 // one-time tokens for links the server resolved itself (never an open proxy).
 // Routes (signed-in, "Use the YouTube app" permission):
 //   GET /yt/api/status · home?region= · search?q=&page=&type= · shorts?page=&q= · video/:id · related/:id?title=
-//       channel/:id?tab=videos|shorts · feed?ids=UC..,UC.. · foryou?subs=&aff=&seeds=&seen= · sponsor/:id · prefetch?ids=a,b,c
+//       channel/:id?tab=videos|shorts · feed?ids=UC..,UC.. · foryou?subs=&aff=&seeds=&seen= · shortsfy?page=&chans=&seen= · sponsor/:id · prefetch?ids=a,b,c
 //   GET /yt/stream?t=TOKEN · /yt/img?u=<YouTube image URL> (thumbnails/avatars fetched by this server, cached on disk)
 // Env: SJ_YT_INSTANCES (Invidious bases), SJ_YT_PIPED (extra Piped API bases), SJ_YT_NO_YTDLP=1, SJ_YT_NO_WARM=1
 import { spawn, execFileSync } from 'node:child_process';
@@ -362,6 +362,29 @@ async function forYou({ subs, aff, seeds, seen, region }) {
   };
 }
 
+/* ---------------- Shorts for you: Shorts from your subs, channels whose Shorts you watch/like, and similar channels,
+   two of those to every general hashtag Short; each page walks on to the next few channels ---------------- */
+async function shortsForYou({ chans, seen, page }) {
+  const seenSet = new Set(seen), per = 6, pick = [];
+  const depth = chans.length ? Math.floor((page - 1) * per / chans.length) * 4 : 0;   // each pass over your channels goes 4 Shorts deeper
+  if (chans.length) for (let i = 0; i < per; i++) pick.push(chans[((page - 1) * per + i) % chans.length]);
+  const uniq = [...new Set(pick)];
+  const lists = await limitAll(uniq, 3, id => channel(id, 'shorts'));
+  // newest few from each channel, dealt round-robin so one channel never fills the screen
+  const decks = lists.map((c, i) => (c ? c.videos : []).filter(v => !seenSet.has(v.id))
+    .slice(depth, depth + 4).map(v => ({ ...v, short: true, author: v.author || c.name, authorId: v.authorId || uniq[i], why: { kind: 'chan', name: c.name } })));
+  const mine = []; for (let k = 0; k < 4; k++) for (const d of decks) if (d[k]) mine.push(d[k]);
+  let general = []; try { general = (await shorts(page, '')).filter(v => !seenSet.has(v.id)); } catch {}
+  const out = [], ids = new Set(); let a = 0, b = 0;
+  while (a < mine.length || b < general.length) {
+    for (let n = 0; n < 2 && a < mine.length; n++) { const v = mine[a++]; if (!ids.has(v.id)) { ids.add(v.id); out.push(v); } }
+    if (b < general.length) { const v = general[b++]; if (!ids.has(v.id)) { ids.add(v.id); out.push(v); } }
+    if (out.length >= 30) break;
+  }
+  if (!out.length) throw new Error('No Shorts found');
+  return out;
+}
+
 /* ---------------- warm-up: trending and the first Shorts are ready before anyone opens Kushtube ---------------- */
 function warm(force) {
   if (process.env.SJ_YT_NO_WARM) return;
@@ -457,6 +480,13 @@ export async function ytApi(req, res, url) {
     if ((m = /^\/yt\/api\/related\/([\w-]{11})$/.exec(p))) return send(200, await related(m[1], q('title').slice(0, 200)), 1800), true;
     if ((m = /^\/yt\/api\/sponsor\/([\w-]{11})$/.exec(p))) return send(200, { segments: await sponsor(m[1]) }, 3600), true;
     if ((m = /^\/yt\/api\/channel\/(UC[\w-]{22})$/.exec(p))) return send(200, await channel(m[1], q('tab') === 'shorts' ? 'shorts' : 'videos')), true;
+    if (p === '/yt/api/shortsfy') {
+      const ids = (k, re, n) => q(k).split(',').filter(x => re.test(x)).slice(0, n);
+      const chans = [...new Set(ids('chans', CHAN, 40))], seen = ids('seen', VID, 150);
+      const key = 'sfy:' + page + ':' + crypto.createHash('sha1').update(chans.join() + '|' + seen.join()).digest('hex');
+      const items = await cached(key, 15 * 60e3, () => shortsForYou({ chans, seen, page }), 6 * 3600e3);
+      prefetch(items.slice(0, 2).map(v => v.id)); return send(200, { items }), true;
+    }
     if (p === '/yt/api/foryou') {
       const ids = (k, re, n) => q(k).split(',').filter(x => re.test(x)).slice(0, n);
       const args = { subs: ids('subs', CHAN, 80), aff: ids('aff', CHAN, 30), seeds: ids('seeds', VID, 10), seen: ids('seen', VID, 120), region };
