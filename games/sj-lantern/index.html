@@ -407,7 +407,7 @@ const sackCount = id => S.sack.filter(x => x === id).length;
 let fullT = 0;
 function sackFull() { if (performance.now() - fullT > 1500) { fullT = performance.now(); log(`🎒 Inventory full (${S.sack.length}/${S.sackCap}) — unload at the camp pile or build a bigger sack.`); G3.tone(200, 0.12, 'square', 0.04); } }
 /** put an item on the ground (it never vanishes) */
-function dropItem(id, x, z, spread = 0.8) { if (S && SPOTS.grinder && (inHopper(x, z) || Math.hypot(x - SPOTS.grinder[0], z - SPOTS.grinder[2]) < 1.6) && feed(id)) return; const a = Math.random() * 6.283, r = Math.random() * spread; const dx = x + Math.cos(a) * r, dz = z + Math.sin(a) * r; S.drops.push({ u: ++S.dropN, id, x: dx, z: dz, y: groundAt(dx, dz) }); }
+function dropItem(id, x, z, spread = 0.8) { if (S && SPOTS.grinder && (inHopper(x, z) || Math.hypot(x - SPOTS.grinder[0], z - SPOTS.grinder[2]) < 1.6) && feed(id)) return; const a = Math.random() * 6.283, r = Math.random() * spread; const dx = x + Math.cos(a) * r, dz = z + Math.sin(a) * r; S.drops.push({ u: isGuest() ? 1e6 + ((Math.random() * 1e9) | 0) : ++S.dropN, id, x: dx, z: dz, y: groundAt(dx, dz) }); }
 const groundAt = (x, z) => (Math.abs(x - LM.cave.x) < 2 && z > LM.cave.z - 1 && z < LM.cave.z + 18) ? 0 : groundH(x, z);
 /** into the sack, or onto the ground if it's full; returns true if it went in */
 function give(id, x, z) { if (sackRoom() > 0) { S.sack.push(id); return true; } dropItem(id, x == null ? P.x : x, z == null ? P.z : z, 0.6); sackFull(); return false; }
@@ -935,7 +935,8 @@ function update(dt) {
   const inp = IN.frame();
   camYaw -= inp.lookX * 0.0042; camPitch = clamp(camPitch - inp.lookY * 0.0036, G3.view.fp ? -1.45 : -1.1, G3.view.fp ? 1.3 : 0.6);
   if (inp.wheel) S.camWant = clamp((S.camWant || 5) + inp.wheel * 0.6, 2.2, 9);
-  // time
+  // time (in a shared world only the host runs the clock)
+  if (!isGuest()) {
   S.t += dt * (S.resting ? 6 : 1);
   if (!S.isNight && S.t >= DAY) { S.isNight = true; S.t = 0; S.night++; log(`🌙 Night ${S.night} falls. Stay near the light.`); G3.tone(180, 0.8, 'sine', 0.05, 90); rollWeather(); S.stormNight = S.weather === 'storm'; S.raidPending = true; }
   if (S.isNight && S.raidPending && S.t > 20) { S.raidPending = false; maybeRaid(); }
@@ -951,9 +952,10 @@ function update(dt) {
     if (mode === 'endless') kit && kit.score(S.night, 'endless');
     save();
   }
+  }
   // needs
   const burn = (S.isNight ? 1 / 1.2 : 1 / 2.6) * (1 + (WX[S.weather].burn - 1) * S.wxK);
-  S.fire = Math.max(0, S.fire - dt * burn * (S.tools.ring ? 0.6 : 1));
+  if (!isGuest()) S.fire = Math.max(0, S.fire - dt * burn * (S.tools.ring ? 0.6 : 1));
   S.food = Math.max(0, S.food - dt / 7);
   if (S.food <= 0 && Math.random() < dt * 0.4) { hurt(3); if (Math.random() < 0.3) log('🍖 You’re starving — eat something (Q).'); }
   const warm = lightAt(P.x, P.z) >= 1;
@@ -1002,7 +1004,7 @@ function update(dt) {
   if (P.swingT > 0) { P.swingT -= dt; P.swing = 1 - P.swingT / 0.45; P.face = camYaw; } else P.swing = 0;
   P.yaw += Math.atan2(Math.sin(P.face - P.yaw), Math.cos(P.face - P.yaw)) * Math.min(1, dt * 12);
   P.inv = Math.max(0, P.inv - dt);
-  updEnemies(dt); updWarden(dt); updWildlife(dt); updArrows(dt); updWeather(dt); updFarms(dt); updRaiders(dt); updTraps();
+  updEnemies(dt); updWarden(dt); updWildlife(dt); updArrows(dt); updWeather(dt); if (!isGuest()) updFarms(dt); updRaiders(dt); updTraps();
   if (Math.hypot(P.x - LM.cave.x, P.z - LM.cave.z - 9) < 12 && S.stones.includes('caveEnd') && !enemies.some(e => e.cave)) S.caveCleared = true;
   for (const e of fx) { e.t -= dt; if (e.k === 'blood' || (e.k === 'puff' && e.vx != null)) { e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.vy -= 9 * dt; } if (e.k === 'fly') { const k = Math.min(1, dt * 14); e.x += (P.x - e.x) * k; e.y += (P.y + 1.1 - e.y) * k; e.z += (P.z - e.z) * k; } } fx = fx.filter(e => e.t > 0);
   IN.endFrame();
@@ -1219,6 +1221,7 @@ function frame(now) {
   if (!paused) update(dt); else IN.frame(), IN.endFrame();
   render(now); hud(dt);
   if (F && R) { F.send({ x: P.x, y: P.y, z: P.z, gy: groundH(P.x, P.z), yaw: P.yaw, spd: Math.min(1, Math.hypot(P.vx, P.vz) / 4), label: S && S.isNight ? 'night' : '' }); F.update(dt); F.tags(R, fTags); }
+  if (F) netTick(now);
 }
 function startGame(m, cont) {
   if (!R && !TEST) return;
@@ -1233,7 +1236,7 @@ function toMenu() { running = false; $('menu').hidden = false; $('hotbar').hidde
 $('bStory').onclick = () => { if (localStorage.getItem(SAVE) && !confirm('Start a new story? Your saved game will be replaced.')) return; startGame('story'); };
 $('bCont').onclick = () => startGame('story', true);
 $('bEndless').onclick = () => startGame('endless');
-$('bOnline').onclick = () => goOnline('lantern', 'Lantern Woods', () => startGame('story', !!localStorage.getItem(SAVE)));
+$('bOnline').onclick = () => goOnline('lantern', 'Lantern Woods', () => { hookWorld(); NET.ready = false; NET.base = null; NET.pend = []; startGame('story', !!localStorage.getItem(SAVE)); });
 if (/[?&](join|online)=/.test(location.search)) setTimeout(() => $('bOnline').click(), 600);
 $('bKeys').onclick = () => { $('keys').hidden = !$('keys').hidden; };
 // first / third person (also V, or the 👁 button while playing) — remembered between visits
@@ -1252,7 +1255,82 @@ requestAnimationFrame(frame);
 // test hooks
 window.__lantern = () => ({ S, P: { x: P && P.x, y: P && P.y, z: P && P.z }, enemies: enemies.length, warden: !!warden, running, usable: running && usable() && usable().label });
 window.__lanternStep = (n, dt = 1 / 30, inputs) => { for (let i = 0; i < n; i++) { if (inputs) inputs(i); if (!paused) update(dt); } return window.__lantern(); };
-window.__lanternApi = { quickDrop, feed, feedAll, ITEMS, openPanel, get sack() { return S.sack; }, get raiders() { return raiders; }, maybeRaid, rollWeather, FARMSPOTS, useRod, landFish, placeTrap, updTraps, inLake, LAKE, fireR, rayTarget, aim: () => { const f = aimDir(); return { eye: aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist], f }; }, collectAround, get animals() { return animals; }, spawnWildlife, fire, reload, WEAP, CHESTS, openChest, hurtAnimal, AN, DENS, get arrows() { return arrows; }, hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
+/* =================== SHARED WORLD (🌐 Play with friends) ===================
+   The host's world is the truth: ~2×/s it sends the shared part of S (clock, weather, fire, camp stock, the Beacon,
+   chopped trees, rocks, bushes, junk, chests, things on the ground, posts, traps, crops). Each guest plays normally on
+   its own copy and ~5×/s sends only what it changed (a diff); the host merges it, and the next world message carries
+   it to everyone. Health, food, your sack, tools and ammo stay yours. */
+const SHK = { union: ['chopped', 'chests', 'junkTaken', 'pages', 'stones', 'scrapsTaken'], maps: ['rocksUsed', 'berriesT'], delta: ['fire', 'placed', 'beds', 'raidsWon'],
+  whole: ['posts', 'traps', 'plots'], flags: ['beaconLit', 'wardenGone', 'caveCleared', 'finalNight'], host: ['night', 't', 'isNight', 'weather', 'wxK', 'stormNight', 'bearDay'] };
+const clone = o => JSON.parse(JSON.stringify(o));
+const NET = { base: null, pend: [], seq: 0, ack: {}, ready: false, hooked: false, lastW: 0, lastD: 0 };
+function isGuest() { return !!(typeof F !== 'undefined' && F && !F.isHost && NET.ready); }
+function sharedOf(s) { const o = {}; for (const g of Object.values(SHK)) for (const k of g) o[k] = s[k] === undefined ? null : s[k]; o.inv = s.inv; o.drops = s.drops; o.dropN = s.dropN; o.over = !!s.over; return clone(o); }
+function diffShared(cur, base) {
+  const d = {}; let any = false; const put = (k, v) => { d[k] = v; any = true; };
+  for (const k of SHK.union) { const b = new Set(base[k] || []), add = (cur[k] || []).filter(x => !b.has(x)); if (add.length) put(k, add); }
+  for (const k of SHK.maps) { const ch = {}; let n = 0; for (const [id, v] of Object.entries(cur[k] || {})) if ((base[k] || {})[id] !== v) { ch[id] = v; n++; } if (n) put(k, ch); }
+  for (const k of SHK.delta) { const dv = (cur[k] || 0) - (base[k] || 0); if (Math.abs(dv) > 1e-6) put(k, dv); }
+  for (const k of SHK.whole) if (JSON.stringify(cur[k]) !== JSON.stringify(base[k])) put(k, cur[k]);
+  for (const k of SHK.flags) if (cur[k] && !base[k]) put(k, cur[k]);
+  const inv = {}; let ni = 0; for (const k of new Set([...Object.keys(cur.inv || {}), ...Object.keys(base.inv || {})])) { const dv = ((cur.inv || {})[k] || 0) - ((base.inv || {})[k] || 0); if (dv) { inv[k] = dv; ni++; } } if (ni) put('inv', inv);
+  const bu = new Set((base.drops || []).map(x => x.u)), cu = new Set((cur.drops || []).map(x => x.u));
+  const addD = (cur.drops || []).filter(x => !bu.has(x.u)), remD = [...bu].filter(u => !cu.has(u));
+  if (addD.length) put('dropAdd', addD); if (remD.length) put('dropRem', remD);
+  return any ? d : null;
+}
+function applyDiff(s, d) {
+  for (const k of SHK.union) if (d[k]) { s[k] = s[k] || []; for (const x of d[k]) if (!s[k].includes(x)) s[k].push(x); }
+  for (const k of SHK.maps) if (d[k]) s[k] = Object.assign(s[k] || {}, d[k]);
+  for (const k of SHK.delta) if (d[k]) s[k] = (s[k] || 0) + d[k];
+  for (const k of SHK.whole) if (d[k]) s[k] = clone(d[k]);
+  for (const k of SHK.flags) if (d[k]) s[k] = d[k];
+  if (d.inv) { s.inv = s.inv || {}; for (const [k, v] of Object.entries(d.inv)) s.inv[k] = Math.max(0, (s.inv[k] || 0) + v); }
+  if (d.dropRem) { const r = new Set(d.dropRem); s.drops = (s.drops || []).filter(x => !r.has(x.u)); }
+  if (d.dropAdd) { s.drops = s.drops || []; for (const x of d.dropAdd) if (!s.drops.some(y => y.u === x.u)) s.drops.push(x); }
+  if (typeof s.fire === 'number') s.fire = clamp(s.fire, 0, 100);
+}
+/** make trees/rocks/bushes/junk match S (only the ones that differ are touched) */
+function worldVisuals() {
+  const ch = new Set(S.chopped), sc = new Set(S.scrapsTaken);
+  trees.forEach((t, i) => { const alive = !ch.has(t.id ?? i); if (t.alive !== alive) { t.alive = alive; t.hp = 0; dirtyAt(t.x, t.z); } });
+  rocks.forEach((r, i) => { const left = S.rocksUsed[r.id ?? i] ?? 3; if (r.left !== left) { r.left = left; dirtyAt(r.x, r.z); } });
+  bushes.forEach((b, i) => { const n = S.berriesT[b.id ?? i] ?? 3; if (b.berries !== n) { b.berries = n; dirtyAt(b.x, b.z); } });
+  scraps.forEach((x, i) => { x.taken = sc.has(x.id ?? i); });
+}
+function onWorld(m, from) {
+  if (!m || !F || !S) return;
+  if (m.lw === 'd' && F.isHost) { applyDiff(S, m.d); NET.ack[from] = Math.max(NET.ack[from] || 0, m.q || 0); worldVisuals(); return; }
+  if (m.lw !== 'w' || F.isHost) return;
+  const w = m.s, wasNight = S.isNight, first = !NET.ready;
+  const mine = (m.ack || {})[F.me && F.me.id] || 0;
+  NET.pend = NET.pend.filter(p => p.q > mine);
+  // what I changed since my last send, so a world message never wipes it
+  const unsent = first || !NET.base ? null : diffShared(sharedOf(S), NET.base);
+  const base = clone(w); for (const p of NET.pend) applyDiff(base, p.d);
+  NET.base = clone(base);
+  const next = clone(base); if (unsent) applyDiff(next, unsent);
+  for (const k of [...Object.values(SHK).flat(), 'inv', 'drops', 'dropN']) S[k] = next[k];
+  NET.ready = true;
+  worldVisuals();
+  if (first) log(`🌐 You’re in ${(F.players().find(p => p.id === F.net.room.hostId) || {}).display || 'your friend'}’s world — the camp, the fire and the forest are shared.`);
+  else if (wasNight !== S.isNight) { log(S.isNight ? `🌙 Night ${S.night} falls. Stay near the light.` : `☀ You survived night ${S.night}!`); if (S.isNight) G3.tone(180, 0.8, 'sine', 0.04); else sfx('win'); }
+  if (w.over && !S.over) winGame();
+}
+function hookWorld() {
+  if (NET.hooked || !F) return; NET.hooked = true;
+  F.on('shout', (d, from) => { try { onWorld(d, from); } catch (e) { console.warn('world', e); } });
+  F.on('join', () => { NET.lastW = 0; });   // someone new: send the world right away
+}
+function netTick(now) {
+  if (!F || !S || !running) return;
+  if (F.isHost) { if (now - NET.lastW > 500) { NET.lastW = now; F.shout({ lw: 'w', s: sharedOf(S), ack: NET.ack }); } return; }
+  if (!NET.ready || !NET.base || now - NET.lastD < 200) return;
+  NET.lastD = now;
+  const d = diffShared(sharedOf(S), NET.base); if (!d) return;
+  const q = ++NET.seq; F.shout({ lw: 'd', d, q }); applyDiff(NET.base, d); NET.pend.push({ q, d });
+}
+window.__lanternApi = { sharedOf, diffShared, applyDiff, worldVisuals, onWorld, NET, quickDrop, feed, feedAll, ITEMS, openPanel, get sack() { return S.sack; }, get raiders() { return raiders; }, maybeRaid, rollWeather, FARMSPOTS, useRod, landFish, placeTrap, updTraps, inLake, LAKE, fireR, rayTarget, aim: () => { const f = aimDir(); return { eye: aimEye || [P.x - f[0] * camDist, P.y + 1.9 - f[1] * camDist, P.z - f[2] * camDist], f }; }, collectAround, get animals() { return animals; }, spawnWildlife, fire, reload, WEAP, CHESTS, openChest, hurtAnimal, AN, DENS, get arrows() { return arrows; }, hotbar, GRINDER, BEDSPOTS, nightLen, save, startGame, attack, usable, craft, RECIPES, LM, SPOTS, trees, rocks, PAGES, STONES, groundH, lightAt, placeStones, eat, placePost, closePanels, get P() { return P; }, get S() { return S; }, IN, setCam: (y, p) => { camYaw = y; camPitch = p; } };
 })();
 </script>
 <script>window.GL3D && (GL3D.fullscreenButton(), GL3D.viewButton());</script>
