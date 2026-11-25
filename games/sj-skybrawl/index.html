@@ -103,7 +103,17 @@ table.res{width:100%;border-collapse:collapse;margin:10px 0}table.res td,table.r
 <script>
 (() => {
 'use strict';
-const kit = window.SJG ? SJG.init('skybrawl', { vs: false, pads: false, title: 'Sky Brawl Ultimate', trophies: [
+const kit = window.SJG ? SJG.init('skybrawl', { vs: false, pads: false, title: 'Sky Brawl Ultimate',
+  // 🌐 Online: the host runs the match; the friend plays "Keys 2" from their own device (their WASD/F/G/H, arrows or touch pad)
+  remote: { canvas: '#c', field: 'code', help: 'WASD / arrows move · Space jump · F attack · G special · H shield',
+    map: { KeyA: 'ArrowLeft', KeyD: 'ArrowRight', KeyW: 'ArrowUp', KeyS: 'ArrowDown', Space: 'ArrowUp', KeyF: 'KeyK', KeyG: 'KeyL', KeyH: 'Semicolon', ShiftLeft: 'ShiftRight', KeyJ: 'KeyK',
+      Escape: 'F24', Enter: 'F24', KeyP: 'F24' },
+    blockHost: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyK', 'Period', 'Numpad1', 'KeyL', 'Slash', 'Numpad2', 'Semicolon', 'ShiftRight', 'Numpad3', 'Numpad0'],
+    pad: [['Attack', 'KeyF'], ['Special', 'KeyG'], ['Jump', 'Space'], ['Shield', 'KeyH']],
+    hide: '#touch', snap: full => window.__brawlNet.snap(full), load: st => window.__brawlNet.load(st), inMenu: st => !st.on,
+    menuText: st => st.res ? `${st.res} — the host can start a rematch.` : 'They pick the fighters and the stage — you’re “Keys 2”.',
+    start: () => window.__brawlNet.addFriend() },
+  trophies: [
   { id: 'win', name: 'First Victory', desc: 'Win a Versus match', icon: '🥇' },
   { id: 'four', name: 'Full House', desc: 'Play a 4-fighter match', icon: '👥' },
   { id: 'local', name: 'Couch Rivals', desc: 'Finish a match with 2+ human players', icon: '🎮' },
@@ -1273,13 +1283,58 @@ function render() {
 let last = performance.now(), acc = 0, menuBg = 0;
 function loop(now) {
   const dt = Math.min(100, now - last); last = now;
-  if (G && G.running && !G.paused) { acc += dt; let n = 0; while (acc >= 1000 / 60 && n < 5) { update(); acc -= 1000 / 60; n++; } if (n === 5) acc = 0; }
+  if (window.SJG && SJG.netRole === 'guest') { if (G) guestStep(dt); }
+  else if (G && G.running && !G.paused) { acc += dt; let n = 0; while (acc >= 1000 / 60 && n < 5) { update(); acc -= 1000 / 60; n++; } if (n === 5) acc = 0; }
   else acc = 0;
   render();
   if (!$('setup').hidden) { drawSlotPreviews(now); pollJoin(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+/* ======================= ONLINE (host → guest snapshots) ======================= */
+// Only what the screen needs travels: links (fighter type, move, platform, owner) become indexes/names and are rebuilt on the guest.
+const prim = o => { const r = {}; for (const k in o) { const v = o[k]; if (v === null || typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') r[k] = v === Infinity ? -1 : v; } return r; };
+let netAt = 0;
+window.__brawlNet = {
+  addFriend() {   // the friend arrived: open Versus and give them "Keys 2"
+    if (G && G.running) return;
+    openSetup('versus'); joinSource('kb2');
+  },
+  snap() {
+    const res = !$('results').hidden ? $('resTitle').textContent : '';
+    if (!G || !G.running || res) return { on: false, res };
+    const pi = p => G.players.indexOf(p);
+    return {
+      on: true, st: STAGES.indexOf(G.stage), rules: G.rules, sd: !!G.cfg.suddenDeath, frame: G.frame, timeLeft: G.timeLeft, cam: G.cam, shakeT: G.shakeT, shakeA: G.shakeA, flash: G.flash, freeze: G.freeze,
+      start: G.start, over: G.over, lava: prim(G.lava), main: prim(G.main), plats: G.plats.map(prim), banner: banner && performance.now() < banner.until ? banner.t : '',
+      players: G.players.map(p => Object.assign(prim(p), { f: FIGHTERS.indexOf(p.F), mv: p.move ? p.move.name || null : null, item: p.item ? { type: p.item.type } : null, buff: p.buff, stocksInf: p.stocks === Infinity })),
+      projs: G.projs.map(q => Object.assign(prim(q), { owner: q.owner ? pi(q.owner) : -1, item: q.item ? { type: q.item.type } : null })),
+      items: G.items.filter(it => !it.held).map(prim), parts: G.parts.slice(-80).map(prim), texts: G.texts.map(prim),
+    };
+  },
+  load(st) {
+    ['title', 'setup', 'results', 'pause', 'help'].forEach(id => $(id).hidden = true);
+    if (!st.on) return;
+    if (!G || G.stage !== STAGES[st.st]) G = { cfg: {}, stage: STAGES[st.st], running: true, paused: false, players: [], projs: [], items: [], parts: [], texts: [], plats: [], cam: st.cam };
+    Object.assign(G, { rules: st.rules, frame: st.frame, timeLeft: st.timeLeft, cam: st.cam, shakeT: st.shakeT, shakeA: st.shakeA, flash: st.flash, freeze: st.freeze, start: st.start, over: st.over, lava: st.lava, main: st.main, plats: st.plats });
+    G.cfg.suddenDeath = st.sd;
+    G.players = st.players.map(d => { const F = FIGHTERS[d.f] || FIGHTERS[0]; const p = Object.assign(d, { F, M: F.M, hitList: new Set(), airOnce: {}, ai: { t: 0 } });
+      p.move = d.mv && F.M ? F.M[d.mv] || null : null; if (d.stocksInf) p.stocks = Infinity; return p; });
+    G.projs = st.projs.map(q => Object.assign(q, { owner: G.players[q.owner] || null }));
+    G.items = st.items; G.parts = st.parts; G.texts = st.texts;
+    banner = st.banner ? { t: st.banner, until: performance.now() + 200 } : null;
+    netAt = performance.now();
+  },
+};
+function guestStep(dt) {   // smooth the gaps between snapshots (positions move one physics frame per 1/60 s), never far past the last one
+  const k = dt / (1000 / 60);
+  for (const q of G.parts) { q.x += (q.vx || 0) * k; q.y += (q.vy || 0) * k; q.life -= k; }
+  G.parts = G.parts.filter(q => q.life > 0); for (const t of G.texts) { t.life -= k; t.y -= 0.6 * k; } G.texts = G.texts.filter(t => t.life > 0);
+  if (performance.now() - netAt > 90) return;
+  for (const p of G.players) { p.x += (p.vx || 0) * k; p.y += (p.vy || 0) * k; p.t += k; }
+  for (const q of G.projs) { q.x += (q.vx || 0) * k; q.y += (q.vy || 0) * k; q.t = (q.t || 0) + k; }
+}
 
 /* ======================= TOUCH ======================= */
 function showTouch(on = true) {

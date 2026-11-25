@@ -56,7 +56,16 @@ h3{margin:12px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.08e
 <script>
 (() => {
 'use strict';
-const kit = window.SJG ? SJG.init('clash', { title: 'Stick Clash 3D', vs: false, pads: false, trophies: [
+const kit = window.SJG ? SJG.init('clash', { title: 'Stick Clash 3D', vs: false, pads: false,
+  // 🌐 Online: the host runs the fight and sends snapshots; the friend plays player 2 with their own keys (or touch pad)
+  remote: { canvas: '#gl', field: 'code', help: 'WASD move · Space jump · J punch · K kick · L special · I block · Q dodge',
+    map: { KeyA: 'ArrowLeft', KeyD: 'ArrowRight', KeyW: 'ArrowUp', KeyS: 'ArrowDown', Space: 'Enter', KeyJ: 'Comma', KeyK: 'Period', KeyL: 'Slash', KeyI: 'ShiftRight', ShiftLeft: 'ShiftRight', KeyQ: 'NumpadDecimal', Enter: 'Enter', Comma: 'Comma', Period: 'Period', Slash: 'Slash' },
+    blockHost: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Numpad0', 'Numpad1', 'Comma', 'Numpad2', 'Period', 'Numpad3', 'Slash', 'ShiftRight', 'Numpad5', 'NumpadDecimal'],
+    pad: [['Punch', 'KeyJ'], ['Kick', 'KeyK'], ['Special', 'KeyL'], ['Jump', 'Space'], ['Block', 'KeyI'], ['Dodge', 'KeyQ']],
+    hide: '#touch', snap: full => window.__clashNet.snap(full), load: st => window.__clashNet.load(st), inMenu: st => st.state === 'menu' || st.state === 'over',
+    menuText: st => st.state === 'over' ? `${st.endT} The host can start a rematch.` : 'They pick the fighters and the arena — you’re player 2.',
+    start: () => { window.__clashNet.twoPlayers(); } },
+  trophies: [
   { id: 'win', name: 'First Blood', desc: 'Win a match against the CPU', icon: '⚔️' },
   { id: 'ringout', name: 'Out of Bounds', desc: 'Win a round by ring-out', icon: '🌀' },
   { id: 'master', name: 'Grandmaster', desc: 'Beat the Master CPU', icon: '🏆' },
@@ -368,10 +377,41 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.04, (now - last) / 1000); last = now;
+  if (window.SJG && SJG.netRole === 'guest') { IN.frame(); IN.endFrame(); if (state !== 'menu' && F.length) { guestStep(dt); render(now); hud(); } return; }
   if (state === 'menu' || state === 'over') { IN.frame(); IN.endFrame(); return; }
   update(dt); render(now); hud();
   for (let i = pops.length - 1; i >= 0; i--) if (pops[i].t <= 0.02 && pops[i].el) pops[i].el.remove();
   document.querySelectorAll('body > .hud').forEach(el => { if (!pops.some(p => p.el === el) && !['bars', 'big'].includes(el.id)) el.remove(); });
+}
+/* =================== ONLINE (host → guest snapshots) =================== */
+let netAt = 0;
+window.__clashNet = {
+  twoPlayers() { opts.mode = 1; renderMenu(); },
+  snap() {
+    return { opts: { mode: opts.mode, arena: opts.arena }, state, stateT, round, wins, survival, shake, roundT, msgT, big: $('big').textContent, endT: $('endT').textContent, endS: $('endS').textContent,
+      F: F.map(f => ({ ...f, c: 0, atk: f.atk ? { ...f.atk } : null, ai: 0 })), projs: projs.map(p => ({ ...p, owner: p.owner ? p.owner.side : 0 })),
+      fx: fx.slice(-70), pops: pops.map(p => ({ side: p.f.side, text: p.text, col: p.col, t: p.t })) };
+  },
+  load(st) {
+    opts.mode = st.opts.mode; opts.arena = st.opts.arena;
+    state = st.state; stateT = st.stateT; round = st.round; wins = st.wins; survival = st.survival; shake = st.shake; roundT = st.roundT;
+    F = st.F.map(f => ({ ...f, c: CHARS[f.ci] || CHARS[0], ai: { t: 0, plan: null } }));
+    projs = st.projs.map(p => ({ ...p, owner: F[p.owner] })); fx = st.fx;
+    for (const p of pops) if (p.el) p.el.remove(); pops.length = 0; for (const p of st.pops) pops.push({ f: F[p.side], text: p.text, col: p.col, t: p.t });
+    if ($('big').textContent !== st.big) $('big').textContent = st.big; msgT = st.msgT; $('big').style.opacity = msgT > 0 ? 1 : 0;
+    $('endT').textContent = st.endT; $('endS').textContent = st.endS;
+    $('menu').hidden = true; $('end').hidden = true;
+    netAt = performance.now();
+  },
+};
+function guestStep(dt) {   // between snapshots keep things moving, but never far past the last one
+  for (const e of fx) { e.t -= dt; if (e.k === 'p') { e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; e.vy -= 12 * dt; } } fx = fx.filter(e => e.t > 0);
+  for (const p of pops) p.t -= dt;
+  msgT -= dt; if (msgT <= 0) $('big').style.opacity = 0;
+  shake = Math.max(0, shake - dt);
+  if (performance.now() - netAt > 110) return;
+  for (const f of F) { f.x += (f.vx || 0) * dt; f.z += (f.vz || 0) * dt; f.walk += dt * 8 * Math.min(1, Math.hypot(f.vx || 0, f.vz || 0) / 4); if (f.atk) f.atk.t += dt; }
+  for (const p of projs) { p.x += (p.vx || 0) * dt; p.z += (p.vz || 0) * dt; }
 }
 /* =================== MENU =================== */
 function chips(el, items, cur, pick) { el.innerHTML = items.map((h, i) => `<button data-i="${i}" class="${i === cur ? 'on' : ''}">${h}</button>`).join(''); el.onclick = e => { const b = e.target.closest('[data-i]'); if (b) pick(+b.dataset.i); }; }
