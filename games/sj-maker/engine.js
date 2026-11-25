@@ -29,6 +29,23 @@ const TILES = {
   '!': ['Switch', 'Blocks', 'Touch it to swap red and blue blocks'],
   'R': ['Red block', 'Blocks', 'Solid until the switch is pressed'],
   'U': ['Blue block', 'Blocks', 'Only solid after the switch is pressed'],
+  'g': ['Grass block', 'Blocks', 'Solid grassy block'],
+  'l': ['Leaves', 'Blocks', 'Solid leafy block'],
+  'v': ['Snow block', 'Blocks', 'Solid snow'],
+  'y': ['Candy block', 'Blocks', 'Solid striped candy'],
+  '7': ['Obsidian', 'Blocks', 'Solid dark stone — even TNT can’t break it'],
+  '8': ['Hay bale', 'Blocks', 'Solid hay'],
+  '5': ['Jelly', 'Blocks', 'Bouncy! Land on it to spring up (hold down to stop)'],
+  '6': ['Honey', 'Blocks', 'Sticky — you walk and jump slowly on it'],
+  '9': ['TNT', 'Blocks', 'Touch it or shoot it — boom! Breaks blocks and enemies nearby'],
+  '{': ['Breakable brick', 'Blocks', 'Bump it from below or shoot it to smash it'],
+  '}': ['Blink block', 'Blocks', 'Turns on and off every 2 seconds'],
+  '_': ['Rope bridge', 'Blocks', 'Thin bridge you can jump up through'],
+  '|': ['Vine', 'Blocks', 'Climb it like a ladder'],
+  '/': ['Fan', 'Blocks', 'Blows you up into the air'],
+  '[': ['Pipe', 'Blocks', 'Solid green pipe'],
+  ']': ['Warp pipe', 'Blocks', 'Stand on it and press down to warp to the next warp pipe'],
+  '&': ['Cactus', 'Blocks', 'Solid, but prickly — hurts to touch'],
   'G': ['Goal flag', 'Goals', 'Touch it to finish the level'],
   'C': ['Coin', 'Goals', 'Collect for points'],
   'K': ['Key', 'Goals', 'Opens one locked door'],
@@ -42,6 +59,9 @@ const TILES = {
   's': ['Speed shoes', 'Power-ups', 'Run super fast for 8 seconds'],
   'b': ['Blaster', 'Power-ups', 'Lets you shoot (X or J) for the rest of the level'],
   '0': ['Shield', 'Power-ups', 'Blocks the next hit'],
+  'Â': ['Magnet', 'Power-ups', 'Pulls coins to you for 10 seconds'],
+  'Ê': ['Feather', 'Power-ups', 'Floaty low gravity for 10 seconds'],
+  'Î': ['Freeze clock', 'Power-ups', 'Freezes every enemy for 5 seconds'],
   'S': ['Spikes', 'Danger', 'Hurts'],
   'L': ['Lava', 'Danger', 'Hurts'],
   'E': ['Walker', 'Danger', 'Enemy that walks side to side'],
@@ -54,11 +74,22 @@ const TILES = {
   'i': ['Icicle', 'Danger', 'Falls when you walk under it'],
   'f': ['Fire spinner', 'Danger', 'Ring of fireballs spinning around'],
   '%': ['Boss', 'Danger', 'Big boss with 6 hit points: jumps, chases and shoots'],
+  '^': ['Ceiling spikes', 'Danger', 'Spikes hanging down — hurts'],
+  'Ñ': ['Crusher', 'Danger', 'Heavy block that slams down when you walk under it'],
+  'Ç': ['Bat', 'Danger', 'Hangs still, then swoops at you'],
+  'Ø': ['Bomber bird', 'Danger', 'Flies along and drops bombs'],
+  'Ö': ['Biter plant', 'Danger', 'Pops up and down — only safe when it’s hiding'],
+  'Ü': ['Slime', 'Danger', 'Slow, wobbly and jumpy'],
   'n': ['Villager', 'Characters', 'Friendly person who says something when you walk up'],
   'z': ['Wizard', 'Characters', 'Wise wizard who says something when you walk up'],
   '@': ['Robot', 'Characters', 'Helpful robot who says something when you walk up'],
   'k': ['Knight', 'Characters', 'Brave knight who says something when you walk up'],
   'd': ['Pet dog', 'Characters', 'Follows you everywhere'],
+  'é': ['Queen', 'Characters', 'Royal queen who says something when you walk up'],
+  'í': ['Alien', 'Characters', 'Friendly alien who says something when you walk up'],
+  'ó': ['Chef', 'Characters', 'Cheerful chef who says something when you walk up'],
+  'á': ['Pet cat', 'Characters', 'Follows you everywhere'],
+  'ú': ['Chicken', 'Characters', 'Wanders around and runs away from you'],
   'J': ['Spring', 'Fun', 'Big bounce (top-down: speed boost)'],
   'T': ['Teleporter', 'Fun', 'Jumps you to the next teleporter'],
   'W': ['Water', 'Fun', 'Swim slowly through it'],
@@ -72,16 +103,28 @@ const TILES = {
   '2': ['Crystal', 'Decoration', 'Glowing crystal, just for looks'],
   '3': ['Rock', 'Decoration', 'Just for looks'],
   '4': ['Fence', 'Decoration', 'Just for looks'],
+  'à': ['Palm tree', 'Decoration', 'Just for looks'],
+  'è': ['Snowman', 'Decoration', 'Just for looks'],
+  'ì': ['Pumpkin', 'Decoration', 'Just for looks'],
+  'ò': ['Statue', 'Decoration', 'Just for looks'],
+  'ù': ['Flag', 'Decoration', 'Waving flag, just for looks'],
+  'â': ['Bones', 'Decoration', 'Spooky, just for looks'],
+  'ê': ['Lantern', 'Decoration', 'Glowing lantern, just for looks'],
+  'ô': ['Mailbox', 'Decoration', 'Just for looks'],
+  'û': ['Sunflower', 'Decoration', 'Just for looks'],
+  ':': ['Window', 'Decoration', 'A window on the wall behind you'],
+  ';': ['Hanging vines', 'Decoration', 'Just for looks'],
+  ',': ['Pebbles', 'Decoration', 'Just for looks'],
 };
 /** palette order (an object can't keep it: number-like keys such as '0' always come first) */
-const TILE_ORDER = ['P', '#', '=', '-', 'I', 'B', 'O', 'r', 'w', 'm', 'a', 'q', 'u', 'c', 'h', '?', '>', '<', 'M', 'V', '!', 'R', 'U', 'G', 'C', 'K', 'D', 'H', 'X', 'N', '$', '+', 'j', 's', 'b', '0', 'S', 'L', 'E', 'F', 'Z', 'e', 'Y', 'Q', 'A', 'i', 'f', '%', 'n', 'z', '@', 'k', 'd', 'J', 'T', 'W', 't', 'o', '*', 'p', 'x', '~', '1', '2', '3', '4'];
+const TILE_ORDER = ["P", "#", "=", "-", "I", "B", "O", "r", "w", "m", "a", "q", "u", "c", "h", "?", ">", "<", "M", "V", "!", "R", "U", "g", "l", "v", "y", "7", "8", "5", "6", "9", "{", "}", "_", "|", "/", "[", "]", "&", "G", "C", "K", "D", "H", "X", "N", "$", "+", "j", "s", "b", "0", "Â", "Ê", "Î", "S", "L", "E", "F", "Z", "e", "Y", "Q", "A", "i", "f", "%", "^", "Ñ", "Ç", "Ø", "Ö", "Ü", "n", "z", "@", "k", "d", "é", "í", "ó", "á", "ú", "J", "T", "W", "t", "o", "*", "p", "x", "~", "1", "2", "3", "4", "à", "è", "ì", "ò", "ù", "â", "ê", "ô", "û", ":", ";", ","];
 /** characters that say something (their text is stored like sign text) */
-const TALK = new Set(['N', 'n', 'z', '@', 'k']);
+const TALK = new Set(['N', 'n', 'z', '@', 'k', 'é', 'í', 'ó']);
 /** tiles that become moving things when the game runs */
-const ENTS = new Set(['C', 'K', 'H', 'E', 'F', '$', '+', 'j', 's', 'b', '0', 'e', 'Y', 'Q', 'A', 'i', 'f', '%', 'n', 'z', '@', 'k', 'd', 'M', 'V']);
+const ENTS = new Set(['C', 'K', 'H', 'E', 'F', '$', '+', 'j', 's', 'b', '0', 'e', 'Y', 'Q', 'A', 'i', 'f', '%', 'n', 'z', '@', 'k', 'd', 'M', 'V', 'é', 'í', 'ó', 'á', 'ú', 'Ñ', 'Ç', 'Ø', 'Ö', 'Ü', 'Â', 'Ê', 'Î']);
 /** tiles that make no sense in some game types (hidden from the palette there) */
-const NOT_IN = { topdown: new Set(['-', 'c', 'h', 'M', 'V', 'i']), platformer: new Set(['O']), '3d': new Set([]) };
-const SOLID = new Set(['#', '=', 'I', 'B', 'D', 'Z', 'r', 'w', 'm', 'a', 'q', 'u', '?', '>', '<', 'R', 'U']);
+const NOT_IN = { topdown: new Set(['-', 'c', 'h', 'M', 'V', 'i', '_', '|', '/', '^', 'Ñ', '5']), platformer: new Set(['O']), '3d': new Set([]) };
+const SOLID = new Set(['#', '=', 'I', 'B', 'D', 'Z', 'r', 'w', 'm', 'a', 'q', 'u', '?', '>', '<', 'R', 'U', 'g', 'l', 'v', 'y', '7', '8', '5', '6', '9', '{', '}', '/', '[', ']', '&']);
 const THEMES = [
   { name: 'Sunny sky', sky: ['#60a5fa', '#bfdbfe'], hill: '#86efac', hill2: '#4ade80' },
   { name: 'Sunset', sky: ['#f97316', '#fde68a'], hill: '#c2410c', hill2: '#9a3412' },
@@ -179,6 +222,47 @@ function drawTile(g, ch, x, y, s, sprites, t = 0, opts = {}) {
     case '2': { g.fillStyle = `rgba(168,85,247,${.15 + Math.sin(t * 2 + x) * .08})`; g.beginPath(); g.arc(x + .5 * s, y + .6 * s, .45 * s, 0, 7); g.fill(); for (const [a, h, w2] of [[.5, .8, .14], [.3, .5, .1], [.7, .55, .1]]) { g.fillStyle = '#a855f7'; g.beginPath(); g.moveTo(x + (a - w2) * s, y + s); g.lineTo(x + a * s, y + (1 - h) * s); g.lineTo(x + (a + w2) * s, y + s); g.fill(); g.fillStyle = '#e9d5ff'; g.beginPath(); g.moveTo(x + (a - w2 * .3) * s, y + .95 * s); g.lineTo(x + a * s, y + (1 - h * .9) * s); g.lineTo(x + a * s, y + .95 * s); g.fill(); } break; }
     case '3': g.fillStyle = '#78716c'; g.beginPath(); g.ellipse(x + .5 * s, y + .78 * s, .4 * s, .24 * s, 0, 0, 7); g.fill(); g.fillStyle = '#a8a29e'; g.beginPath(); g.ellipse(x + .42 * s, y + .7 * s, .2 * s, .1 * s, -.3, 0, 7); g.fill(); break;
     case '4': r(.12, .35, .12, .65, '#d6a756'); r(.76, .35, .12, .65, '#d6a756'); r(0, .5, 1, .1, '#b45309'); r(0, .75, 1, .1, '#b45309'); g.fillStyle = '#d6a756'; for (const a of [.12, .76]) { g.beginPath(); g.moveTo(x + a * s, y + .35 * s); g.lineTo(x + (a + .06) * s, y + .25 * s); g.lineTo(x + (a + .12) * s, y + .35 * s); g.fill(); } break;
+    case 'g': r(0, 0, 1, 1, '#854d0e'); r(0, 0, 1, .3, '#16a34a'); for (let k = 0; k < 5; k++) r(k * .2 + .04, .28, .1, .08 + (k % 2) * .06, '#16a34a'); r(.6, .6, .12, .08, '#713f12'); break;
+    case 'l': r(0, 0, 1, 1, '#15803d'); for (const [a, b2] of [[.2, .2], [.6, .15], [.4, .5], [.8, .6], [.15, .75], [.6, .85]]) circ(a, b2, .14, '#22c55e'); break;
+    case 'v': r(0, 0, 1, 1, '#e2e8f0'); r(0, 0, 1, .25, '#fff'); circ(.3, .55, .05, '#cbd5e1'); circ(.7, .7, .04, '#cbd5e1'); break;
+    case 'y': r(0, 0, 1, 1, '#fdf2f8'); g.fillStyle = '#ec4899'; for (let k = -1; k < 3; k++) { g.beginPath(); g.moveTo(x + k * .5 * s, y + s); g.lineTo(x + (k * .5 + .25) * s, y + s); g.lineTo(x + (k * .5 + 1.25) * s, y); g.lineTo(x + (k * .5 + 1) * s, y); g.fill(); } g.strokeStyle = '#be185d'; g.lineWidth = s * .04; g.strokeRect(x, y, s, s); break;
+    case '7': r(0, 0, 1, 1, '#1e1b4b'); r(.1, .15, .3, .2, '#312e81'); r(.55, .55, .3, .25, '#312e81'); r(.6, .2, .08, .08, '#7c3aed'); break;
+    case '8': r(0, .05, 1, .95, '#eab308'); r(0, .05, 1, .1, '#fde047'); g.strokeStyle = '#a16207'; g.lineWidth = s * .03; g.beginPath(); for (let k = 1; k < 6; k++) { g.moveTo(x + k * .17 * s, y + .2 * s); g.lineTo(x + (k * .17 - .05) * s, y + .95 * s); } g.stroke(); r(0, .45, 1, .07, '#92400e'); break;
+    case '5': { const sq = Math.sin(t * 6 + x) * .03; g.fillStyle = 'rgba(74,222,128,.85)'; g.beginPath(); g.roundRect(x + .02 * s, y + (.08 + sq) * s, .96 * s, (.9 - sq) * s, .22 * s); g.fill(); r(.15, .2 + sq, .25, .1, 'rgba(255,255,255,.7)'); circ(.35, .55, .05, '#14532d'); circ(.65, .55, .05, '#14532d'); break; }
+    case '6': r(0, .1, 1, .9, '#d97706'); g.fillStyle = '#fbbf24'; g.beginPath(); g.moveTo(x, y + .1 * s); for (let k = 0; k <= 5; k++) g.lineTo(x + k * .2 * s, y + (.1 + (k % 2 ? .25 : .05)) * s); g.lineTo(x + s, y + .1 * s); g.fill(); r(.15, .45, .1, .1, '#fde68a'); break;
+    case '9': r(.05, .1, .9, .9, '#dc2626'); r(.05, .45, .9, .2, '#f8fafc'); g.fillStyle = '#111'; g.font = `bold ${s * .2}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('TNT', x + s / 2, y + .56 * s); r(.47, 0, .06, .12, '#78350f'); if (opts.fuse) circ(.5, 0, .08 + Math.random() * .05, '#fde047'); break;
+    case '{': r(0, 0, 1, 1, '#c2410c'); r(.04, .04, .92, .42, '#ea580c'); r(.04, .54, .42, .42, '#ea580c'); r(.54, .54, .42, .42, '#ea580c'); r(.1, .1, .2, .06, '#fdba74'); break;
+    case '}': if (opts.on === false) { g.strokeStyle = '#a78bfa'; g.lineWidth = s * .05; g.setLineDash([s * .12, s * .1]); g.strokeRect(x + s * .08, y + s * .08, s * .84, s * .84); g.setLineDash([]); } else { r(0, 0, 1, 1, '#7c3aed'); r(.08, .08, .84, .84, '#a78bfa'); circ(.5, .5, .16, '#ede9fe'); } break;
+    case '_': r(0, .08, 1, .14, '#a16207'); for (let k = 0; k < 5; k++) r(k * .2 + .02, .06, .16, .18, '#ca8a04'); g.strokeStyle = '#78350f'; g.lineWidth = s * .03; g.beginPath(); g.moveTo(x, y + .04 * s); g.quadraticCurveTo(x + .5 * s, y + .14 * s, x + s, y + .04 * s); g.stroke(); break;
+    case '|': g.strokeStyle = '#16a34a'; g.lineWidth = s * .1; g.beginPath(); g.moveTo(x + .5 * s, y); for (let k = 1; k <= 4; k++) g.lineTo(x + (.5 + (k % 2 ? .12 : -.12)) * s, y + k * .25 * s); g.stroke(); for (const b2 of [.2, .6]) { g.fillStyle = '#22c55e'; g.beginPath(); g.ellipse(x + .66 * s, y + b2 * s, .12 * s, .06 * s, .5, 0, 7); g.fill(); } break;
+    case '/': { r(0, .55, 1, .45, '#475569'); r(.05, .6, .9, .35, '#64748b'); g.save(); g.translate(x + .5 * s, y + .77 * s); g.scale(1, .35); g.rotate(t * 14); g.fillStyle = '#e2e8f0'; for (let k = 0; k < 3; k++) { g.rotate(Math.PI * 2 / 3); g.beginPath(); g.ellipse(.2 * s, 0, .2 * s, .07 * s, 0, 0, 7); g.fill(); } g.restore(); g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = s * .03; g.beginPath(); for (const a of [.25, .5, .75]) { const yy = ((t * 2 + a) % 1) * .5; g.moveTo(x + a * s, y + (.5 - yy) * s); g.lineTo(x + a * s, y + (.35 - yy) * s); } g.stroke(); break; }
+    case '[': r(.08, 0, .84, 1, '#15803d'); r(.18, 0, .14, 1, '#4ade80'); r(.7, 0, .1, 1, '#166534'); break;
+    case ']': r(.08, .25, .84, .75, '#15803d'); r(0, 0, 1, .3, '#16a34a'); r(.08, .03, .22, .24, '#4ade80'); r(.18, .3, .12, .7, '#4ade80'); r(.15, .08, .7, .12, '#052e16'); break;
+    case '&': r(.32, .05, .36, .95, '#16a34a'); r(.06, .35, .18, .1, '#16a34a'); r(.06, .2, .1, .25, '#16a34a'); r(.76, .5, .18, .1, '#16a34a'); r(.84, .3, .1, .3, '#16a34a'); g.fillStyle = '#fef9c3'; for (const [a, b2] of [[.3, .2], [.7, .3], [.3, .55], [.7, .7], [.3, .85], [.5, .05]]) g.fillRect(x + a * s - 1, y + b2 * s, s * .06, s * .03); break;
+    case '^': g.fillStyle = '#d4d4d8'; for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(x + (k / 3) * s, y); g.lineTo(x + (k / 3 + 1 / 6) * s, y + .55 * s); g.lineTo(x + ((k + 1) / 3) * s, y); g.fill(); } r(0, 0, 1, .06, '#52525b'); break;
+    case 'Ñ': r(.02, 0, .96, 1, '#57534e'); r(.08, .06, .84, .88, '#78716c'); g.fillStyle = '#e7e5e4'; for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(x + (k * .25) * s, y + s); g.lineTo(x + (k * .25 + .125) * s, y + 1.12 * s); g.lineTo(x + (k + 1) * .25 * s, y + s); g.fill(); } r(.25, .3, .15, .12, opts.angry ? '#ef4444' : '#1c1917'); r(.6, .3, .15, .12, opts.angry ? '#ef4444' : '#1c1917'); r(.3, .62, .4, .07, '#1c1917'); break;
+    case 'Ç': { const fl = opts.hang ? 0 : Math.sin(t * 22) * .15; g.fillStyle = '#4c1d95'; for (const d of [-1, 1]) { g.beginPath(); g.moveTo(x + .5 * s, y + .45 * s); g.lineTo(x + (.5 + d * .45) * s, y + (.3 - fl) * s); g.lineTo(x + (.5 + d * .35) * s, y + (.6 - fl * .5) * s); g.lineTo(x + (.5 + d * .2) * s, y + .55 * s); g.fill(); } circ(.5, .48, .16, '#6d28d9'); circ(.44, .45, .04, '#fde047'); circ(.56, .45, .04, '#fde047'); break; }
+    case 'Ø': { const fl = Math.sin(t * 16) * .12; circ(.5, .5, .24, '#0f172a'); g.fillStyle = '#1e293b'; g.beginPath(); g.ellipse(x + .3 * s, y + (.4 + fl) * s, .2 * s, .08 * s, -.3, 0, 7); g.ellipse(x + .7 * s, y + (.4 + fl) * s, .2 * s, .08 * s, .3, 0, 7); g.fill(); circ(opts.flip ? .62 : .38, .45, .05, '#fff'); g.fillStyle = '#f59e0b'; g.beginPath(); const bx = opts.flip ? .72 : .28, d = opts.flip ? 1 : -1; g.moveTo(x + bx * s, y + .48 * s); g.lineTo(x + (bx + d * .16) * s, y + .53 * s); g.lineTo(x + bx * s, y + .58 * s); g.fill(); break; }
+    case 'Ö': { const up = opts.up == null ? 1 : opts.up; r(.15, .75, .7, .25, '#15803d'); r(.1, .7, .8, .1, '#16a34a'); if (up > .05) { const top = .75 - .6 * up; r(.45, top + .3, .1, .75 - top - .3, '#16a34a'); circ(.5, top + .2, .22, '#dc2626'); g.fillStyle = '#fff'; for (let k = 0; k < 4; k++) g.fillRect(x + (.32 + k * .1) * s, y + (top + .18) * s, .05 * s, .05 * s); circ(.42, top + .08, .04, '#fff'); circ(.58, top + .08, .04, '#fff'); } break; }
+    case 'Ü': { const sq = opts.air ? -.08 : Math.sin(t * 5 + x) * .04; g.fillStyle = 'rgba(132,204,22,.9)'; g.beginPath(); g.ellipse(x + .5 * s, y + (.7 - sq) * s, (.4 + sq) * s, (.28 - sq) * s, 0, 0, 7); g.fill(); r(.25, .55, .1, .06, 'rgba(255,255,255,.7)'); circ(.4, .66, .05, '#1a2e05'); circ(.6, .66, .05, '#1a2e05'); break; }
+    case 'Â': g.lineWidth = s * .16; g.strokeStyle = '#dc2626'; g.beginPath(); g.arc(x + .5 * s, y + .45 * s, .26 * s, Math.PI, 0); g.stroke(); r(.16, .45, .16, .3, '#dc2626'); r(.68, .45, .16, .3, '#dc2626'); r(.16, .7, .16, .12, '#e5e7eb'); r(.68, .7, .16, .12, '#e5e7eb'); break;
+    case 'Ê': { const w2 = Math.sin(t * 3) * .08; g.save(); g.translate(x + .5 * s, y + .5 * s); g.rotate(-.7 + w2); g.fillStyle = '#e0f2fe'; g.beginPath(); g.ellipse(0, 0, .14 * s, .42 * s, 0, 0, 7); g.fill(); g.strokeStyle = '#7dd3fc'; g.lineWidth = s * .03; g.beginPath(); g.moveTo(0, -.4 * s); g.lineTo(0, .45 * s); g.stroke(); g.restore(); break; }
+    case 'Î': circ(.5, .55, .34, '#0ea5e9'); circ(.5, .55, .27, '#e0f2fe'); r(.47, .32, .06, .25, '#0f172a'); r(.5, .52, .17, .05, '#0f172a'); r(.38, .12, .24, .1, '#0ea5e9'); g.fillStyle = 'rgba(186,230,253,' + (.3 + Math.sin(t * 4) * .2) + ')'; g.fillRect(x, y, s * .15, s * .15); break;
+    case 'é': case 'í': case 'ó': drawPerson(g, ch, x, y, s, opts.flip, opts.anim || 0); break;
+    case 'á': { const b = Math.abs(Math.sin(opts.anim || 0)) * .05, f = opts.flip ? -1 : 1, X = v => x + (f > 0 ? v : 1 - v) * s; g.fillStyle = '#9ca3af'; g.beginPath(); g.ellipse(X(.45), y + (.7 - b) * s, .26 * s, .14 * s, 0, 0, 7); g.fill(); g.beginPath(); g.arc(X(.74), y + (.52 - b) * s, .15 * s, 0, 7); g.fill(); for (const v of [.64, .82]) { g.beginPath(); g.moveTo(X(v), y + (.42 - b) * s); g.lineTo(X(v + .04), y + (.28 - b) * s); g.lineTo(X(v + .09), y + (.42 - b) * s); g.fill(); } g.fillStyle = '#84cc16'; g.beginPath(); g.arc(X(.7), y + (.5 - b) * s, .03 * s, 0, 7); g.arc(X(.8), y + (.5 - b) * s, .03 * s, 0, 7); g.fill(); g.fillStyle = '#9ca3af'; for (const v of [.27, .38, .52, .6]) g.fillRect(Math.min(X(v), X(v + .06)), y + (.8 - b) * s, .06 * s, .2 * s + b * s); g.strokeStyle = '#9ca3af'; g.lineWidth = .06 * s; g.beginPath(); g.moveTo(X(.2), y + .66 * s); g.quadraticCurveTo(X(.02), y + .6 * s, X(.08), y + (.3 + Math.sin(t * 4) * .05) * s); g.stroke(); break; }
+    case 'ú': { const b = Math.abs(Math.sin(opts.anim || 0)) * .06, f = opts.flip ? -1 : 1, X = v => x + (f > 0 ? v : 1 - v) * s; g.fillStyle = '#f8fafc'; g.beginPath(); g.ellipse(X(.45), y + (.62 - b) * s, .26 * s, .22 * s, 0, 0, 7); g.fill(); g.beginPath(); g.arc(X(.68), y + (.38 - b) * s, .13 * s, 0, 7); g.fill(); g.fillStyle = '#ef4444'; g.beginPath(); g.arc(X(.68), y + (.24 - b) * s, .05 * s, 0, 7); g.fill(); g.fillStyle = '#f59e0b'; g.beginPath(); g.moveTo(X(.79), y + (.36 - b) * s); g.lineTo(X(.92), y + (.4 - b) * s); g.lineTo(X(.79), y + (.44 - b) * s); g.fill(); g.fillStyle = '#111'; g.beginPath(); g.arc(X(.71), y + (.35 - b) * s, .025 * s, 0, 7); g.fill(); g.fillStyle = '#f59e0b'; g.fillRect(Math.min(X(.4), X(.44)), y + .82 * s, .04 * s, .16 * s); g.fillRect(Math.min(X(.52), X(.56)), y + .82 * s, .04 * s, .16 * s); break; }
+    case 'à': r(.44, .3, .12, .7, '#a16207'); for (let k = 0; k < 4; k++) r(.44, .35 + k * .17, .12, .03, '#78350f'); g.fillStyle = '#16a34a'; for (const an of [-2.6, -2, -1.1, -.5]) { g.beginPath(); g.ellipse(x + (.5 + Math.cos(an) * .25) * s, y + (.25 + Math.sin(an) * .12 + .1) * s, .26 * s, .07 * s, an + Math.PI / 2 + Math.PI / 2, 0, 7); g.fill(); } circ(.46, .34, .05, '#78350f'); circ(.56, .36, .05, '#78350f'); break;
+    case 'è': circ(.5, .75, .24, '#f8fafc'); circ(.5, .42, .17, '#f8fafc'); circ(.45, .38, .025, '#111'); circ(.55, .38, .025, '#111'); g.fillStyle = '#f97316'; g.beginPath(); g.moveTo(x + .5 * s, y + .43 * s); g.lineTo(x + .66 * s, y + .46 * s); g.lineTo(x + .5 * s, y + .48 * s); g.fill(); r(.36, .22, .28, .06, '#111'); r(.41, .06, .18, .17, '#111'); r(.35, .54, .3, .05, '#dc2626'); circ(.5, .7, .025, '#111'); circ(.5, .8, .025, '#111'); break;
+    case 'ì': g.fillStyle = '#ea580c'; g.beginPath(); g.ellipse(x + .5 * s, y + .68 * s, .4 * s, .3 * s, 0, 0, 7); g.fill(); g.strokeStyle = '#c2410c'; g.lineWidth = s * .03; g.beginPath(); g.ellipse(x + .5 * s, y + .68 * s, .15 * s, .3 * s, 0, 0, 7); g.stroke(); r(.47, .3, .07, .12, '#166534'); g.fillStyle = '#fde047'; g.beginPath(); g.moveTo(x + .33 * s, y + .62 * s); g.lineTo(x + .4 * s, y + .55 * s); g.lineTo(x + .45 * s, y + .62 * s); g.moveTo(x + .55 * s, y + .62 * s); g.lineTo(x + .6 * s, y + .55 * s); g.lineTo(x + .67 * s, y + .62 * s); g.fill(); r(.36, .74, .28, .05, '#fde047'); break;
+    case 'ò': r(.25, .8, .5, .2, '#a8a29e'); r(.32, .75, .36, .06, '#d6d3d1'); circ(.5, .25, .13, '#d6d3d1'); r(.37, .38, .26, .38, '#d6d3d1'); r(.28, .4, .1, .22, '#d6d3d1'); r(.62, .25, .08, .3, '#d6d3d1'); break;
+    case 'ù': { r(.2, .05, .05, .95, '#9ca3af'); g.fillStyle = '#ef4444'; g.beginPath(); g.moveTo(x + .25 * s, y + .08 * s); for (let k = 0; k <= 6; k++) g.lineTo(x + (.25 + k * .1) * s, y + (.1 + Math.sin(t * 6 - k) * .04) * s); for (let k = 6; k >= 0; k--) g.lineTo(x + (.25 + k * .1) * s, y + (.42 + Math.sin(t * 6 - k) * .04) * s); g.fill(); circ(.22, .04, .05, '#facc15'); break; }
+    case 'â': g.fillStyle = '#e7e5e4'; g.beginPath(); g.arc(x + .4 * s, y + .72 * s, .16 * s, 0, 7); g.fill(); r(.32, .8, .16, .1, '#e7e5e4'); circ(.34, .7, .04, '#292524'); circ(.46, .7, .04, '#292524'); g.save(); g.translate(x + .7 * s, y + .85 * s); g.rotate(.5); g.fillRect(-.18 * s, -.03 * s, .36 * s, .06 * s); g.beginPath(); g.arc(-.18 * s, 0, .05 * s, 0, 7); g.arc(.18 * s, 0, .05 * s, 0, 7); g.fill(); g.restore(); break;
+    case 'ê': { const fl = Math.sin(t * 9 + x) * .02; g.strokeStyle = '#57534e'; g.lineWidth = s * .03; g.beginPath(); g.moveTo(x + .5 * s, y); g.lineTo(x + .5 * s, y + .25 * s); g.stroke(); g.fillStyle = `rgba(253,224,71,${.18 + fl * 2})`; g.beginPath(); g.arc(x + .5 * s, y + .5 * s, .45 * s, 0, 7); g.fill(); r(.32, .25, .36, .06, '#292524'); r(.35, .31, .3, .34, '#fde68a'); r(.32, .65, .36, .06, '#292524'); circ(.5, .48 + fl, .07, '#f97316'); break; }
+    case 'ô': r(.45, .5, .1, .5, '#78350f'); g.fillStyle = '#2563eb'; g.beginPath(); g.roundRect(x + .2 * s, y + .22 * s, .6 * s, .32 * s, [.16 * s, .16 * s, 0, 0]); g.fill(); r(.24, .36, .2, .04, '#1e3a8a'); r(.72, .1, .04, .2, '#ef4444'); r(.72, .1, .12, .07, '#ef4444'); break;
+    case 'û': r(.47, .45, .06, .55, '#16a34a'); g.fillStyle = '#16a34a'; g.beginPath(); g.ellipse(x + .62 * s, y + .7 * s, .12 * s, .05 * s, -.4, 0, 7); g.fill(); g.fillStyle = '#facc15'; for (let k = 0; k < 10; k++) { const an = k * Math.PI / 5 + Math.sin(t) * .05; g.beginPath(); g.ellipse(x + (.5 + Math.cos(an) * .17) * s, y + (.3 + Math.sin(an) * .17) * s, .09 * s, .04 * s, an, 0, 7); g.fill(); } circ(.5, .3, .12, '#78350f'); break;
+    case ':': r(.12, .12, .76, .76, '#78350f'); r(.18, .18, .64, .64, '#7dd3fc'); r(.47, .18, .06, .64, '#78350f'); r(.18, .47, .64, .06, '#78350f'); r(.22, .22, .12, .06, 'rgba(255,255,255,.6)'); break;
+    case ';': g.strokeStyle = '#15803d'; g.lineWidth = s * .05; g.beginPath(); for (const a of [.2, .5, .8]) { g.moveTo(x + a * s, y); g.quadraticCurveTo(x + (a + Math.sin(t + a * 5) * .08) * s, y + .4 * s, x + a * s, y + (.6 + a * .3) * s); } g.stroke(); g.fillStyle = '#22c55e'; for (const [a, b2] of [[.22, .3], [.5, .55], [.78, .4], [.2, .6], [.8, .8]]) { g.beginPath(); g.ellipse(x + a * s, y + b2 * s, .07 * s, .04 * s, .6, 0, 7); g.fill(); } break;
+    case ',': for (const [a, b2, rr, c] of [[.25, .88, .1, '#a8a29e'], [.5, .9, .08, '#78716c'], [.7, .86, .12, '#d6d3d1'], [.88, .92, .06, '#a8a29e']]) { g.fillStyle = c; g.beginPath(); g.ellipse(x + a * s, y + b2 * s, rr * s, rr * .7 * s, 0, 0, 7); g.fill(); } break;
     case 'P': drawHero(g, x, y, s, opts.flip, opts.anim || 0); break;
   }
 }
@@ -191,24 +275,59 @@ function drawHero(g, x, y, s, flip, anim) {
   g.fillStyle = '#1e3a8a'; const lg = Math.sin(anim) * .06;
   g.fillRect(x + (.24 + lg) * s, y + .86 * s, .18 * s, .14 * s); g.fillRect(x + (.58 - lg) * s, y + .86 * s, .18 * s, .14 * s);
 }
-const PEOPLE = { n: { body: '#2563eb', skin: '#fcd5b5', hair: '#78350f' }, z: { body: '#7c3aed', skin: '#fcd5b5', hair: '#e5e7eb', hat: '#5b21b6', beard: true }, '@': { robot: true }, k: { body: '#94a3b8', skin: '#fcd5b5', helm: true } };
-function drawPerson(g, ch, x, y, s, flip, anim) {
-  const P = PEOPLE[ch] || PEOPLE.n, b = Math.abs(Math.sin(anim)) * .03 * s, e = flip ? -.04 : .04;
+/* Characters are drawn from a "look" (also what the character designer makes):
+   { skin, hair, hairStyle 0 short·1 long·2 spiky·3 bald·4 ponytail·5 curly, eyes, shirt, pants, shoes,
+     hat 0 none·1 cap·2 wizard·3 crown·4 helmet·5 bow·6 top hat·7 chef·8 antenna, hatCol, acc 0 none·1 glasses·2 moustache·3 scarf·4 beard·5 cape, accCol, robot } */
+const PEOPLE = {
+  n: { shirt: '#2563eb', hair: '#78350f' },
+  z: { shirt: '#7c3aed', pants: '#5b21b6', hair: '#e5e7eb', hat: 2, hatCol: '#5b21b6', acc: 4 },
+  '@': { robot: true },
+  k: { shirt: '#94a3b8', pants: '#475569', hat: 4, acc: 5, accCol: '#dc2626' },
+  'é': { shirt: '#ec4899', pants: '#ec4899', hair: '#facc15', hairStyle: 1, hat: 3, acc: 5, accCol: '#a21caf' },
+  'í': { skin: '#86efac', shirt: '#0f766e', pants: '#134e4a', hairStyle: 3, hat: 8, eyes: '#111' },
+  'ó': { shirt: '#f8fafc', pants: '#334155', hair: '#1f2937', hat: 7, acc: 2 },
+};
+const LOOK_DEFAULT = { skin: '#fcd5b5', hair: '#78350f', hairStyle: 0, eyes: '#111111', shirt: '#2563eb', pants: '#1f2937', shoes: '#111827', hat: 0, hatCol: '#ef4444', acc: 0, accCol: '#111827' };
+function drawPerson(g, ch, x, y, s, flip, anim) { drawLook(g, PEOPLE[ch] || PEOPLE.n, x, y, s, flip, anim); }
+function drawLook(g, look, x, y, s, flip, anim = 0) {
+  const P = Object.assign({}, LOOK_DEFAULT, look || {}), b = Math.abs(Math.sin(anim)) * .03 * s, e = flip ? -.04 : .04;
   const R = (a, c, w, h, col) => { g.fillStyle = col; g.fillRect(x + a * s, y + c * s - b, w * s, h * s); };
   const O = (cx, cy, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x + cx * s, y + cy * s - b, r * s, 0, 7); g.fill(); };
+  const poly = (col, ...pts) => { g.fillStyle = col; g.beginPath(); for (let i = 0; i < pts.length; i += 2) g.lineTo(x + pts[i] * s, y + pts[i + 1] * s - b); g.fill(); };
   if (P.robot) {
-    R(.2, .42, .6, .42, '#94a3b8'); R(.28, .5, .44, .16, '#334155'); O(.4, .58, .04, '#22d3ee'); O(.6, .58, .04, '#22d3ee');
+    R(.2, .42, .6, .42, P.shirt === LOOK_DEFAULT.shirt ? '#94a3b8' : P.shirt); R(.28, .5, .44, .16, '#334155'); O(.4, .58, .04, '#22d3ee'); O(.6, .58, .04, '#22d3ee');
     R(.25, .1, .5, .32, '#cbd5e1'); R(.32, .18, .36, .14, '#0f172a'); O(.42 + e, .25, .045, '#22d3ee'); O(.58 + e, .25, .045, '#22d3ee'); R(.48, 0, .04, .1, '#64748b'); O(.5, 0, .05, '#ef4444');
     g.fillStyle = '#475569'; g.fillRect(x + .26 * s, y + .84 * s, .18 * s, .16 * s); g.fillRect(x + .56 * s, y + .84 * s, .18 * s, .16 * s); return;
   }
-  const lg = Math.sin(anim) * .05; g.fillStyle = '#1f2937'; g.fillRect(x + (.3 + lg) * s, y + .82 * s, .15 * s, .18 * s); g.fillRect(x + (.55 - lg) * s, y + .82 * s, .15 * s, .18 * s);
-  g.fillStyle = P.body; g.beginPath(); g.roundRect(x + .24 * s, y + .44 * s - b, .52 * s, .42 * s, .1 * s); g.fill();
+  if (P.acc === 5) poly(P.accCol, .26, .44, .74, .44, .8 + (flip ? .06 : -.06), .9, .2 + (flip ? .06 : -.06), .9);   // cape behind
+  const lg = Math.sin(anim) * .05;
+  g.fillStyle = P.pants; g.fillRect(x + (.3 + lg) * s, y + .8 * s, .15 * s, .14 * s); g.fillRect(x + (.55 - lg) * s, y + .8 * s, .15 * s, .14 * s);
+  g.fillStyle = P.shoes; g.fillRect(x + (.28 + lg) * s, y + .93 * s, .19 * s, .07 * s); g.fillRect(x + (.53 - lg) * s, y + .93 * s, .19 * s, .07 * s);
+  g.fillStyle = P.shirt; g.beginPath(); g.roundRect(x + .24 * s, y + .44 * s - b, .52 * s, .4 * s, .1 * s); g.fill();
+  R(.24, .76, .52, .08, P.pants);
+  if (P.hairStyle === 1 || P.hairStyle === 4) R(.3, .22, .4, .3, P.hair);   // long hair behind the face
   O(.5, .3, .19, P.skin);
-  if (P.helm) { g.fillStyle = '#cbd5e1'; g.beginPath(); g.arc(x + .5 * s, y + .28 * s - b, .21 * s, Math.PI, 0); g.fill(); R(.29, .27, .42, .05, '#64748b'); R(.47, .02, .06, .1, '#ef4444'); }
-  else if (P.hat) { g.fillStyle = P.hat; g.beginPath(); g.moveTo(x + .24 * s, y + .2 * s - b); g.lineTo(x + (.5 + e * 3) * s, y - .12 * s - b); g.lineTo(x + .76 * s, y + .2 * s - b); g.fill(); O(.6, .05, .03, '#fde047'); }
-  else { g.fillStyle = P.hair; g.beginPath(); g.arc(x + .5 * s, y + .25 * s - b, .2 * s, Math.PI, 0); g.fill(); }
-  if (P.beard) { g.fillStyle = P.hair; g.beginPath(); g.moveTo(x + .36 * s, y + .36 * s - b); g.lineTo(x + .5 * s, y + .62 * s - b); g.lineTo(x + .64 * s, y + .36 * s - b); g.fill(); }
-  O(.43 + e, .3, .03, '#111'); O(.57 + e, .3, .03, '#111');
+  const hs = P.hairStyle;
+  if (hs === 0 || hs === 1) { g.fillStyle = P.hair; g.beginPath(); g.arc(x + .5 * s, y + .25 * s - b, .2 * s, Math.PI, 0); g.fill(); }
+  else if (hs === 2) poly(P.hair, .3, .25, .34, .04, .42, .17, .5, .0, .58, .17, .66, .04, .7, .25);
+  else if (hs === 4) { g.fillStyle = P.hair; g.beginPath(); g.arc(x + .5 * s, y + .25 * s - b, .2 * s, Math.PI, 0); g.fill(); O(flip ? .76 : .24, .3, .08, P.hair); }
+  else if (hs === 5) for (const [cx, cy] of [[.34, .2], [.44, .12], [.56, .12], [.66, .2], [.5, .16]]) O(cx, cy, .08, P.hair);
+  const eyesY = .3; O(.43 + e, eyesY, .03, P.eyes); O(.57 + e, eyesY, .03, P.eyes);
+  if (P.acc === 1) { g.strokeStyle = P.accCol; g.lineWidth = s * .03; g.beginPath(); g.arc(x + (.43 + e) * s, y + eyesY * s - b, .055 * s, 0, 7); g.moveTo(x + (.625 + e) * s, y + eyesY * s - b); g.arc(x + (.57 + e) * s, y + eyesY * s - b, .055 * s, 0, 7); g.stroke(); }
+  if (P.acc === 2) R(.42 + e, .37, .16, .035, P.hair === LOOK_DEFAULT.hair && P.accCol !== LOOK_DEFAULT.accCol ? P.accCol : P.hair);
+  if (P.acc === 3) R(.3, .44, .4, .07, P.accCol);
+  if (P.acc === 4) poly(P.hair, .36, .36, .5, .62, .64, .36);
+  const hc = P.hatCol;
+  switch (P.hat) {
+    case 1: g.fillStyle = hc; g.beginPath(); g.arc(x + .5 * s, y + .22 * s - b, .2 * s, Math.PI, 0); g.fill(); R(flip ? .18 : .5, .19, .32, .05, hc); break;
+    case 2: poly(hc, .24, .2, .5 + e * 3, -.14, .76, .2); O(.6, .05, .03, '#fde047'); break;
+    case 3: poly('#facc15', .32, .16, .32, .02, .4, .1, .5, 0, .6, .1, .68, .02, .68, .16); O(.5, .1, .025, '#ef4444'); break;
+    case 4: g.fillStyle = '#cbd5e1'; g.beginPath(); g.arc(x + .5 * s, y + .28 * s - b, .21 * s, Math.PI, 0); g.fill(); R(.29, .27, .42, .05, '#64748b'); R(.47, .02, .06, .1, hc); break;
+    case 5: O(.38, .1, .07, hc); O(.5, .12, .04, hc); O(.62, .1, .07, hc); break;
+    case 6: R(.3, .1, .4, .04, '#111'); R(.36, -.1, .28, .2, '#111'); R(.36, .05, .28, .03, hc); break;
+    case 7: R(.34, .1, .32, .06, '#f8fafc'); O(.42, .02, .08, '#f8fafc'); O(.58, .02, .08, '#f8fafc'); O(.5, -.02, .09, '#f8fafc'); break;
+    case 8: R(.4, -.02, .03, .14, '#64748b'); R(.57, -.02, .03, .14, '#64748b'); O(.415, -.03, .04, hc); O(.585, -.03, .04, hc); break;
+  }
 }
 function drawBackground(g, theme, W, H, camX, camY) {
   const th = THEMES[theme] || THEMES[0];
@@ -653,5 +772,5 @@ function run(cv, game, o = {}) {
   };
 }
 
-window.MakerEngine = { PAL, TILES, TILE_ORDER, TALK, NOT_IN, SOLID, THEMES, DEFAULT_SETTINGS, drawTile, drawSprite, drawBackground, blankLevel, exampleGame, run, spriteCanvas };
+window.MakerEngine = { PAL, TILES, PEOPLE, LOOK_DEFAULT, drawLook, TILE_ORDER, TALK, NOT_IN, SOLID, THEMES, DEFAULT_SETTINGS, drawTile, drawSprite, drawBackground, blankLevel, exampleGame, run, spriteCanvas };
 })();

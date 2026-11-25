@@ -472,6 +472,44 @@ body.wm-busy iframe { pointer-events: none !important; }
 .tb-btn.on { background: rgba(255, 255, 255, .14); }
 .tb-btn.launch .app-tile { animation: tbBounce .5s var(--ease); }
 @keyframes tbBounce { 40% { transform: translateY(-8px); } }
+#dock-tip { display: none; }
+/* Pop dock look (2026-11-25): glass bar with a soft accent glow, bigger icons that lift on hover, name labels,
+   a divider before Settings, glowing running dots. Other layouts keep their own docks. */
+:root[data-layout="pop"] #dock-inner {
+  gap: 6px; padding: 7px 9px; border-radius: 24px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dock-bg) 82%, #fff 6%), var(--dock-bg));
+  border: 1px solid rgba(255, 255, 255, .13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 18px 44px rgba(0, 0, 0, .45), 0 10px 34px -14px rgba(var(--accent-rgb), .55);
+}
+:root[data-layout="pop"] #dock .dock-sep { height: 32px; margin: 0 5px; background: linear-gradient(transparent, rgba(255, 255, 255, .22), transparent); }
+:root[data-layout="pop"] #dock .tb-btn { width: 54px; height: 54px; border-radius: 16px; overflow: visible; }
+:root[data-layout="pop"] #dock .tb-btn:hover { background: transparent; }
+:root[data-layout="pop"] #dock .tb-btn .app-tile { width: 44px; height: 44px; border-radius: 13px; box-shadow: 0 4px 10px rgba(0, 0, 0, .28); transition: transform .2s var(--ease), box-shadow .2s; }
+:root[data-layout="pop"] #dock .tb-btn:hover .app-tile { transform: translateY(-6px) scale(1.12); box-shadow: 0 10px 20px rgba(0, 0, 0, .38); }
+:root[data-layout="pop"] #dock .tb-btn:active .app-tile { transform: translateY(-2px) scale(.94); }
+:root[data-layout="pop"] #dock .tb-btn.on { background: rgba(255, 255, 255, .12); }
+:root[data-layout="pop"] #dock .tb-btn.dock-gap { margin-left: 13px; }
+:root[data-layout="pop"] #dock .tb-btn.dock-gap::before { content: ""; position: absolute; left: -10px; top: 11px; bottom: 11px; width: 1px; background: linear-gradient(transparent, rgba(255, 255, 255, .22), transparent); }
+:root[data-layout="pop"] #dock .tb-btn::after { bottom: 0; height: 4px; background: rgba(255, 255, 255, .75); }
+:root[data-layout="pop"] #dock .tb-btn.running::after { width: 5px; }
+:root[data-layout="pop"] #dock .tb-btn.active::after { width: 16px; background: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb), .9); }
+:root[data-layout="pop"] #tb-apps { padding: 12px 2px 0; margin: -12px -2px 0; }   /* headroom so the hover lift isn't clipped */
+:root[data-layout="pop"] #dock-tip {
+  display: block; position: fixed; z-index: 10010; white-space: nowrap; pointer-events: none;
+  padding: 5px 10px; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: var(--text);
+  background: var(--menu-bg); border: 1px solid rgba(255, 255, 255, .1); box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  opacity: 0; transform: translate(-50%, 4px); transition: opacity .14s, transform .14s var(--ease);
+}
+:root[data-layout="pop"] #dock-tip.show { opacity: 1; transform: translate(-50%, 0); }
+:root[data-device="mobile"] #dock-tip { display: none; }
+@media (max-width: 520px) {
+  :root[data-layout="pop"] #dock-inner, :root[data-layout="pop"] #tb-apps { gap: 1px !important; }
+  :root[data-layout="pop"] #dock-inner { padding-left: 5px !important; padding-right: 5px !important; }
+  :root[data-layout="pop"] #dock .tb-btn { width: 40px; height: 48px; }
+  :root[data-layout="pop"] #dock .tb-btn .app-tile { width: 35px; height: 35px; border-radius: 11px; }
+  :root[data-layout="pop"] #dock .tb-btn.dock-gap { margin-left: 7px; }
+  :root[data-layout="pop"] #dock .tb-btn.dock-gap::before { left: -4px; }
+}
 
 .popover {
   position: fixed; z-index: 10005; padding: 12px; border-radius: 14px; border: 1px solid var(--glass-border);
@@ -5076,7 +5114,7 @@ const DEFAULT_SETTINGS = {
   workspaces: 4, snapLayouts: true, powerSaver: false, colorFilter: 'none', startupApps: [], restoreSession: false, dynamicWallpaper: false,
   deviceMode: 'desktop', mobileNav: true, appOpacityAll: 100, appOpacity: {}, desktopPet: 'none', petColor: '', petSize: 38, customPets: [], pnWeather: false, clipHistory: true,
   theme: 'dark', iconStyle: 'pop', accent: '#faa41a', wallpaper: 'pop-peaks', customWallpaper: '', username: 'User',
-  pinned: ['explorer', 'linuxfiles', 'seraph', 'gx', 'browser', 'notepad', 'terminal', 'store', 'settings'], firstLogin: true, volume: 70, muted: false,
+  pinned: ['browser', 'linuxfiles', 'messages', 'terminal', 'scrcpy', 'codestudio', 'gamehub', 'settings'], firstLogin: true, volume: 70, muted: false,
   tiling: false, activeHint: true, scheme: 'dark', lastDark: 'dark',
   layout: 'pop', dockSize: 'm', clock24: false, clockSeconds: false, clockDate: true, deskClock: false, hotCorner: true,
   slideshow: 0, brightness: 100, nightLight: false, dnd: false, notifSound: false, lockPin: '', autoLock: 0, setupDone: false,
@@ -5117,6 +5155,13 @@ if (storedSettings && (storedSettings.version || 1) < 8) {
   if (v < 6) Object.assign(Settings.data, { iconStyle: 'pop', layout: 'pop', setupDone: false });   // v6: new icons, layouts, setup
   if (v < 8 && (!Settings.data.osName || Settings.data.osName === 'NoxOS')) Settings.data.osName = 'SanjivramOS';   // v8: renamed to SanjivramOS
   Settings.data.version = 8;
+  Store.set('settings', Settings.data);
+}
+
+/* Dock v2 (2026-11-25): Web Browser, Files (Linux), Messages, Terminal, scrcpy, Code Studio, Sakthula, Settings last. Applied once to existing setups. */
+if ((Settings.data.dockV || 0) < 2) {
+  Settings.data.pinned = ['browser', 'linuxfiles', 'messages', 'terminal', 'scrcpy', 'codestudio', 'gamehub', 'settings'];
+  Settings.data.dockV = 2;
   Store.set('settings', Settings.data);
 }
 
@@ -6593,6 +6638,16 @@ const Taskbar = {
     ['#ws-btn', '#pn-workspaces'].forEach(sel => { const el = $(sel); el && el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation();
       ContextMenu.show(e.clientX, e.clientY, [{ label: 'Hide the Workspaces button', icon: 'close', action: () => { Settings.set('hideWs', true); Toast.show('Workspaces button hidden', 'Bring it back in Settings → Rules & Extras. Ctrl+Alt+W still works.', 'workspaces', 3500); } }]); }); });
     $('#dock').addEventListener('contextmenu', e => { if (!e.target.closest('.tb-btn[data-app]')) e.preventDefault(); });
+    // Name label above the hovered dock icon (Pop layout; a floating element so the scrolling icon row can't clip it).
+    const tip = document.body.appendChild(h('<div id="dock-tip" aria-hidden="true"></div>'));
+    let tipT = 0;
+    $('#dock').addEventListener('mouseover', e => {
+      const b = e.target.closest('.tb-btn'); if (!b) return;
+      const text = b.dataset.tip || b.getAttribute('title') || ''; if (!text || document.documentElement.classList.contains('rd-dragging')) return;
+      clearTimeout(tipT); tipT = setTimeout(() => { const r = b.getBoundingClientRect(); tip.textContent = text; tip.style.left = (r.left + r.width / 2) + 'px'; tip.style.top = (r.top - 38) + 'px'; tip.classList.add('show'); }, tip.classList.contains('show') ? 0 : 140);
+    });
+    $('#dock').addEventListener('mouseout', e => { const from = e.target.closest('.tb-btn'); if (from && e.relatedTarget && from.contains(e.relatedTarget)) return; clearTimeout(tipT); tipT = setTimeout(() => tip.classList.remove('show'), 60); });
+    $('#dock').addEventListener('pointerdown', () => { clearTimeout(tipT); tip.classList.remove('show'); });
     Bus.on('wm', () => this.render());
     Bus.on('settings', ({ key }) => { if (key === 'pinned') this.render(); });
     Bus.on('apps', () => this.render());
@@ -6627,9 +6682,13 @@ const Taskbar = {
       existing.delete(id);
       if (this.appsEl.children[i] !== b) this.appsEl.insertBefore(b, this.appsEl.children[i] || null);
       const wins = WM.windowsOf(id);
+      b.classList.toggle('dock-gap', (id === 'settings' && i === pinned.length - 1 && i > 0) || (i === pinned.length && i > 0));
       b.classList.toggle('running', wins.length > 0);
       b.classList.toggle('active', !!WM.active && WM.active.appId === id);
       b.title = wins.length > 1 ? `${Apps.get(id).name} (${wins.length} windows)` : wins[0] ? wins[0].title : Apps.get(id).name;
+      b.dataset.tip = sakthulaText(Apps.get(id).name) + (wins.length > 1 ? ` · ${wins.length} windows` : '');
+      b.setAttribute('aria-label', b.dataset.tip);
+      if (document.documentElement.dataset.layout === 'pop') b.removeAttribute('title');   // the dock label replaces the browser tooltip
     });
     existing.forEach(b => b.remove());
   },
