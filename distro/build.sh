@@ -22,7 +22,8 @@ lb config \
   --debian-installer "${SJ_INSTALLER:-live}" \
   --debian-installer-gui true \
   --apt-recommends true \
-  --firmware-binary true --firmware-chroot true \
+  --firmware-binary false --firmware-chroot true \
+  --chroot-squashfs-compression-type xz \
   --iso-application "SanjivramOS" \
   --iso-volume "SANJIVRAMOS" \
   --iso-publisher "SanjivramOS; https://github.com/BabuManian/sanjivramos" \
@@ -44,3 +45,6 @@ ISO="$HERE/out/sanjivramos-amd64.iso"
 mv -f "$WORK"/*.iso "$ISO"
 (cd "$HERE/out" && sha256sum "$(basename "$ISO")" > "$(basename "$ISO").sha256")
 ls -lh "$HERE/out"
+# GitHub release files must be under 2 GiB.
+size=$(stat -c %s "$ISO"); echo "ISO size: $((size / 1048576)) MiB"
+[ "$size" -lt 2147000000 ] || { echo "ISO is too big for a GitHub release (2 GiB max)"; exit 1; }

@@ -8,7 +8,7 @@ if [ ! -s "$DATA/site-password" ]; then
 fi
 export SITE_PASSWORD="$(cat "$DATA/site-password")"
 export SANJIVRAM_DATA="$DATA" GAMES_DIR="$APP/games" PORT="${PORT:-8080}" SANJIVRAM_SHELL=1
-export SANJIVRAM_CHROMIUM=/usr/bin/chromium
+[ -x /usr/bin/chromium ] && export SANJIVRAM_CHROMIUM=/usr/bin/chromium   # optional, for other devices: sudo apt install chromium
 # Linux apps open as real windows on this computer's screen (Openbox), not through noVNC.
 export SANJIVRAM_NATIVE=1 DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority"
 export XDG_RUNTIME_DIR="/run/user/$(id -u)" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"

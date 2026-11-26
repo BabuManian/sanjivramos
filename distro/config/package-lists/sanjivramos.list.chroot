@@ -57,9 +57,6 @@ pipewire-audio
 wireplumber
 alsa-utils
 
-# The SanjivramOS "Web Browser" app drives a real Chromium
-chromium
-
 # Fonts
 fonts-dejavu
 fonts-noto-core

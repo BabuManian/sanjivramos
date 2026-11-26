@@ -33,7 +33,7 @@ The ISO ends up in `distro/out/`.
 
 ## How it fits together
 - `build.sh`: live-build configuration (trixie, amd64, ISO hybrid image, Debian installer)
-- `config/package-lists/`: packages (kernel, firmware, Xorg, Electron libraries, PipeWire, Chromium for the Web Browser app, fastfetch)
+- `config/package-lists/`: packages (kernel, firmware, Xorg, Electron libraries, PipeWire, fastfetch)
 - `config/hooks/normal/0500-sanjivramos.hook.chroot`: installs Node 22, creates the `sanjivram` user, clones this repo, installs dependencies and turns on the services
 - `config/includes.chroot/`: systemd units, the updater (`update.sh`), server launcher, X session and fastfetch config
 - `shell/`: the Electron app (`main.js` window + webview browser, `preload.js` = `window.sjNative` for SanjivramOS). It shows a splash with the update progress, then opens `http://localhost:8080/` full screen
