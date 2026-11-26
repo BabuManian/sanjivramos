@@ -1,0 +1,45 @@
+#!/bin/bash
+# Runs inside the new system while the ISO is built: Node 22, the sanjivram user, a first copy of SanjivramOS
+# (so it also works offline), the Electron shell, services and branding.
+set -eux
+export DEBIAN_FRONTEND=noninteractive
+. /etc/sanjivramos/sanjivramos.conf
+
+# Node.js 22 (the server uses node:sqlite, which Debian's Node 20 doesn't have)
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
+node -v
+
+# The desktop user (auto-logs-in into the Electron shell). Password: sanjivram — change it with `passwd`.
+id sanjivram >/dev/null 2>&1 || useradd -m -s /bin/bash -c "SanjivramOS" sanjivram
+for g in audio video input render netdev sudo plugdev; do getent group "$g" >/dev/null && usermod -aG "$g" sanjivram; done
+echo 'sanjivram:sanjivram' | chpasswd
+install -d -o sanjivram -g sanjivram -m 0750 /var/lib/sanjivramos
+
+# First copy of SanjivramOS + dependencies (root-owned; the boot updater keeps it fresh)
+rm -rf /opt/sanjivramos/app
+install -d /opt/sanjivramos
+git clone --depth 1 -b "$SJ_BRANCH" "$SJ_REPO" /opt/sanjivramos/app
+/usr/lib/sanjivramos/update.sh --deps-only
+
+# Services
+systemctl enable NetworkManager.service sanjivramos-update.service sanjivramos-server.service sanjivramos-session.service
+systemctl disable getty@tty1.service || true
+systemctl set-default graphical.target
+
+# Branding
+echo sanjivramos > /etc/hostname
+sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tsanjivramos/' /etc/hosts || true
+grep -q sanjivramos /etc/hosts || echo -e '127.0.1.1\tsanjivramos' >> /etc/hosts
+printf 'SanjivramOS \\n \\l  (Ctrl+Alt+F1 = desktop)\n\n' > /etc/issue
+cat >> /etc/bash.bashrc <<'RC'
+
+# SanjivramOS
+alias neofetch=fastfetch
+[ -z "${SJ_NO_FASTFETCH:-}" ] && [ -t 1 ] && command -v fastfetch >/dev/null && fastfetch
+RC
+
+# Slimmer image
+npm cache clean --force || true
+rm -rf /root/.cache /home/sanjivram/.cache
+apt-get clean

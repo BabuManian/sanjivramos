@@ -1,0 +1,11 @@
+{
+  "name": "sanjivramos-shell",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SanjivramOS desktop shell for the SanjivramOS Linux distro (full-screen Electron).",
+  "main": "main.js",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "electron": "^37.2.0"
+  }
+}

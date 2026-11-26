@@ -1,0 +1,66 @@
+# Base system
+linux-image-amd64
+live-boot
+live-config
+live-config-systemd
+systemd-sysv
+sudo
+locales
+console-setup
+keyboard-configuration
+ca-certificates
+curl
+wget
+git
+nano
+less
+htop
+fastfetch
+bash-completion
+network-manager
+wpasupplicant
+openssh-client
+firmware-linux-free
+firmware-linux-nonfree
+firmware-misc-nonfree
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+intel-microcode
+amd64-microcode
+
+# Display (X11 kiosk for the Electron shell)
+xserver-xorg-core
+xserver-xorg-legacy
+xserver-xorg-video-all
+xserver-xorg-input-libinput
+xinit
+x11-xserver-utils
+xterm
+mesa-utils
+libgl1-mesa-dri
+
+# Electron runtime libraries
+libnss3
+libgtk-3-0t64
+libasound2t64
+libgbm1
+libxss1
+libxshmfence1
+libdrm2
+libnotify4
+libsecret-1-0
+xdg-utils
+
+# Sound
+pipewire-audio
+wireplumber
+alsa-utils
+
+# The SanjivramOS "Web Browser" app drives a real Chromium
+chromium
+
+# Fonts
+fonts-dejavu
+fonts-noto-core
+fonts-noto-color-emoji

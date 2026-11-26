@@ -1,0 +1,14 @@
+[Unit]
+Description=SanjivramOS server
+After=sanjivramos-update.service network.target
+Wants=sanjivramos-update.service
+
+[Service]
+User=sanjivram
+Group=sanjivram
+ExecStart=/usr/lib/sanjivramos/server.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

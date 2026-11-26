@@ -1,0 +1,14 @@
+[Unit]
+Description=Download the latest SanjivramOS from GitHub
+Wants=network-online.target
+After=network-online.target
+Before=sanjivramos-server.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/sanjivramos/update.sh
+TimeoutStartSec=420
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

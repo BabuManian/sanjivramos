@@ -1,0 +1,11 @@
+#!/bin/sh
+# The X session: just the SanjivramOS Electron shell, full screen.
+xset s off -dpms s noblank 2>/dev/null
+xsetroot -solid black 2>/dev/null
+SHELL_DIR=/opt/sanjivramos/app/distro/shell
+ELECTRON="$SHELL_DIR/node_modules/electron/dist/electron"
+if [ ! -x "$ELECTRON" ]; then
+  # Shell missing (first boot offline with a broken copy?) — give a terminal instead of a black screen.
+  exec xterm -maximized -e sh -c 'echo "SanjivramOS shell is missing. Connect to the internet and run: sudo systemctl restart sanjivramos-update"; exec bash'
+fi
+exec "$ELECTRON" "$SHELL_DIR" --ozone-platform=x11

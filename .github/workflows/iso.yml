@@ -1,0 +1,38 @@
+# Builds the SanjivramOS Linux ISO (Debian trixie + Electron) and publishes it as the "iso-latest" release.
+name: Build SanjivramOS ISO
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['distro/**', '.github/workflows/iso.yml']
+permissions:
+  contents: write
+concurrency:
+  group: iso
+  cancel-in-progress: true
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+      - name: Build ISO (Debian trixie container)
+        run: |
+          docker run --rm --privileged -v "$PWD:/src" \
+            -e SJ_REPO="https://github.com/${{ github.repository }}.git" -e SJ_BRANCH="${{ github.ref_name }}" \
+            debian:trixie bash /src/distro/build.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view iso-latest >/dev/null 2>&1 || gh release create iso-latest --prerelease --title "SanjivramOS Linux (latest ISO)" \
+            --notes "Debian-based SanjivramOS live/installer ISO for 64-bit PCs. Flash it to a USB stick (balenaEtcher, Rufus or dd) and boot. It downloads the newest SanjivramOS from GitHub on every boot."
+          gh release upload iso-latest distro/out/sanjivramos-amd64.iso distro/out/sanjivramos-amd64.iso.sha256 --clobber
+          gh release edit iso-latest --notes "Built $(date -u +'%Y-%m-%d %H:%M UTC') from ${GITHUB_SHA::7}. Flash sanjivramos-amd64.iso to a USB stick (balenaEtcher, Rufus or dd) and boot it. Login/sudo password: sanjivram. It downloads the newest SanjivramOS from GitHub on every boot."
+      - name: Build log on failure
+        if: failure()
+        run: sudo tail -n 200 /var/tmp/sanjivramos-build/build.log 2>/dev/null || true
