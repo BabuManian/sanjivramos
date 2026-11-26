@@ -1,11 +1,13 @@
 {
   "name": "sanjivramos-shell",
-  "version": "1.0.0",
+  "productName": "SanjivramOS",
+  "version": "2.0.0",
   "private": true,
-  "description": "SanjivramOS desktop shell for the SanjivramOS Linux distro (full-screen Electron).",
+  "description": "SanjivramOS desktop shell for the SanjivramOS Linux distro (Electron).",
   "main": "main.js",
   "license": "GPL-3.0-or-later",
   "dependencies": {
-    "electron": "^37.2.0"
+    "@ghostery/adblocker-electron": "^2.20.0",
+    "electron": "^44.0.0"
   }
 }

@@ -1,7 +1,7 @@
 // Linux apps made in SanjivramOS's App Store ("Make a Linux App"): a command that runs on this machine, either in a
 // terminal window (CLI) or on the VNC desktop shown by noVNC (GUI). Same rules as the phone shell:
 // SANJIVRAM_SHELL=1 and a SITE_PASSWORD, and requests must come from SanjivramOS itself.
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +10,9 @@ import path from 'node:path';
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 const DISTRO = /^[a-z0-9][\w.-]{0,40}$/i;
+/** SanjivramOS Linux (the distro): apps open as real windows on this computer's own screen instead of the noVNC display. */
+export const NATIVE = process.env.SANJIVRAM_NATIVE === '1';
+const APPS_DISPLAY = NATIVE ? (process.env.DISPLAY || ':0') : ':3';
 const ID = /^lx-[a-z0-9]{1,24}$/;
 
 /** Checks an app description from the browser; returns null when it's unusable. */
@@ -31,7 +34,7 @@ export function parseSpec(o) {
  *  inside a proot-distro Linux when one is chosen. */
 export function buildScript(spec) {
   const inner = [];
-  if (spec.mode === 'gui' && !spec.fromMenu) inner.push('export DISPLAY=:3');   // the Fluxbox apps display (menu launchers keep their own)
+  if (spec.mode === 'gui' && !spec.fromMenu) inner.push(`export DISPLAY=${APPS_DISPLAY}`);   // the apps display (menu launchers keep their own)
   if (spec.cwd) inner.push(`cd ${spec.cwd.startsWith('~/') ? '"$HOME"/' + q(spec.cwd.slice(2)) : q(spec.cwd)} || exit 1`);
   if (spec.setup) {
     const bin = (spec.cmd.match(/^\s*([^\s=;&|<>()]+)(\s|$)/) || [])[1];
@@ -69,7 +72,7 @@ function appsBus() {
 }
 
 export function runGui(spec, logFile) {
-  const env = { ...process.env, DISPLAY: ':3', ...appsBus() };
+  const env = { ...process.env, DISPLAY: APPS_DISPLAY, ...(NATIVE ? {} : appsBus()) };
   delete env.SITE_PASSWORD;
   return new Promise(resolve => {
     let out = '';
@@ -128,6 +131,50 @@ export function readJson(req, limit = 1024 * 1024) {
     req.on('end', () => { try { resolve(JSON.parse(Buffer.concat(parts).toString() || '{}')); } catch (e) { reject(e); } });
     req.on('error', reject);
   });
+}
+
+/* ===================== Native app windows (SanjivramOS Linux: Openbox on the real screen) ===================== */
+const run = (cmd, args) => new Promise(res => execFile(cmd, args, { env: { ...process.env, DISPLAY: APPS_DISPLAY }, timeout: 4000, maxBuffer: 1 << 20 }, (err, out) => res(err ? '' : String(out))));
+const XID = /^0x[0-9a-f]{1,8}$/i;
+/** Open app windows: id, pid, class, title, minimized, active. The SanjivramOS window itself is left out. */
+export async function listXWins() {
+  if (!NATIVE) return { wins: [] };
+  const [list, act] = await Promise.all([run('wmctrl', ['-lpx']), run('xprop', ['-root', '_NET_ACTIVE_WINDOW'])]);
+  const active = (/0x[0-9a-f]+/i.exec(act.split('#')[1] || '') || [''])[0];
+  const wins = [];
+  for (const line of list.split('\n')) {
+    // 0x01e00003  0 1234   firefox-esr.Firefox-esr  host Title words
+    const m = /^(0x[0-9a-f]+)\s+(-?\d+)\s+(\d+)\s+(\S+)\s+\S+\s?(.*)$/i.exec(line.trim());
+    if (!m || m[5] === 'SanjivramOS Desktop' || m[2] === '-1') continue;
+    const [inst, ...cls] = m[4].split('.');
+    wins.push({ id: m[1], pid: +m[3], instance: inst, cls: cls.join('.'), title: m[5] || cls.join('.') || inst });
+  }
+  await Promise.all(wins.map(async w => {
+    const st = await run('xprop', ['-id', w.id, '_NET_WM_STATE']);
+    w.minimized = /_NET_WM_STATE_HIDDEN/.test(st);
+    w.active = !!active && parseInt(active, 16) === parseInt(w.id, 16);
+  }));
+  return { wins };
+}
+/** activate | minimize | close | maximize */
+export async function xwinOp(id, op) {
+  if (!NATIVE || !XID.test(String(id))) throw new Error('bad window');
+  if (op === 'activate') await run('wmctrl', ['-ia', id]);
+  else if (op === 'close') await run('wmctrl', ['-ic', id]);
+  else if (op === 'minimize') await run('xdotool', ['windowminimize', String(parseInt(id, 16))]);
+  else if (op === 'maximize') await run('wmctrl', ['-ir', id, '-b', 'toggle,maximized_vert,maximized_horz']);
+  else throw new Error('bad op');
+  return { ok: true };
+}
+let lastMargins = '';
+/** Room Openbox leaves for SanjivramOS's panel and dock when an app is maximized. */
+export async function setXMargins(m) {
+  if (!NATIVE) return { ok: false };
+  const v = ['top', 'bottom', 'left', 'right'].map(k => String(Math.max(0, Math.min(2000, m[k] | 0))));
+  if (v.join(' ') === lastMargins) return { ok: true, same: true };
+  lastMargins = v.join(' ');
+  await run('/usr/lib/sanjivramos/openbox-setup.sh', v);
+  return { ok: true };
 }
 
 /* ===================== Installed Linux apps (freedesktop .desktop files) ===================== */

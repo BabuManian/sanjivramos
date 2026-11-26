@@ -64,3 +64,12 @@ chromium
 fonts-dejavu
 fonts-noto-core
 fonts-noto-color-emoji
+
+# Native Linux app windows (instead of noVNC)
+openbox
+wmctrl
+xdotool
+x11-utils
+dbus-user-session
+dbus-x11
+perl

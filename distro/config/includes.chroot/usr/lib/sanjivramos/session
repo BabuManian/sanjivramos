@@ -1,7 +1,11 @@
 #!/bin/sh
-# The X session: just the SanjivramOS Electron shell, full screen.
+# The X session: Openbox (manages real Linux app windows) + the SanjivramOS Electron shell under them.
 xset s off -dpms s noblank 2>/dev/null
 xsetroot -solid black 2>/dev/null
+# Apps started by the server (same user) find this screen and session bus.
+command -v dbus-update-activation-environment >/dev/null && dbus-update-activation-environment --systemd DISPLAY XAUTHORITY 2>/dev/null
+/usr/lib/sanjivramos/openbox-setup.sh 0 0 0 0
+openbox --sm-disable &
 SHELL_DIR=/opt/sanjivramos/app/distro/shell
 ELECTRON="$SHELL_DIR/node_modules/electron/dist/electron"
 if [ ! -x "$ELECTRON" ]; then

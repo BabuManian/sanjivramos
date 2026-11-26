@@ -126,7 +126,14 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 ::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, .35); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 body.wm-busy, body.wm-busy * { user-select: none !important; }
-body.wm-busy iframe { pointer-events: none !important; }
+body.wm-busy iframe, body.wm-busy webview { pointer-events: none !important; }
+.nb-view webview { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: flex; }
+.nb-view webview:not(.on) { visibility: hidden; pointer-events: none; }
+.vip-tab img.nb-fav { width: 14px; height: 14px; flex: none; object-fit: contain; }
+.nb .vip-find small { min-width: 64px; font-size: 12px; color: var(--text-2); }
+.nb .vip-over { z-index: 2; }
+.window.nb-fs .titlebar { display: none; }
+.tb-btn.tb-x.xmin .app-tile { opacity: .55; filter: saturate(.6); }
 
 /* App icon tiles. Five styles: Pop (default, full-colour artwork), Circles, Monochrome (new) and
    Graphite, Colorful (older). Every style sets the same properties so previews can override the page style. */
@@ -5962,6 +5969,7 @@ const WM = {
     if (!app) { Toast.show('App not found', `"${appId}" is not installed.`, 'info'); return null; }
     StartMenu.hide();
     if (app.direct) { app.direct(args); return null; }   // e.g. Android apps: open on the phone, no window here
+    if (app.native && SanjServer.native && app.native(args)) return null;   // SanjivramOS Linux: a real window on screen instead
     const existing = app.singleton ? this.windowsOf(appId)[0] : (app.findExisting ? app.findExisting(args) : null);
     if (existing) { this.focus(existing); existing.receive && existing.receive(args); return existing; }
 
@@ -8734,6 +8742,7 @@ Apps.register({
   keywords: 'web browser internet chromium chrome vip real browser no proxy fast google youtube tabs bookmarks', aliases: ['web', 'internet', 'browser', 'vip', 'chromium', 'chrome', 'vipbrowser'],
   findExisting(args) { return args.newWindow ? null : WM.windowsOf('browser')[0] || null; },
   launch(win, args = {}) {
+    if (window.sjNative && window.sjNative.webview && !args.file) return nativeBrowser(win, args);   // SanjivramOS Linux: real Chromium tabs
     const q = s => $(s, win.body);
     let o = VipData.opts();
     // App mode (Discord etc.): the site runs as its own app — no tabs, address bar or bookmarks, and Home is the app's own page.
@@ -10068,6 +10077,11 @@ Apps.register({
 /* ---------------- Apps: Linux (noVNC) & scrcpy ---------------- */
 /** Shows one of the server's VNC displays through noVNC. `path` picks the display; `bare` hides noVNC's side panel. */
 function launchVnc(win, { path, title, bare }) {
+  if (SanjServer.native) {   // SanjivramOS Linux: no VNC — apps are real windows on this screen
+    win.body.innerHTML = `<div class="lx-start">${tile('penguin', 'linear-gradient(135deg,#fdba74,#ea580c)')}<b>Linux apps open as real windows here</b><small>On SanjivramOS Linux there’s no remote desktop to show: every Linux app gets its own fast, native window, with a button in the dock.</small><span class="cust-presets"><button class="btn primary" data-open-app="linuxapps">${svg('penguin')}Linux Apps</button><button class="btn" data-open-app="terminal">${svg('terminal')}Terminal</button></span></div>`;
+    win.body.addEventListener('click', e => { const b = e.target.closest('[data-open-app]'); if (b) { WM.open(b.dataset.openApp); WM.close(win, true); } });
+    return;
+  }
   if (!SanjServer.desktop) {
     win.body.innerHTML = `<div class="set-card" style="margin:24px"><div class="set-label">The phone desktop isn’t switched on</div><div class="set-desc" style="margin-top:6px">${SanjServer.server
       ? 'On the phone, in Termux, run:<br><code>sanjivramos shell on</code><br><code>sanjivramos restart</code><br>then reopen this app.'
@@ -10075,7 +10089,7 @@ function launchVnc(win, { path, title, bare }) {
     return;
   }
   // The path goes in the URL every time: noVNC remembers settings per site, so the two apps would otherwise share one.
-  win.body.innerHTML = `<iframe title="${esc(title)}" style="width:100%;height:100%;border:0;display:block;background:#1e1c1b" src="${SanjServer.base.pathname}vendor/novnc17/vnc.html?path=${path}" allow="clipboard-read; clipboard-write; fullscreen" allowfullscreen></iframe>`;
+  win.body.innerHTML = `<iframe title="${esc(title)}" style="width:100%;height:100%;border:0;display:block;background:#1e1c1b" src="${SanjServer.base.pathname}vendor/novnc17/vnc.html?path=${path}&autoconnect=true&reconnect=true&reconnect_delay=800${/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? '&compression=0&quality=9' : '&compression=2&quality=6'}" allow="clipboard-read; clipboard-write; fullscreen" allowfullscreen></iframe>`;
   const f = $('iframe', win.body);
   if (bare) f.addEventListener('load', () => { try { f.contentDocument.head.appendChild(Object.assign(f.contentDocument.createElement('style'), { textContent: '#noVNC_control_bar_anchor,#noVNC_control_bar_handle{display:none!important}' })); } catch {} });
   win.onFocus = () => setTimeout(() => { try { f.contentWindow.focus(); } catch {} }, 0);
@@ -18631,14 +18645,14 @@ Bus.on('ws', () => { if (Settings.get('wsWallpaperOn')) Theme.apply(); });
 const loadScript = src => new Promise((res, rej) => { if ($(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Couldn’t load ' + src)); document.head.appendChild(s); });
 const SanjServer = {
   base: new URL('.', location.href),
-  server: null, shell: false, claude: false, vip: false, slander: false, files: false, desktop: false, games: [],
+  server: null, native: false, shell: false, claude: false, vip: false, slander: false, files: false, desktop: false, games: [],
   web() { return /^https?:$/.test(location.protocol) && !Desk.ok; },
   async detect() {
     if (!this.web()) { this.server = false; return false; }
     try {
       const r = await fetch(new URL('sanjivram-server.json', this.base), { cache: 'no-store' });
       const j = r.ok ? await r.json() : {};
-      this.server = j.app === 'SanjivramOS'; this.httpsPort = +j.httpsPort || 0; this.shell = !!j.shell; this.claude = !!j.claude; this.vip = !!j.vip; this.slander = !!j.slander; this.files = !!j.files; this.desktop = !!j.desktop; this.games = j.games || [];
+      this.server = j.app === 'SanjivramOS'; this.native = !!j.native; this.httpsPort = +j.httpsPort || 0; this.shell = !!j.shell; this.claude = !!j.claude; this.vip = !!j.vip; this.slander = !!j.slander; this.files = !!j.files; this.desktop = !!j.desktop; this.games = j.games || [];
     } catch { this.server = false; }
     Bus.emit('server'); return this.server;
   }
@@ -19093,6 +19107,7 @@ const LinuxApps = {
       id: a.id, name: a.name, icon: a.icon || (a.mode === 'gui' ? 'workspaces' : 'terminal'), color: a.color,
       width: a.mode === 'gui' ? 1100 : 820, height: a.mode === 'gui' ? 700 : 520, minWidth: 360,
       keywords: `linux ${a.mode} ${a.cmd} ${a.desc || ''}`.toLowerCase(), linuxApp: true,
+      native() { const cur = LinuxApps.get(a.id) || a; if (cur.mode !== 'gui') return false; NativeWins.run(cur); return true; },
       launch(win) { const cur = LinuxApps.get(a.id) || a; if (cur.mode === 'gui') launchLinuxGui(win, cur); else launchLinuxCli(win, cur); }
     });
   },
@@ -19135,6 +19150,7 @@ function launchLinuxCli(win, a) {
 }
 /** GUI app: start it on display :1 (starting the desktop if needed), then show that display. */
 async function launchLinuxGui(win, a) {
+  if (SanjServer.native) { NativeWins.run(a); setTimeout(() => WM.close(win, true), 0); return; }   // real window on screen
   if (!SanjServer.desktop) return lxNeedsShell(win, esc(a.name));
   win.body.innerHTML = `<div class="lx-start">${tile(a.icon, a.color)}<b>Starting ${esc(a.name)}…</b><small>${a.setup ? 'The first start may install it, which can take a few minutes.' : 'Starting the apps screen (Fluxbox) if it isn’t running yet.'}</small><div class="st-progress lx-spin"><div></div></div></div>`;
   try {
@@ -19656,6 +19672,7 @@ const LinuxSys = {
         id, name: this.label(a), icon: this.iconOf(a), color: this.colorOf(a), hidden: true, linuxSys: true,
         width: a.terminal ? 820 : 1100, height: a.terminal ? 520 : 700, minWidth: 360,
         keywords: `linux ${a.section} ${a.generic} ${a.comment} ${a.keywords} ${a.exec} ${a.distro}`.toLowerCase(),
+        native(args = {}) { const x = LinuxSys.find(id) || a; if (x.terminal || args.cli) return false; NativeWins.run(LinuxSys.spec(x)); return true; },
         launch(win, args = {}) { LinuxSys.launchIn(win, LinuxSys.find(id) || a, args); }
       });
     }
@@ -19719,6 +19736,279 @@ const LinuxSys = {
     setTimeout(() => this.maybeRefresh(), 3000);
   }
 };
+
+/* ---------------- SanjivramOS Linux (the distro): real app windows + Electron browser tabs ---------------- */
+/** Linux GUI apps open as real windows on this computer's screen (Openbox under the Electron shell) — no noVNC.
+ *  Their windows get dock buttons, and Openbox is told how much room the panel and dock need. */
+const NativeWins = {
+  wins: [], timer: 0, recent: new Map(), lastMargins: '',
+  on() { return !!SanjServer.native; },
+  binOf(cmd) { const m = String(cmd || '').match(/^\s*(?:env\s+(?:\S+=\S+\s+)*)?("[^"]+"|\S+)/); return m ? m[1].replace(/"/g, '').split('/').pop().toLowerCase() : ''; },
+  /** Start a GUI app. Its window shows up on screen and in the dock. */
+  async run(spec, look = {}) {
+    const bin = this.binOf(spec.cmd);
+    if (bin) this.recent.set(bin, { icon: look.icon || spec.icon, color: look.color || spec.color, name: spec.name });
+    Toast.show(`Opening ${spec.name}…`, spec.setup ? 'The first start may install it, which can take a few minutes.' : '', 'external', 1600);
+    try { await LinuxApps.server('run', LinuxApps.spec(spec)); setTimeout(() => this.poll(), 700); }
+    catch (err) { Toast.show(`${spec.name} didn’t start`, (err.message + (err.output ? '\n' + err.output.slice(-300) : '')), 'info', 5000); }
+  },
+  /** Icon for a window: the app that was launched for it, else an installed app with the same program name. */
+  look(w) {
+    const keys = [w.instance, w.cls].map(s => String(s || '').toLowerCase()).filter(Boolean);
+    for (const k of keys) { const r = this.recent.get(k) || [...this.recent.entries()].find(([b]) => k.includes(b) || b.includes(k))?.[1]; if (r) return r; }
+    const a = LinuxSys.all().find(x => { const b = this.binOf(x.exec); return b && keys.some(k => k === b || k.startsWith(b) || b.startsWith(k)); });
+    return a ? { icon: LinuxSys.iconOf(a), color: LinuxSys.colorOf(a), name: a.name } : { icon: 'workspaces', color: 'linear-gradient(135deg,#64748b,#334155)', name: w.cls || w.instance };
+  },
+  async op(w, op) { try { await LinuxApps.server('xwin', { id: w.id, op }); } catch {} setTimeout(() => this.poll(), 120); },
+  async poll() {
+    if (!this.on()) return;
+    try { this.wins = (await LinuxApps.server('xwins', {})).wins || []; } catch { this.wins = []; }
+    this.render();
+  },
+  render() {
+    const box = $('#tb-apps'); if (!box) return;
+    const have = new Map($$('.tb-x', box).map(b => [b.dataset.xwin, b]));
+    for (const w of this.wins) {
+      let b = have.get(w.id); have.delete(w.id);
+      const lk = this.look(w);
+      if (!b) {
+        b = h(`<button class="tb-btn tb-x running" data-xwin="${esc(w.id)}">${tile(lk.icon, lk.color)}</button>`);
+        b.addEventListener('click', () => { const x = this.wins.find(y => y.id === b.dataset.xwin); if (x) this.op(x, x.active && !x.minimized ? 'minimize' : 'activate'); });
+        b.addEventListener('contextmenu', e => {
+          e.preventDefault(); e.stopPropagation();
+          const x = this.wins.find(y => y.id === b.dataset.xwin); if (!x) return;
+          ContextMenu.show(e.clientX, e.clientY, [{ title: x.title }, { label: x.minimized ? 'Show' : 'Minimize', icon: 'min', action: () => this.op(x, x.minimized ? 'activate' : 'minimize') },
+            { label: 'Maximize', icon: 'max', action: () => this.op(x, 'maximize') }, '-', { label: 'Close', icon: 'close', danger: true, action: () => this.op(x, 'close') }]);
+        });
+        box.appendChild(b);
+      }
+      b.classList.toggle('active', !!w.active && !w.minimized);
+      b.classList.toggle('xmin', !!w.minimized);
+      b.title = w.title; b.dataset.tip = `${w.title}`; b.setAttribute('aria-label', w.title);
+    }
+    have.forEach(b => b.remove());
+  },
+  /** Room for SanjivramOS's panel and dock, in screen pixels, so maximized apps don't cover them. */
+  margins() {
+    const vis = el => { if (!el) return null; const r = el.getBoundingClientRect(), cs = getComputedStyle(el); return r.width && r.height && cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity !== 0 ? r : null; };
+    const W = innerWidth, H = innerHeight, m = { top: 0, bottom: 0, left: 0, right: 0 };
+    for (const r of [vis($('#panel')), vis($('#dock'))].filter(Boolean)) {
+      if (r.width > W * 0.5 && r.top <= 4 && r.height < H / 3) m.top = Math.max(m.top, r.bottom);
+      else if (r.width > W * 0.3 && r.bottom >= H - 4 && r.height < H / 3) m.bottom = Math.max(m.bottom, H - r.top);
+      else if (r.height > H * 0.3 && r.left <= 4 && r.width < W / 3) m.left = Math.max(m.left, r.right);
+      else if (r.height > H * 0.3 && r.right >= W - 4 && r.width < W / 3) m.right = Math.max(m.right, W - r.left);
+    }
+    const d = devicePixelRatio || 1;
+    Object.keys(m).forEach(k => { m[k] = Math.round(m[k] * d); });
+    const key = JSON.stringify(m);
+    if (key !== this.lastMargins) { this.lastMargins = key; LinuxApps.server('xmargins', m).catch(() => { this.lastMargins = ''; }); }
+  },
+  start() {
+    if (!this.on() || this.timer) return;
+    document.documentElement.classList.add('sj-native');
+    this.timer = setInterval(() => { if (!document.hidden) this.poll(); }, 1500);
+    let mt; const later = () => { clearTimeout(mt); mt = setTimeout(() => this.margins(), 400); };
+    addEventListener('resize', later); Bus.on('settings', later); setInterval(() => this.margins(), 5000);
+    this.poll(); later();
+  },
+  init() { Bus.on('server', () => this.start()); }
+};
+
+/** Web Browser on SanjivramOS Linux: real Chromium tabs (Electron <webview>), native speed, its own ad blocker. */
+const NB = {
+  owners: new Map(), hooked: false, dl: new Set(), dlDir: '',
+  hook() {
+    if (this.hooked || !window.sjNative) return;
+    this.hooked = true;
+    const call = k => d => { const o = this.owners.get(d && d.from); if (o && o[k]) o[k](d); };
+    sjNative.onNewTab(call('newTab')); sjNative.onKey(call('key')); sjNative.onSearch(call('search'));
+    sjNative.onDownload(d => {
+      this.dlDir = d.path.replace(/\/[^/]*$/, '');
+      if (!this.dl.has(d.id)) { this.dl.add(d.id); Toast.show('Downloading', d.name, 'download', 2200); }
+      if (d.state === 'completed') Toast.show('Downloaded', `${d.name} — in Downloads`, 'check', 3500);
+      else if (d.state === 'cancelled' || d.state === 'interrupted') Toast.show('Download stopped', d.name, 'info', 3000);
+    });
+    try { sjNative.setAdblock(VipData.opts().adblock !== false); } catch {}
+  }
+};
+function nativeBrowser(win, args = {}) {
+  NB.hook();
+  const q = s => $(s, win.body);
+  let o = VipData.opts();
+  const appName = args.appMode || '', home = () => (appName && args.url) || vipHome();
+  win.body.innerHTML = `<div class="vip nb${appName ? ' vip-app' : ''}">
+    <div class="vip-tabs"><div class="vip-tablist"></div><button class="icon-btn" data-a="newtab" title="New tab (Ctrl+T)">${svg('plus')}</button></div>
+    <div class="toolbar vip-bar">
+      <button class="icon-btn" data-a="back" title="Back (Alt+←)">${svg('back')}</button><button class="icon-btn" data-a="forward" title="Forward (Alt+→)">${svg('forward')}</button>
+      <button class="icon-btn" data-a="reload" title="Reload (Ctrl+R)">${svg('reload')}</button><button class="icon-btn" data-a="home" title="Home">${svg('home')}</button>
+      <form class="vip-addr"><span class="vip-lock">${svg('lock')}</span><input class="vip-url" spellcheck="false" autocomplete="off" placeholder="Search ${esc(VIP_SEARCH_NAME[o.search] || 'Google')} or type an address"><button type="button" class="vip-star" data-a="star" title="Bookmark (Ctrl+D)">${svg('star')}</button></form>
+      <button class="icon-btn vip-t" data-a="adblock" title="Block ads and trackers">${svg('shield')}</button>
+      <button class="icon-btn" data-a="menu" title="More">${svg('menu')}</button>
+    </div>
+    <div class="vip-bm"${o.bmBar === false ? ' hidden' : ''}></div>
+    <div class="vip-find" hidden><input placeholder="Find in page" spellcheck="false"><small class="nb-count"></small><button class="icon-btn" data-a="find-prev" title="Previous">${svg('back')}</button><button class="icon-btn" data-a="find-next" title="Next">${svg('forward')}</button><button class="icon-btn" data-a="find-close" title="Close (Esc)">${svg('close')}</button></div>
+    <div class="vip-view nb-view"><div class="vip-load"></div><div class="vip-over" hidden></div></div>
+  </div>`;
+  const view = q('.nb-view'), urlIn = q('.vip-url'), findBar = q('.vip-find'), findIn = q('.vip-find input'), over = q('.vip-over');
+  const tabs = [], closed = [];
+  let active = 0, seq = 0;
+  const cur = () => tabs.find(t => t.id === active);
+  const safe = (f, d) => { try { return f(); } catch { return d; } };
+  const label = t => t.title && !/^data:/.test(t.title) ? t.title : t.url === 'about:blank' ? 'New tab' : t.url;
+
+  function addTab(url, bg = false, at = null) {
+    const t = { id: ++seq, url: url || home(), title: '', loading: true, fav: '', zoom: 1, err: null };
+    const wv = document.createElement('webview');
+    wv.setAttribute('partition', 'persist:web');
+    wv.setAttribute('allowpopups', '');
+    wv.setAttribute('webpreferences', 'contextIsolation=yes, sandbox=yes');
+    wv.src = t.url;
+    t.wv = wv;
+    const on = (ev, f) => wv.addEventListener(ev, f);
+    on('dom-ready', () => {
+      if (!t.wcId) { t.wcId = wv.getWebContentsId(); NB.owners.set(t.wcId, { newTab: d => addTab(d.url, d.background, tabs.indexOf(t) + 1), key: d => shortcut(d.combo), search: d => addTab(vipUrl(d.text), false, tabs.indexOf(t) + 1) }); }
+      if (t.zoom !== 1) safe(() => wv.setZoomFactor(t.zoom));
+      render();
+    });
+    on('did-start-loading', () => { t.loading = true; t.err = null; render(); });
+    on('did-stop-loading', () => { t.loading = false; render(); });
+    on('page-title-updated', e => { t.title = e.title; if (/^https?:/.test(t.url)) VipData.visit(t.url, t.title); render(); });
+    on('page-favicon-updated', e => { t.fav = (e.favicons || [])[0] || ''; render(); });
+    on('did-navigate', e => { t.url = e.url; t.err = null; render(); });
+    on('did-navigate-in-page', e => { if (e.isMainFrame) { t.url = e.url; render(); } });
+    on('did-fail-load', e => { if (e.isMainFrame && e.errorCode !== -3) { t.err = { code: e.errorCode, desc: e.errorDescription, url: e.validatedURL }; t.loading = false; render(); } });
+    on('found-in-page', e => { const r = e.result || {}; if (r.matches != null) q('.nb-count').textContent = r.matches ? `${r.activeMatchOrdinal}/${r.matches}` : 'No matches'; });
+    on('focus', () => { if (WM.active !== win) WM.focus(win); });
+    on('enter-html-full-screen', () => win.el.classList.add('nb-fs'));
+    on('leave-html-full-screen', () => win.el.classList.remove('nb-fs'));
+    on('render-process-gone', () => { t.err = { code: 'crash', desc: 'This page crashed.', url: t.url }; render(); });
+    view.appendChild(wv);
+    if (at != null && at >= 0 && at <= tabs.length) tabs.splice(at, 0, t); else tabs.push(t);
+    if (!bg || !active) select(t.id); else render();
+    return t;
+  }
+  function select(id) {
+    active = id;
+    tabs.forEach(t => t.wv.classList.toggle('on', t.id === id));
+    render();
+    const t = cur(); if (t) setTimeout(() => { if (t.url === 'about:blank' || document.activeElement === urlIn) urlIn.focus(); else t.wv.focus(); }, 0);
+  }
+  function closeTab(id) {
+    const i = tabs.findIndex(t => t.id === id); if (i < 0) return;
+    const [t] = tabs.splice(i, 1);
+    closed.push(t.url); if (closed.length > 20) closed.shift();
+    NB.owners.delete(t.wcId); t.wv.remove();
+    if (!tabs.length) { WM.close(win, true); return; }
+    if (active === id) select((tabs[i] || tabs[i - 1]).id); else render();
+  }
+  const go = s => { const t = cur(); const u = vipUrl(s); if (!t) return addTab(u); t.url = u; t.err = null; t.wv.src = u; t.wv.focus(); render(); };
+  const zoom = d => { const t = cur(); if (!t) return; t.zoom = d === 0 ? 1 : Math.min(5, Math.max(0.25, Math.round((t.zoom + d) * 100) / 100)); safe(() => t.wv.setZoomFactor(t.zoom)); Toast.show('Zoom', Math.round(t.zoom * 100) + '%', 'search', 900); };
+  const isMarked = u => VipData.bookmarks().some(b => b.u === u);
+  const toggleMark = () => {
+    const t = cur(); if (!t || !/^https?:/.test(t.url)) return;
+    const l = VipData.bookmarks();
+    VipData.setBookmarks(isMarked(t.url) ? l.filter(b => b.u !== t.url) : l.concat({ t: (t.title || t.url).slice(0, 60), u: t.url }));
+    render(); renderBm();
+  };
+  const find = (dir) => { const t = cur(), s = findIn.value; if (!t) return; if (!s) { safe(() => t.wv.stopFindInPage('clearSelection')); q('.nb-count').textContent = ''; return; } safe(() => t.wv.findInPage(s, { forward: dir !== -1, findNext: dir != null })); };
+  const openFind = () => { findBar.hidden = false; findIn.focus(); findIn.select(); };
+  const closeFind = () => { findBar.hidden = true; const t = cur(); if (t) { safe(() => t.wv.stopFindInPage('clearSelection')); t.wv.focus(); } };
+  function shortcut(c) {
+    const t = cur();
+    const map = {
+      'ctrl+t': () => addTab('about:blank'), 'ctrl+w': () => t && closeTab(t.id), 'ctrl+n': () => WM.open('browser', { newWindow: true }),
+      'ctrl+l': () => { urlIn.focus(); urlIn.select(); }, f6: () => { urlIn.focus(); urlIn.select(); },
+      'ctrl+r': () => t && t.wv.reload(), f5: () => t && t.wv.reload(), 'ctrl+f': openFind, 'ctrl+d': toggleMark,
+      'ctrl+tab': () => { const i = tabs.indexOf(t); if (tabs.length > 1) select(tabs[(i + 1) % tabs.length].id); },
+      'ctrl+shift+tab': () => { const i = tabs.indexOf(t); if (tabs.length > 1) select(tabs[(i - 1 + tabs.length) % tabs.length].id); },
+      'ctrl+shift+t': () => { const u = closed.pop(); if (u) addTab(u); },
+      'ctrl+=': () => zoom(0.1), 'ctrl++': () => zoom(0.1), 'ctrl+-': () => zoom(-0.1), 'ctrl+0': () => zoom(0),
+      'alt+arrowleft': () => t && safe(() => t.wv.goBack()), 'alt+arrowright': () => t && safe(() => t.wv.goForward()), 'alt+home': () => go(home()),
+      f11: () => WM.fullscreen(win), f12: () => t && safe(() => t.wv.isDevToolsOpened() ? t.wv.closeDevTools() : t.wv.openDevTools()),
+      escape: () => { if (!findBar.hidden) closeFind(); else if (t && t.loading) safe(() => t.wv.stop()); },
+      'ctrl+h': () => menu(true), 'ctrl+j': () => WM.open('linuxfiles', { path: NB.dlDir || '/home/sanjivram/Downloads' })
+    };
+    if (map[c]) { map[c](); return true; }
+    return false;
+  }
+  function renderBm() {
+    const bm = q('.vip-bm');
+    bm.innerHTML = VipData.bookmarks().map((b, i) => `<button data-bm="${i}" title="${esc(b.u)}">${svg('globe')}${esc(b.t)}</button>`).join('');
+  }
+  function render() {
+    const t = cur();
+    q('.vip-tablist').innerHTML = tabs.map(x => `<div class="vip-tab${x.id === active ? ' on' : ''}" data-tab="${x.id}" title="${esc(label(x))}">${x.loading ? '<span class="vip-dot"></span>' : x.fav ? `<img class="nb-fav" src="${esc(x.fav)}" alt="" onerror="this.remove()">` : svg('globe')}<span>${esc(label(x))}</span><button class="vip-x" data-close="${x.id}" title="Close tab (Ctrl+W)">${svg('close')}</button></div>`).join('');
+    if (!t) return;
+    if (document.activeElement !== urlIn) urlIn.value = t.url === 'about:blank' ? '' : t.url;
+    q('.vip-lock').classList.toggle('secure', /^https:/.test(t.url));
+    q('.vip-star').classList.toggle('on', isMarked(t.url));
+    q('[data-a="back"]').disabled = !safe(() => t.wv.canGoBack(), false);
+    q('[data-a="forward"]').disabled = !safe(() => t.wv.canGoForward(), false);
+    q('[data-a="reload"]').innerHTML = svg(t.loading ? 'close' : 'reload');
+    q('[data-a="reload"]').title = t.loading ? 'Stop (Esc)' : 'Reload (Ctrl+R)';
+    q('[data-a="adblock"]').classList.toggle('on', o.adblock !== false);
+    q('.vip-load').classList.toggle('on', !!t.loading);
+    if (t.err) {
+      over.hidden = false;
+      over.innerHTML = `${tile('app-browser', 'linear-gradient(135deg,#38bdf8,#6366f1)')}<b>${t.err.code === 'crash' ? 'This page crashed' : 'Can’t open this page'}</b><small>${esc(t.err.url || '')}\n${esc(t.err.desc || '')}</small><button class="btn primary" data-a="retry">${svg('reload')}Try again</button>`;
+    } else over.hidden = true;
+    win.setTitle(appName ? appName : `${label(t) === 'New tab' ? 'New tab' : label(t)} — Web Browser`);
+  }
+  function menu(historyOnly) {
+    const t = cur(), b = q('[data-a="menu"]').getBoundingClientRect();
+    const hist = VipData.history().slice(0, 12).map(x => ({ label: (x.t || x.u).slice(0, 60), icon: 'history', action: () => go(x.u) }));
+    const items = historyOnly ? [{ title: 'History' }].concat(hist.length ? hist : [{ label: 'Nothing yet', disabled: true }]) : [
+      { label: 'New tab', icon: 'plus', action: () => addTab('about:blank') },
+      { label: 'New window', icon: 'external', action: () => WM.open('browser', { newWindow: true }) },
+      ...(hist.length ? ['-', { title: 'History' }, ...hist.slice(0, 6)] : []), '-',
+      { label: `Zoom in (${Math.round((t ? t.zoom : 1) * 100)}%)`, icon: 'plus', action: () => zoom(0.1) },
+      { label: 'Zoom out', icon: 'search', action: () => zoom(-0.1) },
+      { label: 'Find in page', icon: 'search', action: openFind },
+      { label: o.bmBar === false ? 'Show bookmarks bar' : 'Hide bookmarks bar', icon: 'star', action: () => { o = VipData.opts(); o.bmBar = o.bmBar === false; VipData.setOpts(o); q('.vip-bm').hidden = o.bmBar === false; } },
+      { label: 'Print…', icon: 'file', action: () => t && t.wcId && sjNative.print(t.wcId) },
+      { label: 'Downloads', icon: 'download', action: () => WM.open('linuxfiles', { path: NB.dlDir || '/home/sanjivram/Downloads' }) },
+      { label: 'Developer tools', icon: 'code', action: () => t && safe(() => t.wv.openDevTools()) },
+      '-', { label: 'Clear browsing data', icon: 'trash', danger: true, action: async () => { await sjNative.clearData(); Store.set('vip.history', []); Toast.show('Cleared', 'Cookies, cache and history are gone.', 'check', 2000); } }
+    ];
+    ContextMenu.show(b.right - 220, b.bottom + 4, items);
+  }
+  win.body.addEventListener('click', e => {
+    const tabEl = e.target.closest('[data-tab]'), x = e.target.closest('[data-close]'), bm = e.target.closest('[data-bm]'), a = e.target.closest('[data-a]');
+    if (x) { e.stopPropagation(); closeTab(+x.dataset.close); return; }
+    if (tabEl) { select(+tabEl.dataset.tab); return; }
+    if (bm) { const m = VipData.bookmarks()[+bm.dataset.bm]; if (m) go(m.u); return; }
+    if (!a) return;
+    const t = cur(), k = a.dataset.a;
+    if (k === 'newtab') addTab('about:blank');
+    else if (k === 'back') t && safe(() => t.wv.goBack());
+    else if (k === 'forward') t && safe(() => t.wv.goForward());
+    else if (k === 'reload') t && (t.loading ? safe(() => t.wv.stop()) : t.wv.reload());
+    else if (k === 'retry') { if (t) { t.err = null; t.wv.src = t.url; render(); } }
+    else if (k === 'home') go(home());
+    else if (k === 'star') toggleMark();
+    else if (k === 'adblock') { o = VipData.opts(); o.adblock = o.adblock === false; VipData.setOpts(o); sjNative.setAdblock(o.adblock); Toast.show(o.adblock ? 'Ad blocker on' : 'Ad blocker off', 'Reload the page to see the difference.', 'shield', 1600); render(); }
+    else if (k === 'menu') menu(false);
+    else if (k === 'find-next') find(1);
+    else if (k === 'find-prev') find(-1);
+    else if (k === 'find-close') closeFind();
+  });
+  q('.vip-tablist').addEventListener('auxclick', e => { const tb = e.target.closest('[data-tab]'); if (tb && e.button === 1) closeTab(+tb.dataset.tab); });
+  q('.vip-addr').addEventListener('submit', e => { e.preventDefault(); go(urlIn.value); });
+  urlIn.addEventListener('focus', () => setTimeout(() => urlIn.select(), 0));
+  findIn.addEventListener('input', () => find(null));
+  findIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); find(e.shiftKey ? -1 : 1); } else if (e.key === 'Escape') closeFind(); });
+  win.body.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    const c = e.ctrlKey && !e.altKey ? (e.shiftKey ? 'ctrl+shift+' : 'ctrl+') + k : e.altKey && !e.ctrlKey ? 'alt+' + k : ['f5', 'f6', 'f11', 'f12'].includes(k) ? k : null;
+    if (c && !(document.activeElement === urlIn && ['ctrl+a', 'ctrl+c', 'ctrl+v', 'ctrl+x', 'ctrl+z'].includes(c)) && shortcut(c)) e.preventDefault();
+  });
+  win.receive = a => { if (a && a.url) addTab(vipUrl(a.url)); };
+  win.onFocus = () => { const t = cur(); if (t && document.activeElement !== urlIn) setTimeout(() => t.wv.focus(), 0); };
+  win.onClose = () => tabs.forEach(t => NB.owners.delete(t.wcId));
+  if (args.file) Toast.show('Can’t open files here', 'Open it from the Files app instead.', 'info', 2500);
+  renderBm();
+  addTab(args.url ? vipUrl(args.url) : home());
+}
 
 /** Linux Apps: every installed Linux app, by category, with search, details and launch options. */
 Apps.register({
@@ -22235,6 +22525,7 @@ const BrowserRoute = {
   proxy(args = {}) {
     const eng = Settings.get('browserEngine') || 'auto';
     if (eng === 'proxy') return true;
+    if (window.sjNative && window.sjNative.webview && !args.file && !/^(blob|data|javascript):/i.test(args.url || '')) return false;   // Electron tabs handle it
     if (args.file || /^(blob|data|file|javascript):/i.test(args.url || '')) return true;
     if (eng === 'chromium') return false;
     return SanjServer.server === false || (SanjServer.server === true && !SanjServer.vip);
@@ -22645,6 +22936,7 @@ const OsdHint = {
   Theme.apply();
   AppStore.boot();   // register installed store apps, hide removed ones
   AutoFullscreen.init();
+  NativeWins.init();   // SanjivramOS Linux: real app windows in the dock
   LinuxSys.init();   // installed Linux apps (cached from the last scan) as hidden, launchable apps
   Tweaks.init();
   WM.init();

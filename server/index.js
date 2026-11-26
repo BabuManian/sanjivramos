@@ -17,7 +17,7 @@ import { ttApi } from './tiktok.js';
 import { handleFiles } from './files.js';
 import { handleRestore } from './restore.js';
 import { serveGame, gameRedirect, installedGames, gamesApi } from './games.js';
-import { parseSpec, runGui, exportDesktop, removeDesktop, readJson, scanApps, iconFileOk, sysInfo, distros } from './linuxapps.js';
+import { parseSpec, runGui, exportDesktop, removeDesktop, readJson, scanApps, iconFileOk, sysInfo, distros, NATIVE, listXWins, xwinOp, setXMargins } from './linuxapps.js';
 import { spawn } from 'node:child_process';
 import { ensureDesktop } from './vnc.js';
 import { initSocial, handleSocial, socialUpgrade, ipBan, bannedPage, noteVisit, claudeGate, terminalGate } from './social.js';
@@ -137,7 +137,7 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/sanjivram-server.json') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ app: 'SanjivramOS', httpsPort: HTTPS_PORT && httpsUp ? HTTPS_PORT : 0, shell: shellOk(req), claude: shellOk(req), slander: shellOk(req), vip: shellOk(req) && !!chromiumPath(), files: shellOk(req), desktop: shellOk(req), linuxApps: shellOk(req), android: shellOk(req), games: installedGames() }));
+    res.end(JSON.stringify({ app: 'SanjivramOS', httpsPort: HTTPS_PORT && httpsUp ? HTTPS_PORT : 0, native: NATIVE && shellOk(req) && isLocalBrowser(req), shell: shellOk(req), claude: shellOk(req), slander: shellOk(req), vip: shellOk(req) && !!chromiumPath(), files: shellOk(req), desktop: shellOk(req), linuxApps: shellOk(req), android: shellOk(req), games: installedGames() }));
     return;
   }
   if (gamesApi(req, res, url)) return;
@@ -218,6 +218,9 @@ async function linuxApp(req, res, action) {
     if (action === 'scan') return reply(200, scanApps(!!body.force));
     if (action === 'sysinfo') return reply(200, sysInfo());
     if (action === 'distros') return reply(200, { distros: distros() });
+    if (action === 'xwins') return reply(200, await listXWins());
+    if (action === 'xwin') return reply(200, await xwinOp(String(body.id || ''), String(body.op || '')));
+    if (action === 'xmargins') return reply(200, await setXMargins(body || {}));
     if (action === 'kill') {
       const pid = body.pid | 0, sig = ['SIGTERM', 'SIGKILL', 'SIGSTOP', 'SIGCONT'].includes(body.signal) ? body.signal : 'SIGTERM';
       if (pid <= 1 || pid === process.pid) return reply(400, { error: 'Not allowed' });
@@ -233,7 +236,7 @@ async function linuxApp(req, res, action) {
     if (!spec) return reply(400, { error: 'The app needs a command.' });
     if (action === 'export') return reply(200, { ok: true, file: exportDesktop(spec, String(body.id || ''), body.icon) });
     if (action === 'run') {
-      if (!(await ensureDesktop())) return reply(500, { error: "The apps display didn't start. In Termux run: sanjivramos desktop apps-start" });
+      if (!NATIVE && !(await ensureDesktop())) return reply(500, { error: "The apps display didn't start. In Termux run: sanjivramos desktop apps-start" });
       return reply(200, await runGui(spec, path.join(DATA, 'linux-apps.log')));
     }
     reply(404, { error: 'Not found' });
