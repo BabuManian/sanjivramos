@@ -27,6 +27,7 @@ img{display:block}
 .ni{display:flex;align-items:center;gap:12px;height:42px;padding:0 12px;border-radius:12px;font-weight:600;font-size:15px;text-align:left;position:relative}
 .ni:hover{background:var(--hover)}
 .ni.on{color:var(--accent);background:rgba(var(--accent-rgb),.12)}
+.ni-s{display:none}
 .ni.on:before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:3px;background:var(--accent)}
 .sp{flex:1}
 .mecard{display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);text-align:left;width:100%}
@@ -41,9 +42,9 @@ img{display:block}
 #view{position:absolute;inset:0}
 .feed{position:absolute;inset:0;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;overscroll-behavior:contain}
 .feed::-webkit-scrollbar{display:none}
-.slide{height:100%;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;position:relative}
-.frame{position:relative;height:100%;aspect-ratio:9/16;max-width:calc(100% - 80px);border-radius:18px;overflow:hidden;background:#000 center/cover no-repeat;box-shadow:0 20px 50px rgba(0,0,0,.5)}
-.frame .bgc{position:absolute;inset:-10%;background:inherit;filter:blur(30px) brightness(.55);transform:scale(1.1)}
+.slide{height:100%;scroll-snap-align:start;contain:layout paint;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;position:relative}
+.frame{position:relative;height:100%;aspect-ratio:9/16;max-width:calc(100% - 80px);border-radius:18px;overflow:hidden;background:#000 center/cover no-repeat;box-shadow:0 10px 30px rgba(0,0,0,.4);contain:layout paint}
+.frame .bgc{display:none}
 .frame video,.frame .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:transparent}
 .frame .ph{display:flex;transition:transform .4s ease}
 .frame .ph img{width:100%;height:100%;object-fit:contain;flex:none}
@@ -159,7 +160,19 @@ img{display:block}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 #toast svg{color:var(--accent);width:18px;height:18px}
 #tabs{display:none}
-@media (max-width:760px){
+@media (max-width:1100px) and (min-width:641px){
+  #app{grid-template-columns:68px minmax(0,1fr)}
+  #side{padding:12px 8px;align-items:center}
+  .brand{padding:2px 0 12px}.brand div{display:none}
+  #side .sbox{display:none}
+  .ni{width:48px;justify-content:center;padding:0}.ni span{display:none}.ni-s{display:flex}
+  .ni.on:before{left:-8px}
+  .mecard{padding:4px;border:none;background:none;justify-content:center}.mecard .tx{display:none}
+  #sideSign{width:48px;height:48px;padding:0;border-radius:14px}#sideSign span{display:none}
+  .frame{max-width:calc(100% - 74px)}
+  .navarrows{right:10px}
+}
+@media (max-width:640px){
   #app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
   #side{display:none}
   #tabs{display:flex;justify-content:space-around;padding:6px 0 calc(6px + env(safe-area-inset-bottom));background:#000;border-top:1px solid var(--line)}
@@ -229,7 +242,7 @@ const P = {
 };
 const I = (n, x = '') => `<svg viewBox="0 0 24 24" ${x}>${P[n] || ''}</svg>`;
 const img = u => u ? '/tt/img?u=' + encodeURIComponent(u) : '';
-const avatar = (u, cls = '') => u.avatar ? `<img class="${cls}" src="${esc(img(u.avatar))}" alt="" loading="lazy">` : `<span class="av0 ${cls}">${esc((u.name || u.id || '?')[0].toUpperCase())}</span>`;
+const avatar = (u, cls = '') => u && u.avatar ? `<img class="${cls}" src="${esc(img(u.avatar))}" alt="" loading="lazy">` : `<span class="av0 ${cls}">${esc((u.name || u.id || '?')[0].toUpperCase())}</span>`;
 const vf = u => u.verified ? `<span class="vf" title="Verified">${I('vf')}</span>` : '';
 
 /* ---------- follow the SanjivramOS accent + font ---------- */
@@ -263,17 +276,26 @@ function list(kind, q = '') {
   if (!lists.has(k)) lists.set(k, { kind, q, items: [], users: [], cursor: 0, hasMore: true, busy: null, err: '', profile: null, note: '' });
   return lists.get(k);
 }
+// Videos watched before this visit don't come back in the endless feeds.
+const SEEN = new Set(D.history.map(x => x.id)), ENDLESS = { foryou: 1, following: 1, explore: 1 };
 async function loadMore(L, fresh) {
   if (L.busy) return L.busy;
-  if (fresh) Object.assign(L, { items: [], users: [], cursor: 0, hasMore: true, err: '' });
+  if (fresh) Object.assign(L, { items: [], users: [], cursor: 0, hasMore: true, err: '', started: false });
   if (!L.hasMore || L.kind === 'saved' || L.kind === 'history') return;
   L.busy = (async () => {
     try {
-      const j = await api(`feed?kind=${L.kind}&q=${encodeURIComponent(L.q)}&cursor=${L.cursor}${fresh ? '&fresh=1' : ''}`);
-      const have = new Set(L.items.map(x => x.id));
-      for (const v of j.items || []) if (!have.has(v.id)) L.items.push(v);
+      let added = 0, j;
+      for (let round = 0; round < 3; round++) {
+        // The first load of an endless feed asks for new videos (not the ones TikTok showed last time).
+        j = await api(`feed?kind=${L.kind}&q=${encodeURIComponent(L.q)}&cursor=${L.cursor}${(fresh || (ENDLESS[L.kind] && !L.started)) ? '&fresh=1' : ''}`);
+        L.started = true;
+        const have = new Set(L.items.map(x => x.id));
+        for (const v of j.items || []) if (!have.has(v.id) && !(ENDLESS[L.kind] && SEEN.has(v.id))) { L.items.push(v); added++; }
+        L.cursor = j.next;
+        if (added >= 3 || !j.hasMore || !(j.items || []).length) break;
+      }
       const hu = new Set(L.users.map(x => x.id)); for (const u of j.users || []) if (!hu.has(u.id)) L.users.push(u);
-      L.cursor = j.next; L.hasMore = j.hasMore && ((j.items || []).length > 0 || (j.users || []).length > 0); L.profile = j.profile || L.profile; L.note = j.note || ''; L.signin = !!j.signin; L.err = '';
+      L.hasMore = j.hasMore && ((j.items || []).length > 0 || (j.users || []).length > 0); L.profile = j.profile || L.profile; L.note = j.note || ''; L.signin = !!j.signin; L.err = '';
     } catch (e) { L.err = e.message; L.signin = !!e.signin; L.hasMore = false; if (e.block) throw e; }
     finally { L.busy = null; }
   })();
@@ -286,9 +308,9 @@ const NAV = [['foryou', 'For You', 'home'], ['following', 'Following', 'users'],
 function go(r, push = true) { if (push) back.push(route); route = r; closeComments(); render(); renderNav(); }
 function renderNav() {
   const cur = route.v === 'feed' && !route.from ? route.kind : route.v === 'grid' ? route.kind : route.v;
-  $('#nav').innerHTML = NAV.map(([k, n, ic]) => `<button class="ni ${cur === k ? 'on' : ''}" data-nav="${k}">${I(ic)}${n}</button>`).join('');
+  $('#nav').innerHTML = `<button class="ni ni-s ${cur === 'search' ? 'on' : ''}" data-nav="search" title="Search">${I('search')}<span>Search</span></button>` + NAV.map(([k, n, ic]) => `<button class="ni ${cur === k ? 'on' : ''}" data-nav="${k}" title="${n}">${I(ic)}<span>${n}</span></button>`).join('');
   $('#tabs').innerHTML = [['foryou', 'Home', 'home'], ['explore', 'Explore', 'compass'], ['search', 'Search', 'search'], ['saved', 'Saved', 'bookmark'], ['me', 'Profile', 'user']].map(([k, n, ic]) => `<button class="${cur === k || (k === 'foryou' && cur === 'following') ? 'on' : ''}" data-nav="${k}">${I(ic)}${n}</button>`).join('');
-  $('#mebox').innerHTML = ME ? `<button class="mecard" data-nav="me">${avatar(ME)}<div class="tx"><b>${esc(ME.name || ME.id)}</b><small>${ME.id ? '@' + esc(ME.id) : 'Signed in'}</small></div></button>` : `<button class="btn wide" id="sideSign">${I('key')}Sign in to TikTok</button>`;
+  $('#mebox').innerHTML = ME ? `<button class="mecard" data-nav="me" title="@${esc(ME.id)}">${avatar(ME)}<div class="tx"><b>${ME.id ? '@' + esc(ME.id) : 'Signed in'}</b><small>Your profile</small></div></button>` : `<button class="btn wide" id="sideSign" title="Sign in to TikTok">${I('key')}<span>Sign in to TikTok</span></button>`;
 }
 document.addEventListener('click', e => {
   const n = e.target.closest('[data-nav]'); if (!n) return;
@@ -314,15 +336,17 @@ function feedView(r) {
   const L = r.list || (r.kind === 'saved' ? { kind: 'saved', items: D.saved, hasMore: false } : r.kind === 'history' ? { kind: 'history', items: D.history, hasMore: false } : list(r.kind, r.q || ''));
   const v = $('#view');
   const top = !r.from && (r.kind === 'foryou' || r.kind === 'following') ? `<div class="topbar"><button data-nav="following" class="${r.kind === 'following' ? 'on' : ''}">Following</button><button data-nav="foryou" class="${r.kind === 'foryou' ? 'on' : ''}">For You</button></div>` : r.from ? `<div class="topbar" style="justify-content:flex-start"><button id="fBack" style="display:flex;align-items:center;gap:6px;color:#fff">${I('left')}${esc(r.title || 'Back')}</button></div>` : '';
-  v.innerHTML = `${top}<div class="sound"><button class="chip" id="mute">${I(D.muted ? 'mute' : 'vol')}${D.muted ? 'Sound off' : ''}</button></div><div class="navarrows"><button id="pv" title="Previous (↑)">${I('up')}</button><button id="nx" title="Next (↓)">${I('down')}</button></div><div class="feed" id="feed"></div>`;
+  v.innerHTML = `${top}<div class="sound">${ENDLESS[r.kind] && !r.from ? `<button class="chip" id="fresh" title="New videos">${I('refresh')}</button>` : ''}<button class="chip" id="mute">${I(D.muted ? 'mute' : 'vol')}${D.muted ? 'Sound off' : ''}</button></div><div class="navarrows"><button id="pv" title="Previous (↑)">${I('up')}</button><button id="nx" title="Next (↓)">${I('down')}</button></div><div class="feed" id="feed"></div>`;
   const fb = $('#fBack'); if (fb) fb.onclick = () => { const p = back.pop(); if (p) go(p, false); };
   F = { L, idx: -1, el: $('#feed'), start: r.start || 0, built: 0 };
   $('#mute').onclick = () => setMuted(!D.muted);
+  const fr = $('#fresh'); if (fr) fr.onclick = () => { if (L.busy) return; L.items.forEach(x => SEEN.add(x.id)); F.el.querySelectorAll('.slide').forEach(unmount); F.built = 0; F.idx = -1; if (F.io) { F.io.disconnect(); F.io = null; } F.el.innerHTML = ''; loadMore(L, true).then(() => F && F.fill()); F.fill(); toast('Getting new videos…', 'refresh'); };
   $('#pv').onclick = () => step(-1); $('#nx').onclick = () => step(1);
   const msg = (ic, h, p, extra = '') => { F.el.innerHTML = `<div class="msg">${I(ic)}<h3>${h}</h3><p>${p}</p>${extra}</div>`; };
   const fill = () => {
     if (!F || F.L !== L) return;
     if (!L.items.length) {
+      if (!L.busy && L.hasMore && !L.err && (L.retries = (L.retries || 0) + 1) <= 3) loadMore(L).then(fill).catch(render);
       if (L.busy) return msg('refresh', 'Loading…', 'Getting videos from TikTok', '<div class="spin" style="display:block;position:static;margin:8px"></div>');
       if (L.signin || r.kind === 'following' && !ME) return msg('users', 'Sign in to see this', L.err || 'Sign in to TikTok to see videos from people you follow.', `<button class="btn" data-signin>${I('key')}Sign in</button>`);
       if (L.err) return msg('wifi', 'Couldn’t load videos', esc(L.err), '<button class="btn" id="retry">Try again</button>');
@@ -355,6 +379,8 @@ function build() {
   if (!F.io) {
     F.io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting && e.target.dataset.i != null) show(+e.target.dataset.i); }, { root: F.el, threshold: 0.6 });
     F.el.addEventListener('click', onFeedClick); F.el.addEventListener('dblclick', onDbl);
+    let wAcc = 0, wLock = 0;
+    F.el.addEventListener('wheel', e => { if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; e.preventDefault(); if (Date.now() < wLock) return; wAcc += e.deltaY; if (Math.abs(wAcc) > 30) { step(wAcc > 0 ? 1 : -1); wAcc = 0; wLock = Date.now() + 420; } }, { passive: false });
     if (F.start) requestAnimationFrame(() => { const s = F.el.querySelector(`.slide[data-i="${F.start}"]`); if (s) s.scrollIntoView({ block: 'start' }); });
   }
   F.el.querySelectorAll('.slide:not([data-o])').forEach(s => { s.dataset.o = 1; F.io.observe(s); });
@@ -369,7 +395,7 @@ function show(i) {
   F.el.querySelectorAll('.slide').forEach(s => { const k = +s.dataset.i; if (Math.abs(k - i) > 1) unmount(s); });
   mount(i, true); if (L.items[i + 1]) mount(i + 1, false);
   if (L.kind !== 'history') { D.history = [slim(v), ...D.history.filter(x => x.id !== v.id)].slice(0, 200); save(); }
-  if (L.hasMore && i >= L.items.length - 4) loadMore(L).then(() => F && F.L === L && build());
+  if (L.hasMore && i >= L.items.length - 6) loadMore(L).then(() => F && F.L === L && build());
   if ($('#cm').classList.contains('open')) openComments(v);
 }
 function unmount(s) { s.querySelectorAll('video,audio').forEach(m => { m.pause(); m.removeAttribute('src'); m.load(); m.remove(); }); const ph = s.querySelector('.ph'); if (ph) ph.remove(); const d = s.querySelector('.dots'); if (d) d.remove(); s.classList.add('wait'); s.classList.remove('paused'); s.dataset.m = ''; }
@@ -391,15 +417,16 @@ function mount(i, play) {
       fr.insertBefore(vid, fr.querySelector('.spin'));
     }
   }
+  if (!play) { const m = s.querySelector('video,audio'); if (m) m.pause(); return; }
   F.el.querySelectorAll('video,audio').forEach(m => { if (!s.contains(m)) m.pause(); });
   clearInterval(F.photoT);
-  if (play) {
+  {
     const m = s.querySelector('video,audio'); m.muted = D.muted; m.volume = D.vol;
-    m.play().catch(() => { m.muted = true; m.play().catch(() => s.classList.add('paused')); if (!D.muted) { $('#mute').innerHTML = I('mute') + 'Tap for sound'; } });
+    m.play().then(() => { const b = $('#mute'); if (b && !D.muted) b.innerHTML = I('vol'); }).catch(e => { if (e.name === 'AbortError') return; m.muted = true; m.play().catch(() => s.classList.add('paused')); if (!D.muted) { const b = $('#mute'); if (b) b.innerHTML = I('mute') + 'Tap for sound'; } });
     if (v.photo > 1) { let k = 0; F.photoT = setInterval(() => { k = (k + 1) % v.photo; const ph = s.querySelector('.ph'); if (ph) ph.style.transform = `translateX(-${k * 100}%)`; s.querySelectorAll('.dots i').forEach((d, j) => d.classList.toggle('on', j === k)); }, 3200); }
   }
 }
-function step(d) { if (!F) return; const s = F.el.querySelector(`.slide[data-i="${Math.max(0, F.idx + d)}"]`); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function step(d) { if (!F) return; const i = Math.max(0, Math.min(F.idx + d, F.built - 1)); const s = F.el.querySelector(`.slide[data-i="${i}"]`); if (s) F.el.scrollTo({ top: s.offsetTop, behavior: 'smooth' }); }
 function playing() { return F && F.el.querySelector(`.slide[data-i="${F.idx}"]`); }
 function togglePlay() { const s = playing(); if (!s) return; const m = s.querySelector('video,audio'); if (!m) return; if (m.paused) { m.muted = D.muted; m.play().catch(() => {}); s.classList.remove('paused'); } else { m.pause(); s.classList.add('paused'); } }
 function setMuted(on) { D.muted = on; save(); const b = $('#mute'); if (b) b.innerHTML = I(on ? 'mute' : 'vol') + (on ? 'Sound off' : ''); const s = playing(); const m = s && s.querySelector('video,audio'); if (m) { m.muted = on; if (m.paused && !on) m.play().catch(() => {}); } }
@@ -426,9 +453,11 @@ function onDbl(e) {
 /* ---------- actions ---------- */
 async function like(v, btn) {
   if (!ME) { if (!isSaved(v)) toggleSave(v, F && F.el.querySelector(`[data-save="${F.L.items.indexOf(v)}"]`)); toast('Saved here. Sign in to like on TikTok', 'bookmark'); return; }
+  if (v._liking) return; v._liking = true;
   const on = !v.liked; v.liked = on; v.stats.likes += on ? 1 : -1;
   if (btn) { btn.classList.toggle('on', on); btn.lastChild.textContent = num(v.stats.likes); }
-  try { await api('like', { id: v.id, on }); } catch (e) { v.liked = !on; v.stats.likes += on ? -1 : 1; if (btn) { btn.classList.toggle('on', !on); btn.lastChild.textContent = num(v.stats.likes); } toast(e.message, 'x'); }
+  try { await api('like', { id: v.id, on, author: v.author.id }); } catch (e) { v.liked = !on; v.stats.likes += on ? -1 : 1; if (btn) { btn.classList.toggle('on', !on); btn.lastChild.textContent = num(v.stats.likes); } toast(e.message, 'x'); }
+  v._liking = false;
 }
 function toggleSave(v, btn) {
   const on = !isSaved(v);
@@ -438,7 +467,7 @@ function toggleSave(v, btn) {
 }
 async function follow(v, btn) {
   btn.innerHTML = I('check');
-  try { await api('follow', { uid: v.author.uid, on: true }); v.following = true; toast('Following @' + v.author.id, 'users'); setTimeout(() => btn.remove(), 600); }
+  try { await api('follow', { id: v.id, author: v.author.id, on: true }); v.following = true; toast('Following @' + v.author.id, 'users'); setTimeout(() => btn.remove(), 600); }
   catch (e) { btn.innerHTML = I('plus'); toast(e.message, 'x'); }
 }
 function openUser(id) { if (id) go({ v: 'grid', kind: 'user', q: id }); }
@@ -494,7 +523,7 @@ function gridView(r) {
 /* ---------- search ---------- */
 function searchView(r) {
   const v = $('#view'), q = (r.q || '').trim();
-  const mobileBox = innerWidth <= 760 ? `<label class="sbox" style="margin-bottom:16px">${I('search')}<input id="q2" placeholder="Search or @name" value="${esc(q)}"></label>` : '';
+  const mobileBox = innerWidth <= 640 ? `<label class="sbox" style="margin-bottom:16px">${I('search')}<input id="q2" placeholder="Search or @name" value="${esc(q)}"></label>` : '';
   if (!q) { v.innerHTML = `<div class="page"><h1>Search</h1>${mobileBox}<div class="msg" style="position:static;padding:40px">${I('search')}<h3>Find videos and people</h3><p>Type words to search TikTok${ME ? '' : ' (needs sign-in)'}, or <b>@name</b> to open someone’s profile.</p></div></div>`; bindQ2(); return; }
   if (q.startsWith('@') || /^[\w.]{2,24}$/.test(q) && !ME) { go({ v: 'grid', kind: 'user', q: q.replace(/^@/, '') }, false); return; }
   const V = list('search', q), U = list('users', q);
@@ -521,7 +550,7 @@ $('#q').onkeydown = e => { if (e.key === 'Enter') { const s = $('#q').value.trim
 function meView() {
   const v = $('#view');
   if (!ME) { v.innerHTML = `<div class="page"><h1>Profile</h1><div class="msg" style="position:static;padding:40px">${I('user')}<h3>Sign in to TikTok</h3><p>See your For You page, the people you follow, and like, comment-read and follow from Kushtok. Saved and Watched work without signing in.</p><button class="btn" data-signin>${I('key')}Sign in</button></div></div>`; return; }
-  v.innerHTML = `<div class="page"><h1>Profile</h1><div class="ph-head">${avatar(ME)}<div><h2>${esc(ME.name || ME.id)}</h2><div class="nm">${ME.id ? '@' + esc(ME.id) : ''}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${ME.id ? `<button class="btn" id="myP">${I('user')}My videos</button>` : ''}<button class="btn ghost" id="sOut">${I('out')}Sign out</button></div></div></div><p style="color:var(--text2)">You’re signed in on this SanjivramOS machine’s own browser. Your password was never seen by Kushtok.</p></div>`;
+  v.innerHTML = `<div class="page"><h1>Profile</h1><div class="ph-head">${avatar(ME)}<div><h2>${ME.id ? '@' + esc(ME.id) : 'Signed in'}</h2><div class="nm">Signed in to TikTok</div><div style="display:flex;gap:8px;flex-wrap:wrap">${ME.id ? `<button class="btn" id="myP">${I('user')}My videos</button>` : ''}<button class="btn ghost" id="sOut">${I('out')}Sign out</button></div></div></div><p style="color:var(--text2)">You’re signed in on this SanjivramOS machine’s own browser. Your password was never seen by Kushtok.</p></div>`;
   const mp = $('#myP'); if (mp) mp.onclick = () => openUser(ME.id);
   $('#sOut').onclick = async () => { if (!confirm('Sign out of TikTok on this machine?')) return; await api('signout', {}).catch(() => {}); ME = null; lists.clear(); renderNav(); toast('Signed out', 'out'); go({ v: 'feed', kind: 'foryou' }); };
 }
@@ -531,7 +560,7 @@ function signIn() {
   document.body.appendChild(d);
   let mode = 'qr', timer = 0, alive = true;
   const close = () => { alive = false; clearTimeout(timer); d.remove(); api('login/cancel', {}).catch(() => {}); };
-  const done = async j => { alive = false; clearTimeout(timer); d.remove(); ME = j.me || (await api('status?force=1')).me; lists.clear(); renderNav(); toast('Signed in' + (ME && ME.id ? ' as @' + ME.id : ''), 'check'); go({ v: 'feed', kind: 'foryou' }); };
+  const done = async j => { if (ME) toast('You’re already signed in', 'check'); alive = false; clearTimeout(timer); d.remove(); ME = j.me || (await api('status?force=1')).me; lists.clear(); renderNav(); toast('Signed in' + (ME && ME.id ? ' as @' + ME.id : ''), 'check'); go({ v: 'feed', kind: 'foryou' }); };
   d.querySelector('#sX').onclick = close; d.onclick = e => { if (e.target === d) close(); };
   d.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; d.querySelectorAll('[data-m]').forEach(x => x.classList.toggle('on', x === b)); start(); });
   const body = d.querySelector('#sBody');
@@ -587,7 +616,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'l') { const v = cur(); if (v) like(v, F.el.querySelector(`[data-like="${F.idx}"]`)); }
   else if (e.key === 's') { const v = cur(); if (v) toggleSave(v, F.el.querySelector(`[data-save="${F.idx}"]`)); }
   else if (e.key === 'c') { const v = cur(); if ($('#cm').classList.contains('open')) closeComments(); else if (v) openComments(v); }
-  else if (e.key === '/') { e.preventDefault(); if (innerWidth <= 760) go({ v: 'search' }); else $('#q').focus(); }
+  else if (e.key === '/') { e.preventDefault(); if (innerWidth <= 640) go({ v: 'search' }); else $('#q').focus(); }
   else if (e.key === 'Escape') closeComments();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { const s = playing(); const m = s && s.querySelector('video,audio'); if (m && !m.paused) { m.pause(); s.classList.add('paused'); } } });

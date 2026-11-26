@@ -93,12 +93,15 @@ function remember(id, m) { media.delete(id); media.set(id, m); if (media.size > 
 const first = u => (u && (u.url_list || u.urlList || [])[0]) || (typeof u === 'string' ? u : '');
 function normItem(it) {
   if (!it || !it.id || !(it.video || it.imagePost)) return null;
+  // Ads and promoted posts: skip them (they often can't play outside TikTok anyway).
+  if (it.isAd || it.is_ad || it.adAuthorization || it.ad_info || it.adInfo || it.adLabelVersion || it.isPromoted || it.brandOrganicType === 1 || (it.aweme_type && it.aweme_type !== 0 && it.aweme_type !== 150 && it.aweme_type !== 61)) return null;
   const v = it.video || {}, a = it.author || {}, st = it.statsV2 || it.stats || {}, m = it.music || {};
   // Prefer an H.264 copy near 1.2 Mbit/s: quick to start, small on phone data, still sharp on a phone screen.
   const br = (v.bitrateInfo || []).filter(b => b.PlayAddr && (b.PlayAddr.UrlList || []).length && !/265|hevc|bytevc/i.test(b.CodecType || ''))
-    .sort((x, y) => Math.abs((x.Bitrate || 0) - 1.2e6) - Math.abs((y.Bitrate || 0) - 1.2e6));
+    .sort((x, y) => Math.abs((x.Bitrate || 0) - 0.85e6) - Math.abs((y.Bitrate || 0) - 0.85e6));
   const urls = [...br.flatMap(b => b.PlayAddr.UrlList.slice(0, 2)), v.playAddr, v.downloadAddr].filter(Boolean);
   const photo = it.imagePost && it.imagePost.images ? it.imagePost.images.map(i => first(i.imageURL)).filter(Boolean) : null;
+  if (!photo && !urls.length) return null;
   remember(it.id, { urls: [...new Set(urls)], music: m.playUrl || '', imgs: photo || [] });
   return {
     id: it.id, desc: it.desc || '', created: +it.createTime || 0,
@@ -123,9 +126,15 @@ const API_RE = /\/api\/(prefetch\/explore|recommend|post|repost|favorite|followi
 /* ---------------- feeds: one hidden TikTok tab per list ---------------- */
 const feeds = new Map();   // key → feed
 const FEED_URL = { foryou: () => `${TT}/foryou`, following: () => `${TT}/following`, explore: () => `${TT}/explore`, user: q => `${TT}/@${encodeURIComponent(q)}`, search: q => `${TT}/search/video?q=${encodeURIComponent(q)}`, users: q => `${TT}/search/user?q=${encodeURIComponent(q)}`, tag: q => `${TT}/tag/${encodeURIComponent(q)}`, video: q => `${TT}/@x/video/${encodeURIComponent(q)}` };
-async function openFeed(key, kind, q) {
+const opening = new Map();
+function openFeed(key, kind, q) {
+  if (opening.has(key)) return opening.get(key);
+  const p = openFeed1(key, kind, q).finally(() => opening.delete(key));
+  opening.set(key, p); return p;
+}
+async function openFeed1(key, kind, q) {
   const old = feeds.get(key); if (old) { feeds.delete(key); closeTab(old.tab); }
-  while (feeds.size >= MAX_FEEDS) { const [k, f] = [...feeds].sort((a, b) => a[1].t - b[1].t)[0]; feeds.delete(k); closeTab(f.tab); }
+  while ([...feeds.keys()].filter(k => !k.endsWith('#spare')).length >= MAX_FEEDS && !key.endsWith('#spare')) { const [k, f] = [...feeds].filter(([k]) => !k.endsWith('#spare')).sort((a, b) => a[1].t - b[1].t)[0]; feeds.delete(k); closeTab(f.tab); }
   const tab = await newTab();
   const f = { key, kind, q, tab, items: [], ids: new Set(), users: [], uids: new Set(), hasMore: true, t: Date.now(), wake: [], profile: null, urls: new Map(), err: '' };
   feeds.set(key, f);
@@ -171,10 +180,20 @@ async function feed(kind, q, cursor, fresh) {
   // TikTok only lets signed-in people search videos; for guests, look the words up as a hashtag instead.
   if ((kind === 'search' || kind === 'users' || kind === 'tag') && !(await me())) return { items: [], users: [], next: 0, hasMore: false, note: 'TikTok only lets signed-in people search. Sign in, or open a profile by typing @name.', signin: true };
   const key = kind + ':' + (q || '').toLowerCase();
-  let f = feeds.get(key);
-  if (!f || fresh || (cursor === 0 && Date.now() - f.t > 15 * 60e3) || f.dead) f = await openFeed(key, kind, q);
+  let f = feeds.get(key) || (opening.has(key) ? await opening.get(key) : null);
+  const endless = kind === 'foryou' || kind === 'following' || kind === 'explore';
+  // Endless feeds keep their tab: "fresh" just starts after everything already shown (new videos, no reload wait).
+  const spareKey = key + '#spare', spare = feeds.get(spareKey);
+  if (fresh && endless && f && f.served && spare && spare.items.length) {
+    // A new For You is already waiting in the background: swap to it straight away.
+    feeds.delete(spareKey); closeTab(f.tab); spare.key = key; feeds.set(key, spare); f = spare;
+  }
+  else if (!f || f.dead || (fresh && (!endless || f.served)) || (cursor === 0 && Date.now() - f.t > 30 * 60e3) || (endless && f.items.length > 600)) f = await openFeed(key, kind, q);
+  // Keep one fresh For You loading behind the scenes for the next refresh or visit.
+  if (kind === 'foryou' && !feeds.has(spareKey) && !opening.has(spareKey)) setTimeout(() => { if (C && !feeds.has(spareKey)) openFeed(spareKey, kind, q).catch(() => {}); }, 6000);
   f.t = Date.now();
-  const want = cursor + 6, list = () => kind === 'users' ? f.users : f.items;
+  const base = 0;
+  const want = cursor + 8, list = () => kind === 'users' ? f.users : f.items;
   const deadline = Date.now() + (list().length ? 9000 : 20000);
   let tries = 0;
   while (list().length < want && f.hasMore && Date.now() < deadline) {
@@ -184,8 +203,8 @@ async function feed(kind, q, cursor, fresh) {
     if (list().length === before) tries++;
     if (tries >= 3 && list().length) break;
   }
-  const out = list().slice(cursor, cursor + 15);
-  return { items: kind === 'users' ? [] : out, users: kind === 'users' ? out : f.users.slice(0, 12), next: cursor + out.length, hasMore: f.hasMore || list().length > cursor + out.length, profile: f.profile };
+  const out = list().slice(cursor, cursor + 15); f.served = true;
+  return { items: kind === 'users' ? [] : out, users: kind === 'users' ? out : f.users.slice(0, 12), next: cursor - base + out.length, hasMore: f.hasMore || list().length > cursor + out.length, profile: f.profile };
 }
 
 /* ---------------- cookies, sign-in state ---------------- */
@@ -213,7 +232,7 @@ async function me(force) {
   try {
     const j = await getJson(`${TT}/passport/web/account/info/?aid=1459&app_language=en`, ck.s, C.ua);
     const d = j.data || {};
-    meCache = { t: Date.now(), v: { id: d.username || '', name: d.screen_name || d.username || '', avatar: d.avatar_url || '', uid: d.user_id_str || String(d.user_id || '') } };
+    meCache = { t: Date.now(), v: { id: d.username || '', name: d.username || d.screen_name || '', avatar: d.avatar_url || d.avatar_large_url || d.avatar_thumb_url || '', uid: d.user_id_str || String(d.user_id || '') } };
   } catch { meCache = { t: Date.now(), v: { id: '', name: 'Signed in', avatar: '' } }; }
   return meCache.v;
 }
@@ -227,7 +246,15 @@ async function loginOpen(mode) {
   t.c.on.set(t.sid, () => {});
   await t.c.call('Page.navigate', { url: mode === 'qr' ? `${TT}/login/qrcode` : `${TT}/login` }, t.sid);
   loginTab = t; loginMode = mode;
+  await focus(t);
+  await settle(t);
   return t;
+}
+// Headless Chromium only delivers clicks and typing to the tab in front.
+const focus = t => t.c.call('Target.activateTarget', { targetId: t.tid }).catch(() => {});
+async function settle(t, ms = 12000) { const end = Date.now() + ms; while (Date.now() < end) { const r = await evalIn(t, 'document.readyState', 2000).catch(() => ''); if (r === 'complete' || r === 'interactive') return; await W(250); } }
+async function shot(t, opts) {
+  for (let i = 0; i < 4; i++) { try { return (await t.c.call('Page.captureScreenshot', opts, t.sid)).data; } catch (e) { if (i === 3) throw e; await W(400); } }
 }
 async function loginDone() {
   const ck = await cookies(true);
@@ -256,12 +283,13 @@ async function qr() {
 async function liveFrame() {
   if (await loginDone()) return { done: true, me: meCache.v };
   const t = await loginOpen('live');
-  const s = await t.c.call('Page.captureScreenshot', { format: 'jpeg', quality: 75 }, t.sid);
+  const data = await shot(t, { format: 'jpeg', quality: 75 });
   const info = await evalIn(t, 'location.href', 3000).catch(() => '');
-  return { done: false, img: 'data:image/jpeg;base64,' + s.data, w: 420, h: 760, url: info };
+  return { done: false, img: 'data:image/jpeg;base64,' + data, w: 420, h: 760, url: info };
 }
 async function liveInput(m) {
   const t = loginTab && loginMode === 'live' ? loginTab : await loginOpen('live'), call = (k, p) => t.c.call(k, p, t.sid);
+  await focus(t);
   const X = v => Math.max(0, Math.min(420, +v || 0)), Y = v => Math.max(0, Math.min(760, +v || 0));
   if (m.t === 'click') { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await call('Input.dispatchMouseEvent', { type, x: X(m.x), y: Y(m.y), button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 }); }
   else if (m.t === 'drag') {
@@ -292,8 +320,63 @@ async function comments(id, cursor) {
   const j = await pageFetch(`/api/comment/list/?aid=1988&aweme_id=${encodeURIComponent(id)}&count=30&cursor=${cursor | 0}`);
   return { items: (j.comments || []).map(c => ({ id: c.cid, text: c.text || '', likes: +c.digg_count || 0, replies: +c.reply_comment_total || 0, t: +c.create_time || 0, user: { id: c.user && c.user.unique_id || '', name: c.user && c.user.nickname || '', avatar: c.user && first(c.user.avatar_thumb) } })), next: +j.cursor || 0, hasMore: !!j.has_more, total: +j.total || 0 };
 }
-async function like(id, on) { const j = await pageFetch(`/api/commit/item/digg/?aid=1988&aweme_id=${encodeURIComponent(id)}&type=${on ? 1 : 0}`, true); if (j.status_code !== 0) throw new Error(j.status_msg || 'TikTok said no'); return { ok: true }; }
-async function follow(uid, on) { const j = await pageFetch(`/api/commit/follow/user/?aid=1988&user_id=${encodeURIComponent(uid)}&type=${on ? 1 : 0}&action_type=${on ? 1 : 0}`, true); if (j.status_code !== 0) throw new Error(j.status_msg || 'TikTok said no'); return { ok: true }; }
+let actTab = null;
+async function actionTab() {
+  if (actTab && C && C.on.has(actTab.sid)) return actTab;
+  const t = await newTab({ w: 1280, h: 860 }); t.waiters = []; t.pend = new Set();
+  t.c.on.set(t.sid, async m => {
+    const p = m.params || {};
+    if (m.method === 'Network.responseReceived' && /\/api\/commit\//.test(p.response.url)) t.pend.add(p.requestId);
+    else if (m.method === 'Network.loadingFinished' && t.pend.has(p.requestId)) {
+      t.pend.delete(p.requestId);
+      try { const b = await t.c.call('Network.getResponseBody', { requestId: p.requestId }, t.sid); const j = JSON.parse(b.base64Encoded ? Buffer.from(b.body, 'base64').toString() : b.body); t.waiters.splice(0).forEach(r => r(j)); } catch {}
+    }
+  });
+  actTab = t; return t;
+}
+async function videoPage(id, author) {
+  const t = await actionTab();
+  const here = await evalIn(t, 'location.href', 3000).catch(() => '');
+  if (!here.includes('/video/' + id)) { await t.c.call('Page.navigate', { url: `${TT}/@${encodeURIComponent(author || 'x')}/video/${encodeURIComponent(id)}` }, t.sid); await W(800); await settle(t); }
+  return t;
+}
+async function findBtn(t, js, ms = 15000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const r = await evalIn(t, `(() => { const b = (${js})(); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); if (!r.width) return null; return { x: r.x + r.width / 2, y: r.y + r.height / 2, pressed: b.getAttribute('aria-pressed'), text: (b.textContent || '').trim().slice(0, 30) } })()`, 4000).catch(() => null);
+    if (r) return r; await W(400);
+  }
+  return null;
+}
+async function press(t, b) {
+  const got = new Promise(r => { t.waiters.push(r); setTimeout(() => r(null), 9000); });
+  await focus(t);
+  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await t.c.call('Input.dispatchMouseEvent', { type, x: b.x, y: b.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 }, t.sid);
+  const j = await got;
+  if (!j) throw new Error('TikTok didn’t answer. Try again in a moment.');
+  if (j.status_code !== 0) throw new Error(j.status_msg || 'TikTok said no');
+  return j;
+}
+const LIKE_BTN = `() => { const i = document.querySelector('[data-e2e="browse-like-icon"], [data-e2e="like-icon"]'); return (i && (i.closest('button') || i)) || [...document.querySelectorAll('button[aria-label]')].find(x => /^like|like video/i.test(x.getAttribute('aria-label'))) }`;
+// TikTok paints the heart red once you've liked a video.
+const LIKED = `(() => { const i = document.querySelector('[data-e2e="browse-like-icon"], [data-e2e="like-icon"]'); if (!i) return null; const b = i.closest('button'); if (b && b.getAttribute('aria-pressed')) return b.getAttribute('aria-pressed') === 'true'; const cs = [i, ...i.querySelectorAll('*')].map(e => getComputedStyle(e)); return cs.some(c => /254, ?44, ?85|255, ?59, ?92|fe2c55/i.test(c.color + c.fill + c.backgroundColor)) || /fe2c55|FE2C55|rgb\\(254, ?44, ?85\\)/.test(i.innerHTML) })()`;
+async function like(id, on, author) {
+  const t = await videoPage(id, author);
+  const b = await findBtn(t, LIKE_BTN);
+  if (!b) throw new Error('Couldn’t find TikTok’s like button for this video');
+  const liked = await evalIn(t, LIKED, 3000).catch(() => null);
+  if (liked === on || b.pressed === (on ? 'true' : 'false')) return { ok: true };
+  await press(t, b);
+  return { ok: true };
+}
+async function follow(id, on, author) {
+  const t = await videoPage(id, author);
+  const b = await findBtn(t, `() => document.querySelector('[data-e2e="feed-follow"], [data-e2e="browse-follow"], [data-e2e="follow-button"]') || [...document.querySelectorAll('button')].find(x => /^follow$/i.test((x.textContent || '').trim()))`);
+  if (!b) throw new Error('Couldn’t find TikTok’s follow button');
+  if (on && /following|friends/i.test(b.text)) return { ok: true };
+  await press(t, b);
+  return { ok: true };
+}
 
 /* ---------------- streaming videos and pictures ---------------- */
 const IMG_HOST = /(^|\.)(tiktokcdn(-[a-z]+)?\.com|tiktokcdn-us\.com|tiktok\.com|ibyteimg\.com|byteimg\.com|muscdn\.com|tiktokv\.com)$/;
@@ -337,7 +420,7 @@ export async function ttApi(req, res, url, allowed) {
   try {
     if (p === '/tt/v') return await streamVideo(req, res, q('id'), q('k'));
     if (p === '/tt/img') return await img(req, res, q('u'));
-    if (p === '/tt/api/status') { await browser(); const u = await me(q('force') === '1'); return send(200, { signedIn: !!u, me: u }); }
+    if (p === '/tt/api/status') { await browser(); const u = await me(q('force') === '1'); if (!feeds.has('foryou:')) openFeed('foryou:', 'foryou', '').catch(() => {}); return send(200, { signedIn: !!u, me: u }); }
     if (p === '/tt/api/feed') {
       const kind = q('kind') || 'foryou';
       if (!FEED_URL[kind]) return send(400, { error: 'Unknown list' });
@@ -349,8 +432,8 @@ export async function ttApi(req, res, url, allowed) {
     if (p === '/tt/api/comments') return send(200, await comments(q('id'), +q('cursor') || 0));
     if (req.method !== 'POST') return send(404, { error: 'Not found' });
     const b = await body(req);
-    if (p === '/tt/api/like') { if (!(await me())) return send(401, { error: 'Sign in to like videos', signin: true }); return send(200, await like(String(b.id || ''), !!b.on)); }
-    if (p === '/tt/api/follow') { if (!(await me())) return send(401, { error: 'Sign in to follow people', signin: true }); return send(200, await follow(String(b.uid || ''), !!b.on)); }
+    if (p === '/tt/api/like') { if (!(await me())) return send(401, { error: 'Sign in to like videos', signin: true }); return send(200, await like(String(b.id || ''), !!b.on, String(b.author || ''))); }
+    if (p === '/tt/api/follow') { if (!(await me())) return send(401, { error: 'Sign in to follow people', signin: true }); return send(200, await follow(String(b.id || ''), !!b.on, String(b.author || ''))); }
     if (p === '/tt/api/login/qr') return send(200, await qr());
     if (p === '/tt/api/login/live') return send(200, b.t ? await liveInput(b) : await liveFrame());
     if (p === '/tt/api/login/cancel') { closeTab(loginTab); loginTab = null; return send(200, { ok: true }); }
