@@ -456,8 +456,15 @@ async function like(v, btn) {
   if (v._liking) return; v._liking = true;
   const on = !v.liked; v.liked = on; v.stats.likes += on ? 1 : -1;
   if (btn) { btn.classList.toggle('on', on); btn.lastChild.textContent = num(v.stats.likes); }
-  try { await api('like', { id: v.id, on, author: v.author.id }); } catch (e) { v.liked = !on; v.stats.likes += on ? -1 : 1; if (btn) { btn.classList.toggle('on', !on); btn.lastChild.textContent = num(v.stats.likes); } toast(e.message, 'x'); }
+  try { await api('like', { id: v.id, on, author: v.author.id }); } catch (e) { v.liked = !on; v.stats.likes += on ? -1 : 1; if (btn) { btn.classList.toggle('on', !on); btn.lastChild.textContent = num(v.stats.likes); } likeFailed(v, e.message); }
   v._liking = false;
+}
+function likeFailed(v, why) {
+  const d = document.createElement('div'); d.className = 'dlg';
+  d.innerHTML = `<div class="box"><h3>TikTok didn’t accept that like</h3><p class="sub">${esc(why)}. TikTok often refuses likes from apps outside its own website. You can like it on tiktok.com instead (sign in there once).</p><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" id="lfX">Close</button><button class="btn" id="lfO">${I('link')}Open on TikTok</button></div></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#lfX').onclick = () => d.remove(); d.onclick = e => { if (e.target === d) d.remove(); };
+  d.querySelector('#lfO').onclick = () => { window.open(`https://www.tiktok.com/@${v.author.id}/video/${v.id}`, '_blank', 'noopener'); d.remove(); };
 }
 function toggleSave(v, btn) {
   const on = !isSaved(v);
@@ -508,6 +515,7 @@ function gridView(r) {
     const head = r.kind === 'user' ? (p ? `<div class="ph-head">${avatar(p)}<div><h2>${esc(p.id)} ${vf(p)}</h2><div class="nm">${esc(p.name)}</div><div class="st"><span><b>${num(p.following)}</b>Following</span><span><b>${num(p.followers)}</b>Followers</span><span><b>${num(Math.abs(p.likes))}</b>Likes</span></div>${p.sig ? `<div class="sig">${esc(p.sig)}</div>` : '<div style="height:14px"></div>'}<div style="display:flex;gap:8px;flex-wrap:wrap">${L.items.length ? `<button class="btn" id="gPlay">${I('play')}Play all</button>` : ''}<button class="btn ghost" id="gLink">${I('link')}Copy link</button></div></div></div>` : `<h1>${esc(title)}</h1>`) : `<h1>${esc(title)}</h1>`;
     const body = L.items.length ? `<div class="grid">${L.items.map(gridItem).join('')}</div>${L.hasMore ? '<div class="more-sp" id="gMore"><div class="spin" style="display:block;position:static"></div></div>' : ''}`
       : L.busy || (L.hasMore && r.kind === 'user') ? '<div class="more-sp"><div class="spin" style="display:block;position:static"></div></div>'
+      : r.kind === 'user' && ME && r.q.toLowerCase() === (ME.id || '').toLowerCase() ? `<div class="msg" style="position:static;padding:50px">${I('user')}<h3>TikTok won’t share your own videos with Kushtok</h3><p>Your videos (including private ones) only open on TikTok’s own website or app.</p><button class="btn" onclick="window.open('https://www.tiktok.com/@${esc(r.q)}', '_blank', 'noopener')">${I('link')}Open my profile on TikTok</button></div>`
       : `<div class="msg" style="position:static;padding:50px">${I(r.kind === 'saved' ? 'bookmark' : r.kind === 'history' ? 'clock' : 'user')}<h3>${L.err ? 'Couldn’t load this' : p && p.private ? 'This account is private' : 'Nothing here yet'}</h3><p>${esc(L.err || (r.kind === 'saved' ? 'Tap the bookmark on any video to save it here.' : r.kind === 'history' ? 'Videos you watch show up here.' : ''))}</p></div>`;
     v.innerHTML = `<div class="page" id="pg">${back.length ? `<button class="btn ghost" id="pBack" style="height:34px;margin-bottom:14px">${I('left')}Back</button>` : ''}${head}${body}</div>`;
     const pb = $('#pBack'); if (pb) pb.onclick = () => { const x = back.pop(); if (x) go(x, false); };
@@ -531,7 +539,9 @@ function searchView(r) {
     if (route !== r) return;
     let h = `<div class="page" id="pg"><h1>“${esc(q)}”</h1>${mobileBox}`;
     if (V.signin || U.signin) h += `<div class="note">${I('key')}<div style="flex:1">${esc(V.note || U.note || 'Sign in to search.')}</div><button class="btn" data-signin>Sign in</button></div><button class="ur" style="max-width:360px" data-open="${esc(q.replace(/\s+/g, ''))}">${avatar({ name: q })}<div class="tx"><b>@${esc(q.replace(/\s+/g, ''))}</b><small>Open this profile</small></div></button>`;
-    if (U.users.length) h += `<div class="sh">People</div><div class="users">${U.users.slice(0, 8).map(u => `<button class="ur" data-open="${esc(u.id)}">${avatar(u)}<div class="tx"><b>${esc(u.id)} ${vf(u)}</b><small>${esc(u.name)} · ${num(u.followers)} followers</small></div></button>`).join('')}</div>`;
+    const people = U.users.length ? U.users : [...new Map(V.items.map(x => [x.author.id, x.author])).values()].filter(a => a.id).slice(0, 8);
+    if (people.length) h += `<div class="sh">People</div><div class="users">${people.slice(0, 8).map(u => `<button class="ur" data-open="${esc(u.id)}">${avatar(u)}<div class="tx"><b>${esc(u.id)} ${vf(u)}</b><small>${esc(u.name || '')}${u.followers ? ' · ' + num(u.followers) + ' followers' : ''}</small></div></button>`).join('')}</div>`;
+    if (false) h += `<div class="sh">People</div><div class="users">${U.users.slice(0, 8).map(u => `<button class="ur" data-open="${esc(u.id)}">${avatar(u)}<div class="tx"><b>${esc(u.id)} ${vf(u)}</b><small>${esc(u.name)} · ${num(u.followers)} followers</small></div></button>`).join('')}</div>`;
     if (V.items.length) h += `<div class="sh">Videos</div><div class="grid">${V.items.map(gridItem).join('')}</div>${V.hasMore ? '<div class="more-sp"><div class="spin" style="display:block;position:static"></div></div>' : ''}`;
     else if (V.busy || U.busy) h += '<div class="more-sp"><div class="spin" style="display:block;position:static"></div></div>';
     else if (!V.signin) h += `<div class="msg" style="position:static;padding:40px">${I('search')}<h3>${V.err ? 'Search didn’t work' : 'No results'}</h3><p>${esc(V.err || 'Try other words.')}</p></div>`;
@@ -539,9 +549,9 @@ function searchView(r) {
     $('#pg').onclick = e => { const o = e.target.closest('[data-open]'); if (o) return openUser(o.dataset.open); const g = e.target.closest('[data-gi]'); if (g) go({ v: 'feed', kind: 'search', q, list: V, from: 1, title: '“' + q + '”', start: +g.dataset.gi }); };
     const pg = $('#pg'); pg.onscroll = () => { if (V.hasMore && !V.busy && pg.scrollTop + pg.clientHeight > pg.scrollHeight - 500) { const y = pg.scrollTop; loadMore(V).then(() => { draw(); $('#pg').scrollTop = y; }); } };
   };
-  draw();
   if (!V.items.length && V.hasMore) loadMore(V).then(draw).catch(render);
   if (!U.users.length && U.hasMore) loadMore(U).then(draw).catch(() => {});
+  draw();
 }
 function bindQ2() { const q2 = $('#q2'); if (q2) q2.onkeydown = e => { if (e.key === 'Enter' && q2.value.trim()) go({ v: 'search', q: q2.value.trim() }); }; }
 $('#q').onkeydown = e => { if (e.key === 'Enter') { const s = $('#q').value.trim(); if (s) go({ v: 'search', q: s }); } };

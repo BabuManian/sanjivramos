@@ -219,6 +219,21 @@ async function cookies(force) {
 }
 const signedIn = ck => ck.all.some(k => (k.name === 'sessionid' || k.name === 'sessionid_ss') && k.value);
 let meCache = { t: 0, v: null };
+function getText(u, cookie, ua) {
+  return new Promise((res, rej) => {
+    const r = https.get(u, { headers: { 'user-agent': ua, cookie, referer: TT + '/', accept: 'text/html,application/json' }, timeout: 12000 }, up => { let b = ''; up.setEncoding('utf8'); up.on('data', d => { b += d; if (b.length > 4e6) up.destroy(); }); up.on('end', () => res(b)); });
+    r.on('error', rej); r.on('timeout', () => r.destroy(new Error('timeout')));
+  });
+}
+// Your current picture is on your profile page (the account-info answer can be an old one).
+async function currentAvatar(id, cookie, ua) {
+  try {
+    const html = await getText(`${TT}/@${encodeURIComponent(id)}`, cookie, ua);
+    const m = /<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/.exec(html); if (!m) return '';
+    const u = (((JSON.parse(m[1]).__DEFAULT_SCOPE__ || {})['webapp.user-detail'] || {}).userInfo || {}).user || {};
+    return u.avatarMedium || u.avatarThumb || u.avatarLarger || '';
+  } catch { return ''; }
+}
 function getJson(u, cookie, ua) {
   return new Promise((res, rej) => {
     const r = https.get(u, { headers: { 'user-agent': ua, cookie, referer: TT + '/', accept: 'application/json' }, timeout: 10000 }, up => { let b = ''; up.setEncoding('utf8'); up.on('data', d => { b += d; if (b.length > 2e6) up.destroy(); }); up.on('end', () => { try { res(JSON.parse(b)); } catch { rej(new Error('bad answer')); } }); });
@@ -232,7 +247,8 @@ async function me(force) {
   try {
     const j = await getJson(`${TT}/passport/web/account/info/?aid=1459&app_language=en`, ck.s, C.ua);
     const d = j.data || {};
-    meCache = { t: Date.now(), v: { id: d.username || '', name: d.username || d.screen_name || '', avatar: d.avatar_url || d.avatar_large_url || d.avatar_thumb_url || '', uid: d.user_id_str || String(d.user_id || '') } };
+    const fresh = d.username ? await currentAvatar(d.username, ck.s, C.ua) : '';
+    meCache = { t: Date.now(), v: { id: d.username || '', name: d.username || d.screen_name || '', avatar: fresh || d.avatar_url || d.avatar_large_url || d.avatar_thumb_url || '', uid: d.user_id_str || String(d.user_id || '') } };
   } catch { meCache = { t: Date.now(), v: { id: '', name: 'Signed in', avatar: '' } }; }
   return meCache.v;
 }
