@@ -23,11 +23,31 @@ openssh-client
 firmware-linux-free
 firmware-linux-nonfree
 firmware-misc-nonfree
+intel-microcode
+amd64-microcode
+
+# Wi-Fi / Bluetooth / network firmware (Intel, Realtek, Atheros/Qualcomm, MediaTek, Broadcom, Marvell, TI)
 firmware-iwlwifi
 firmware-realtek
 firmware-atheros
-intel-microcode
-amd64-microcode
+firmware-mediatek
+firmware-brcm80211
+firmware-libertas
+firmware-ti-connectivity
+firmware-bnx2
+bluez
+rfkill
+iw
+
+# GPU drivers: AMD (amdgpu/radeon) and Intel, open NVIDIA (nouveau) — Mesa OpenGL/Vulkan + video decoding
+firmware-amd-graphics
+firmware-intel-graphics
+mesa-vulkan-drivers
+mesa-va-drivers
+mesa-vdpau-drivers
+intel-media-va-driver-non-free
+vainfo
+vulkan-tools
 
 # Display (X11 kiosk for the Electron shell)
 xserver-xorg-core

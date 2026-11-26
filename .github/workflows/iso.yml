@@ -7,11 +7,16 @@ on:
     paths: ['distro/**', '.github/workflows/iso.yml']
 permissions:
   contents: write
-concurrency:
-  group: iso
-  cancel-in-progress: true
 jobs:
   iso:
+    # Two ISOs: "standard" (AMD/Intel/open NVIDIA drivers) and "nvidia" (NVIDIA's own driver for GeForce/RTX cards).
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [standard, nvidia]
+    concurrency:
+      group: iso-${{ matrix.variant }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -24,6 +29,7 @@ jobs:
         run: |
           docker run --rm --privileged -v "$PWD:/src" \
             -e SJ_REPO="https://github.com/${{ github.repository }}.git" -e SJ_BRANCH="${{ github.ref_name }}" \
+            -e SJ_VARIANT="${{ matrix.variant }}" -e WORK=/src/distro/work \
             debian:trixie bash /src/distro/build.sh
       - name: Publish release
         env:
@@ -31,8 +37,13 @@ jobs:
         run: |
           gh release view iso-latest >/dev/null 2>&1 || gh release create iso-latest --prerelease --title "SanjivramOS Linux (latest ISO)" \
             --notes "Debian-based SanjivramOS live/installer ISO for 64-bit PCs. Flash it to a USB stick (balenaEtcher, Rufus or dd) and boot. It downloads the newest SanjivramOS from GitHub on every boot."
-          gh release upload iso-latest distro/out/sanjivramos-amd64.iso distro/out/sanjivramos-amd64.iso.sha256 --clobber
-          gh release edit iso-latest --notes "Built $(date -u +'%Y-%m-%d %H:%M UTC') from ${GITHUB_SHA::7}. Flash sanjivramos-amd64.iso to a USB stick (balenaEtcher, Rufus or dd) and boot it. Login/sudo password: sanjivram. It downloads the newest SanjivramOS from GitHub on every boot."
+          gh release upload iso-latest distro/out/*.iso distro/out/*.iso.sha256 --clobber
+          gh release edit iso-latest --notes "Built $(date -u +'%Y-%m-%d %H:%M UTC') from ${GITHUB_SHA::7}.
+
+          - **sanjivramos-amd64.iso**: for most PCs (AMD and Intel graphics, older NVIDIA cards with the open nouveau driver).
+          - **sanjivramos-amd64-nvidia.iso**: for PCs with a GeForce GTX 900 series / RTX or newer NVIDIA card (NVIDIA's own driver).
+
+          Both include Wi-Fi firmware (Intel, Realtek, Atheros/Qualcomm, MediaTek, Broadcom, Marvell, TI). Flash one to a USB stick (balenaEtcher, Rufus or dd) and boot it. Login/sudo password: sanjivram. It downloads the newest SanjivramOS from GitHub on every boot."
       - name: Build log on failure
         if: failure()
-        run: sudo tail -n 200 /var/tmp/sanjivramos-build/build.log 2>/dev/null || true
+        run: sudo grep -nE '^E: |error|Error|failed' distro/work/build.log | tail -n 60 || true; sudo tail -n 120 distro/work/build.log 2>/dev/null || true

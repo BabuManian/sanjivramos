@@ -1,0 +1,7 @@
+# Extra packages for the NVIDIA ISO (sanjivramos-amd64-nvidia.iso): NVIDIA's own driver, built for the ISO's kernel.
+linux-headers-amd64
+nvidia-kernel-dkms
+nvidia-driver
+firmware-nvidia-gsp
+nvidia-settings
+nvidia-vaapi-driver

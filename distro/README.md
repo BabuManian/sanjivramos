@@ -8,7 +8,11 @@ A real Linux distro for 64-bit PCs. It's built on **Debian 13 (trixie)** and boo
 - **fastfetch says Arch.** Run `fastfetch` (or `neofetch`) and you'll see the Arch logo, "Arch Linux x86_64", an `-arch1-1` kernel and a `(pacman)` package count. Underneath it's Debian, so `apt` is still the package manager.
 
 ## Get it
-GitHub Actions builds the ISO every time `distro/` changes: **Releases → iso-latest → `sanjivramos-amd64.iso`**. You can also start a build by hand under Actions → *Build SanjivramOS ISO* → Run workflow.
+GitHub Actions builds two ISOs every time `distro/` changes (**Releases → iso-latest**):
+- **`sanjivramos-amd64.iso`**: for most PCs. Has AMD and Intel graphics drivers (Mesa OpenGL/Vulkan + video decoding) and the open nouveau driver for NVIDIA.
+- **`sanjivramos-amd64-nvidia.iso`**: the same, plus NVIDIA's own driver (550) for GeForce GTX 900 series / RTX and newer cards.
+
+Both come with Wi-Fi and Bluetooth firmware for Intel, Realtek, Atheros/Qualcomm, MediaTek, Broadcom (brcmfmac), Marvell and TI chips. You can also start a build by hand under Actions → *Build SanjivramOS ISO* → Run workflow.
 
 Flash the ISO to a USB stick with balenaEtcher, Rufus or `dd`, then boot from it. The boot menu has **Live** (try it) and **Install** (Debian installer that copies the system to disk). It also runs in VirtualBox, QEMU or GNOME Boxes.
 
@@ -29,6 +33,7 @@ On any Linux machine with Docker (takes about 30–60 min and needs ~15 GB free)
 ```
 docker run --rm --privileged -v "$PWD:/src" debian:trixie bash /src/distro/build.sh
 ```
+For the NVIDIA ISO add `-e SJ_VARIANT=nvidia` after `--privileged`.
 The ISO ends up in `distro/out/`.
 
 ## How it fits together
