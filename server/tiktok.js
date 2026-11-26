@@ -49,11 +49,14 @@ function launch() {
   });
   proc.stderr.on('data', () => {});
   proc.stdio[3].on('error', () => {});
-  proc.on('exit', () => { for (const p of pending.values()) p.rej(new Error('Chromium stopped')); if (C === c) { C = null; feeds.clear(); loginTab = null; } });
+  proc.on('exit', () => { for (const p of pending.values()) p.rej(new Error('Chromium stopped')); if (C === c) { C = null; feeds.clear(); loginTab = null; guest = null; ckCache = {}; } });
   c.ready = (async () => { const v = await c.call('Browser.getVersion'); c.ua = String(v.userAgent || '').replace('HeadlessChrome', 'Chrome'); return c; })();
   c.ready.catch(() => { try { proc.kill('SIGKILL'); } catch {} });
   return c;
 }
+// A signed-out session (own cookies, nothing saved) for endless guest For You when TikTok stops sending your own.
+let guest = null;
+async function guestCtx() { const c = await browser(); if (!guest) guest = c.call('Target.createBrowserContext', { disposeOnDetach: false }).then(r => r.browserContextId).catch(e => { guest = null; throw e; }); return guest; }
 async function browser() {
   clearTimeout(idleT); idleT = setTimeout(() => { if (C) try { C.proc.kill('SIGTERM'); } catch {} }, IDLE_MS);
   if (!C) C = launch();
@@ -67,9 +70,9 @@ const uaMeta = ua => {
 // Hidden feed tabs never need to play or show anything: mute/pause videos and skip downloading video and pictures.
 const QUIET = `setInterval(()=>{for(const v of document.querySelectorAll('video')){v.muted=true;if(!v.paused)v.pause()}},400)`;
 const BLOCK = ['*://*/video/tos/*', '*mime_type=video*', '*.mp4*', '*~tplv-*', '*.jpeg?*', '*.webp?*', '*/aweme/v1/play/*'];
-async function newTab({ quiet = true, w = 1280, h = 800 } = {}) {
+async function newTab({ quiet = true, w = 1280, h = 800, ctx } = {}) {
   const c = await browser();
-  const { targetId } = await c.call('Target.createTarget', { url: 'about:blank' });
+  const { targetId } = await c.call('Target.createTarget', ctx ? { url: 'about:blank', browserContextId: ctx } : { url: 'about:blank' });
   const { sessionId } = await c.call('Target.attachToTarget', { targetId, flatten: true });
   await Promise.all(['Page.enable', 'Network.enable', 'Runtime.enable'].map(m => c.call(m, {}, sessionId).catch(() => {})));
   await c.call('Network.setUserAgentOverride', { userAgent: c.ua, acceptLanguage: 'en-US,en', platform: 'Linux x86_64', userAgentMetadata: uaMeta(c.ua) }, sessionId).catch(() => {});
@@ -91,7 +94,7 @@ const evalIn = async (t, expr, timeout = 15000) => {
 const media = new Map();   // video id → { urls: [...], music }
 function remember(id, m) { media.delete(id); media.set(id, m); if (media.size > 3000) for (const k of [...media.keys()].slice(0, 1000)) media.delete(k); }
 const first = u => (u && (u.url_list || u.urlList || [])[0]) || (typeof u === 'string' ? u : '');
-function normItem(it) {
+function normItem(it, ctx) {
   if (!it || !it.id || !(it.video || it.imagePost)) return null;
   // Ads and promoted posts: skip them (they often can't play outside TikTok anyway).
   if (it.isAd || it.is_ad || it.adAuthorization || it.ad_info || it.adInfo || it.adLabelVersion || it.isPromoted || it.brandOrganicType === 1 || (it.aweme_type && it.aweme_type !== 0 && it.aweme_type !== 150 && it.aweme_type !== 61)) return null;
@@ -102,7 +105,7 @@ function normItem(it) {
   const urls = [...br.flatMap(b => b.PlayAddr.UrlList.slice(0, 2)), v.playAddr, v.downloadAddr].filter(Boolean);
   const photo = it.imagePost && it.imagePost.images ? it.imagePost.images.map(i => first(i.imageURL)).filter(Boolean) : null;
   if (!photo && !urls.length) return null;
-  remember(it.id, { urls: [...new Set(urls)], music: m.playUrl || '', imgs: photo || [] });
+  remember(it.id, { urls: [...new Set(urls)], music: m.playUrl || '', imgs: photo || [], ctx: ctx || '' });
   return {
     id: it.id, desc: it.desc || '', created: +it.createTime || 0,
     author: { id: a.uniqueId || '', uid: a.id || '', name: a.nickname || a.uniqueId || '', avatar: a.avatarThumb || a.avatarMedium || '', verified: !!a.verified },
@@ -127,18 +130,19 @@ const API_RE = /\/api\/(prefetch\/explore|recommend|post|repost|favorite|followi
 const feeds = new Map();   // key → feed
 const FEED_URL = { foryou: () => `${TT}/foryou`, following: () => `${TT}/following`, explore: () => `${TT}/explore`, user: q => `${TT}/@${encodeURIComponent(q)}`, search: q => `${TT}/search/video?q=${encodeURIComponent(q)}`, users: q => `${TT}/search/user?q=${encodeURIComponent(q)}`, tag: q => `${TT}/tag/${encodeURIComponent(q)}`, video: q => `${TT}/@x/video/${encodeURIComponent(q)}` };
 const opening = new Map();
-function openFeed(key, kind, q) {
+function openFeed(key, kind, q, asGuest) {
   if (opening.has(key)) return opening.get(key);
-  const p = openFeed1(key, kind, q).finally(() => opening.delete(key));
+  const p = openFeed1(key, kind, q, asGuest).finally(() => opening.delete(key));
   opening.set(key, p); return p;
 }
-async function openFeed1(key, kind, q) {
+async function openFeed1(key, kind, q, asGuest) {
   const old = feeds.get(key); if (old) { feeds.delete(key); closeTab(old.tab); }
   while ([...feeds.keys()].filter(k => !k.endsWith('#spare')).length >= MAX_FEEDS && !key.endsWith('#spare')) { const [k, f] = [...feeds].filter(([k]) => !k.endsWith('#spare')).sort((a, b) => a[1].t - b[1].t)[0]; feeds.delete(k); closeTab(f.tab); }
-  const tab = await newTab();
-  const f = { key, kind, q, tab, items: [], ids: new Set(), users: [], uids: new Set(), hasMore: true, t: Date.now(), wake: [], profile: null, urls: new Map(), err: '' };
+  const ctx = asGuest ? await guestCtx() : '';
+  const tab = await newTab({ ctx });
+  const f = { key, kind, q, tab, ctx, items: [], ids: new Set(), users: [], uids: new Set(), hasMore: true, t: Date.now(), wake: [], profile: null, urls: new Map(), err: '' };
   feeds.set(key, f);
-  const add = list => { let n = 0; for (const it of list) { const x = normItem(it); if (x && !f.ids.has(x.id)) { f.ids.add(x.id); f.items.push(x); n++; } } return n; };
+  const add = list => { let n = 0; for (const it of list) { const x = normItem(it, f.ctx); if (x && !f.ids.has(x.id)) { f.ids.add(x.id); f.items.push(x); n++; } } return n; };
   f.add = add;
   tab.c.on.set(tab.sid, async m => {
     const p = m.params || {};
@@ -201,21 +205,41 @@ async function feed(kind, q, cursor, fresh) {
     if (before || tries > 0) await pull(f);
     await waitNew(f, before ? 3500 : 6000);
     if (list().length === before) tries++;
-    if (tries >= 3 && list().length) break;
+    if (tries >= 2 && list().length) break;
+  }
+  if ((kind === 'foryou' || kind === 'explore') && list().length < want && !f.ctx) {
+    const gk = key + '#guest';
+    let g = feeds.get(gk) || await openFeed(gk, kind, q, true);
+    g.t = Date.now();
+    const gEnd = Date.now() + 16000;
+    let stalls = 0;
+    while (Date.now() < gEnd) {
+      const fresh2 = g.items.filter(x => !f.ids.has(x.id));
+      if (fresh2.length >= 6) break;
+      const before = g.items.length;
+      if (before && stalls < 1) await pull(g);
+      await waitNew(g, before ? 3500 : 7000);
+      if (g.items.length === before && ++stalls >= 1 && before) {
+        // TikTok stopped sending this page more: a freshly loaded For You always brings a new batch.
+        feeds.delete(gk); closeTab(g.tab); g = await openFeed(gk, kind, q, true); stalls = 0;
+      }
+    }
+    for (const x of g.items) if (!f.ids.has(x.id)) { f.ids.add(x.id); f.items.push(x); }
+    f.hasMore = true;
   }
   const out = list().slice(cursor, cursor + 15); f.served = true;
   return { items: kind === 'users' ? [] : out, users: kind === 'users' ? out : f.users.slice(0, 12), next: cursor - base + out.length, hasMore: f.hasMore || list().length > cursor + out.length, profile: f.profile };
 }
 
 /* ---------------- cookies, sign-in state ---------------- */
-let ckCache = { t: 0, s: '', all: [] };
-async function cookies(force) {
-  if (!force && Date.now() - ckCache.t < 30000) return ckCache;
+let ckCache = {};
+async function cookies(force, ctx = '') {
+  const hit = ckCache[ctx];
+  if (!force && hit && Date.now() - hit.t < 30000) return hit;
   const c = await browser();
-  const r = await c.call('Storage.getCookies', {}).catch(() => ({ cookies: [] }));
+  const r = await c.call('Storage.getCookies', ctx ? { browserContextId: ctx } : {}).catch(() => ({ cookies: [] }));
   const all = (r.cookies || []).filter(k => /(^|\.)tiktok(v)?\.com$|tiktokcdn|byteoversea|ibyteimg/.test(k.domain.replace(/^\./, '')));
-  ckCache = { t: Date.now(), all, s: all.filter(k => /tiktok\.com$/.test(k.domain)).map(k => `${k.name}=${k.value}`).join('; ') };
-  return ckCache;
+  return (ckCache[ctx] = { t: Date.now(), all, s: all.filter(k => /tiktok\.com$/.test(k.domain)).map(k => `${k.name}=${k.value}`).join('; ') });
 }
 const signedIn = ck => ck.all.some(k => (k.name === 'sessionid' || k.name === 'sessionid_ss') && k.value);
 let meCache = { t: 0, v: null };
@@ -415,7 +439,7 @@ function pipe(u, req, res, extra, hops = 0) {
 async function streamVideo(req, res, id, which) {
   const m = media.get(id);
   if (!m) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('Unknown video'); return; }
-  const ck = await cookies();
+  const ck = await cookies(false, m.ctx || '');
   const list = which === 'music' ? [m.music] : which && /^\d+$/.test(which) ? [m.imgs[+which]] : m.urls;
   const extra = { cookie: ck.s }; if (req.headers.range && !/^\d+$/.test(which || '')) extra.range = req.headers.range;
   for (const u of list.filter(Boolean)) if (await pipe(u, req, res, extra)) return;
@@ -457,7 +481,7 @@ export async function ttApi(req, res, url, allowed) {
       const c = await browser();
       for (const [k, f] of feeds) { closeTab(f.tab); feeds.delete(k); }
       const t = await newTab({ quiet: false }); await c.call('Network.clearBrowserCookies', {}, t.sid).catch(() => {}); await c.call('Storage.clearDataForOrigin', { origin: TT, storageTypes: 'all' }, t.sid).catch(() => {}); closeTab(t);
-      ckCache.t = 0; meCache = { t: 0, v: null };
+      ckCache = {}; meCache = { t: 0, v: null };
       return send(200, { ok: true });
     }
     return send(404, { error: 'Not found' });

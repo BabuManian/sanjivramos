@@ -396,7 +396,7 @@ setTimeout(() => warm(true), 8000).unref();
 setInterval(() => warm(false), 20 * 60e3).unref();
 
 /* ---------------- streaming ---------------- */
-async function stream(req, res, t) {
+async function stream(req, res, t, dl = '') {
   const tk = tokens.get(t);
   if (!tk || tk.exp < Date.now()) { res.writeHead(410, { 'content-type': 'text/plain' }); res.end('This video link expired — reopen the video.'); return; }
   const ac = new AbortController(); req.on('close', () => ac.abort());
@@ -406,6 +406,8 @@ async function stream(req, res, t) {
   catch (e) { if (!res.headersSent) { res.writeHead(502, { 'content-type': 'text/plain' }); res.end('Couldn’t reach the video: ' + e.message); } return; }
   const out = { 'content-type': up.headers.get('content-type') || tk.mime || 'application/octet-stream', 'cache-control': 'private, max-age=3600', 'accept-ranges': 'bytes' };
   for (const k of ['content-length', 'content-range']) { const v = up.headers.get(k); if (v) out[k] = v; }
+  // ?dl=Name.ext saves the stream as a file (Kushtube / Kush Music "Download").
+  if (dl) { const name = String(dl).replace(/[\x00-\x1f\/\\:*?"<>|]+/g, ' ').trim().slice(0, 150) || 'download'; out['content-disposition'] = `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`; out['cache-control'] = 'no-store'; }
   res.writeHead(up.status, out);
   if (!up.body || req.method === 'HEAD') { res.end(); return; }
   Readable.fromWeb(up.body).on('error', () => res.destroy()).pipe(res);
@@ -466,7 +468,7 @@ export async function ytApi(req, res, url) {
   if (why) { send(401, { error: why }); return true; }
   lastUse = Date.now();
   try {
-    if (p === '/yt/stream') { await stream(req, res, url.searchParams.get('t') || ''); return true; }
+    if (p === '/yt/stream') { await stream(req, res, url.searchParams.get('t') || '', url.searchParams.get('dl') || ''); return true; }
     if (p === '/yt/img') { await serveImg(req, res, url.searchParams.get('u') || ''); return true; }
     const q = k => url.searchParams.get(k) || '', page = Math.max(1, Math.min(20, +q('page') || 1));
     const region = /^[A-Z]{2}$/.test(q('region')) ? q('region') : 'US';

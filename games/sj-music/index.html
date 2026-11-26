@@ -570,6 +570,7 @@ const P = {
   expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
   stats: '<path d="M5 20V11M12 20V5M19 20v-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
   glass: '<path d="M12 3.5c3 3.6 6 7.2 6 10.5a6 6 0 0 1-12 0c0-3.3 3-6.9 6-10.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9.2 14.5a2.9 2.9 0 0 0 2.3 2.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  dl: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
   share: '<path d="M12 15V4m-4 4 4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 const I = (n, extra = '') => `<svg viewBox="0 0 24 24" ${extra}>${P[n] || ''}</svg>`;
@@ -693,7 +694,7 @@ function pickAudio(v) {
   const A = (v.streams && v.streams.audio) || [];
   const mp4 = A.filter(a => /mp4a/.test(a.mime)).sort((a, b) => b.bitrate - a.bitrate);
   const any = mp4[0] || A.sort((a, b) => b.bitrate - a.bitrate).find(a => au.canPlayType(a.mime.split(';')[0]) !== '');
-  if (any) return { url: any.url, kbps: Math.round(any.bitrate > 2000 ? any.bitrate / 1000 : any.bitrate) };
+  if (any) return { url: any.url, mime: any.mime, kbps: Math.round(any.bitrate > 2000 ? any.bitrate / 1000 : any.bitrate) };
   const pr = (v.streams && v.streams.progressive) || []; if (pr[0]) return { url: pr[0].url, kbps: 0 };
   throw new Error('No audio stream');
 }
@@ -967,8 +968,22 @@ function songMenu(t, e, fromNP) {
   if (t.albumId) items.push({ t: 'Go to Album', i: 'album', f: () => { if (fromNP) closeNP(); go({ v: 'album', id: t.albumId }); } });
   if (t.artistId) items.push({ t: 'Go to Artist', i: 'mic', f: () => { if (fromNP) closeNP(); go({ v: 'artist', id: t.artistId }); } });
   items.push({ t: 'Create Station', i: 'radio', f: () => station(t) });
+  items.push({ t: 'Download Song', i: 'dl', f: () => downloadSong(t) });
   if (t.yt || D.map[t.id]) items.push({ t: 'Open in Kushtube', i: 'yt', f: () => openTube(t.yt || D.map[t.id]) });
   menu(e, items);
+}
+// Save a song as an audio file (the same full-length stream Kush Music plays).
+async function downloadSong(t) {
+  toast('Getting “' + t.title + '” ready…', 'dl');
+  try {
+    const vid = t.yt || D.map[t.id] || await resolveYt(t);
+    const a = pickAudio(await ytApi('video/' + vid));
+    const ext = /webm|opus/.test(a.mime || '') ? 'webm' : 'm4a';
+    const name = `${t.artist} - ${t.title}`.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 140) + '.' + ext;
+    const link = document.createElement('a'); link.href = a.url + (a.url.includes('?') ? '&' : '?') + 'dl=' + encodeURIComponent(name); link.download = name;
+    document.body.appendChild(link); link.click(); link.remove();
+    toast('Downloading “' + name + '”', 'dl');
+  } catch (e) { toast(e.signin ? 'Sign in to SanjivramOS to download full songs' : 'Couldn’t download this song', 'x'); }
 }
 function plMenu(t, e) { setTimeout(() => menu(e, [{ t: 'New Playlist…', i: 'plus', f: () => newPlaylist(pl => addToPlaylist(t, pl.id)) }, ...(D.playlists.length ? ['-'] : []), ...D.playlists.map(p => ({ t: p.name, i: 'playlist', f: () => addToPlaylist(t, p.id) }))]), 10); }
 function openTube(id) { try { if (parent !== window && parent.WM) { parent.WM.open('html-tube', { url: location.origin + '/games/sj-tube/?v=' + id }); return; } } catch {} window.open('../sj-tube/?v=' + id, '_blank'); }

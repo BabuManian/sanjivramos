@@ -173,8 +173,25 @@ const I = {
   later: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', check: '<path d="M5 12l5 5 9-10"/>', vol: '<path d="M4 9h4l5-4v14l-5-4H4zM17 8a5 5 0 0 1 0 8"/>', mute: '<path d="M4 9h4l5-4v14l-5-4H4zM22 9l-6 6M16 9l6 6"/>',
   up: '<path d="M6 15l6-6 6 6"/>', down: '<path d="M6 9l6 6 6-6"/>', theater: '<rect x="2" y="6" width="20" height="12" rx="2"/>', pip: '<rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor"/>',
-  full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/>', trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+  full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', dl: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/>', trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
 };
+// Download: video with sound (the combined MP4 streams) or audio only, saved by the browser as a file.
+function downloadMenu(v, btn) {
+  const S = v.streams || { progressive: [], audio: [] }, safe = (v.title || 'video').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 120) || 'video';
+  const vids = (S.progressive || []).slice().sort((a, b) => (b.height || 0) - (a.height || 0));
+  const aud = (S.audio || []).filter(a => /mp4a|m4a|audio\/mp4/.test(a.mime || '')).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || (S.audio || [])[0];
+  const opts = vids.map(x => [`Video ${x.height ? x.height + 'p' : ''} (MP4)`, x.url, safe + '.mp4']).concat(aud ? [[`Audio only (${/webm|opus/.test(aud.mime || '') ? 'WebM' : 'M4A'})`, aud.url, safe + (/webm|opus/.test(aud.mime || '') ? '.webm' : '.m4a')]] : []);
+  document.querySelectorAll('.dlmenu').forEach(m => m.remove());
+  if (!opts.length) { toast('No downloadable copy of this video'); return; }
+  const m = document.createElement('div'); m.className = 'dlmenu';
+  const r = btn.getBoundingClientRect();
+  m.style.cssText = `position:fixed;z-index:80;left:${Math.min(r.left, innerWidth - 230)}px;top:${r.bottom + 6}px;min-width:220px;padding:6px;border-radius:12px;background:var(--surface,#222);border:1px solid var(--border,#444);box-shadow:0 14px 40px rgba(0,0,0,.4)`;
+  m.innerHTML = opts.map((o, i) => `<button data-i="${i}" style="display:block;width:100%;text-align:left;padding:9px 12px;border:none;border-radius:8px;background:none;color:inherit;font:inherit;cursor:pointer">${o[0]}</button>`).join('');
+  m.onmouseover = e => { const b = e.target.closest('button'); m.querySelectorAll('button').forEach(x => x.style.background = x === b ? 'rgba(127,127,127,.18)' : 'none'); };
+  m.onclick = e => { const b = e.target.closest('button'); if (!b) return; const o = opts[+b.dataset.i]; const a = document.createElement('a'); a.href = o[1] + (o[1].includes('?') ? '&' : '?') + 'dl=' + encodeURIComponent(o[2]); a.download = o[2]; document.body.appendChild(a); a.click(); a.remove(); m.remove(); toast('Downloading “' + o[2] + '”'); };
+  document.body.appendChild(m);
+  setTimeout(() => addEventListener('click', function off(e) { if (!m.contains(e.target)) { m.remove(); removeEventListener('click', off, true); } }, true), 0);
+}
 const ic = (k, extra = '') => `<svg viewBox="0 0 24 24"${extra}>${I[k]}</svg>`;
 
 /* ---------------- look: follow the SanjivramOS theme ---------------- */
@@ -544,7 +561,7 @@ async function watch(id) {
     <div class="vt">${esc(v.title)}</div>
     <div class="owner"><span id="avbox" data-ch="${esc(v.authorId)}">${v.authorThumb ? `<img src="${esc(pic(v.authorThumb))}" alt="">` : avatar(v.author)}</span><div class="n" data-ch="${esc(v.authorId)}"><b>${esc(v.author)}</b><small>${esc(v.subs || '')}</small></div>
       <button class="pill ${isSub(v.authorId) ? '' : 'acc'}" id="subB">${isSub(v.authorId) ? ic('check') + ' Subscribed' : ic('plus') + ' Subscribe'}</button><span style="flex:1"></span>
-      <button class="pill${liked ? ' acc' : ''}" id="like">${ic('like')} ${v.likes ? num(v.likes) : 'Like'}</button><button class="pill${later ? ' acc' : ''}" id="later">${ic('later')} Later</button><button class="pill" id="share">${ic('share')} Share</button></div>
+      <button class="pill${liked ? ' acc' : ''}" id="like">${ic('like')} ${v.likes ? num(v.likes) : 'Like'}</button><button class="pill${later ? ' acc' : ''}" id="later">${ic('later')} Later</button><button class="pill" id="share">${ic('share')} Share</button><button class="pill" id="dlB" title="Download">${ic('dl')} Download</button></div>
     <div class="desc" id="desc"><span class="st">${[v.views != null ? num(v.views) + ' views' : '', ago(v)].filter(Boolean).join(' · ')}</span>${linkify(v.desc || 'No description.')}</div>
   </div><div class="side"><h4>Up next</h4><div id="rel">${v.related.length ? v.related.map(card).join('') : '<div class="skel" style="height:94px;margin-bottom:12px"></div>'.repeat(5)}</div></div></div>`;
   const vid = $('#vid'), poster = $('.player .poster', main), spin = $('.player .spin', main);
@@ -573,6 +590,7 @@ async function watch(id) {
   const toggleList = (k, btn) => { const has = D[k].some(x => x.id === id); if (has) { D[k] = D[k].filter(x => x.id !== id); save(); } else addTo(k, v); btn.classList.toggle('acc', !has); toast(has ? 'Removed' : k === 'liked' ? 'Added to Liked' : 'Saved to Watch later'); };
   $('#like').onclick = e => toggleList('liked', e.currentTarget); $('#later').onclick = e => toggleList('later', e.currentTarget);
   $('#share').onclick = () => share('https://www.youtube.com/watch?v=' + id);
+  $('#dlB').onclick = e => downloadMenu(v, e.currentTarget);
   $('#desc').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { e.preventDefault(); vid.currentTime = +t.dataset.t; vid.play(); return; } if (e.target.tagName !== 'A') $('#desc').classList.add('open'); };
   vid.addEventListener('ended', () => { savePos(); const nx = v.related[0]; if (D.set.autoplay && nx) { toast('Up next: ' + nx.title); setTimeout(() => { if (W && W.v === v) go('watch', nx.id); }, 1500); } });
   vid.addEventListener('timeupdate', () => { for (const s of (W && W.sponsor) || []) if (vid.currentTime >= s.start && vid.currentTime < s.end - 0.5 && !s.done) { s.done = true; vid.currentTime = s.end; toast('Skipped ' + ({ sponsor: 'sponsor', selfpromo: 'self-promotion', interaction: 'subscribe reminder', intro: 'intro', outro: 'outro' }[s.cat] || s.cat)); } });

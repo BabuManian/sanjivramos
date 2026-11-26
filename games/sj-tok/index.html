@@ -295,7 +295,10 @@ async function loadMore(L, fresh) {
         if (added >= 3 || !j.hasMore || !(j.items || []).length) break;
       }
       const hu = new Set(L.users.map(x => x.id)); for (const u of j.users || []) if (!hu.has(u.id)) L.users.push(u);
-      L.hasMore = j.hasMore && ((j.items || []).length > 0 || (j.users || []).length > 0); L.profile = j.profile || L.profile; L.note = j.note || ''; L.signin = !!j.signin; L.err = '';
+      // TikTok sends videos in bursts: an empty answer doesn't mean the end, so keep asking (up to 5 empty tries in a row).
+      const got = (j.items || []).length > 0 || (j.users || []).length > 0;
+      L.empties = got ? 0 : (L.empties || 0) + 1;
+      L.hasMore = j.hasMore && (got || (ENDLESS[L.kind] && L.empties < 5)); L.profile = j.profile || L.profile; L.note = j.note || ''; L.signin = !!j.signin; L.err = '';
     } catch (e) { L.err = e.message; L.signin = !!e.signin; L.hasMore = false; if (e.block) throw e; }
     finally { L.busy = null; }
   })();
@@ -304,7 +307,7 @@ async function loadMore(L, fresh) {
 
 /* ---------- navigation ---------- */
 let route = { v: 'feed', kind: 'foryou' }, back = [];
-const NAV = [['foryou', 'For You', 'home'], ['following', 'Following', 'users'], ['explore', 'Explore', 'compass'], ['saved', 'Saved', 'bookmark'], ['history', 'Watched', 'clock'], ['me', 'Profile', 'user']];
+const NAV = [['foryou', 'For You', 'home'], ['following', 'Following', 'users'], ['explore', 'Explore', 'compass'], ['saved', 'Saved', 'bookmark'], ['history', 'Watched', 'clock'], ['inbox', 'Inbox', 'chat'], ['me', 'Profile', 'user']];
 function go(r, push = true) { if (push) back.push(route); route = r; closeComments(); render(); renderNav(); }
 function renderNav() {
   const cur = route.v === 'feed' && !route.from ? route.kind : route.v === 'grid' ? route.kind : route.v;
@@ -319,6 +322,8 @@ document.addEventListener('click', e => {
   else if (k === 'saved' || k === 'history') go({ v: 'grid', kind: k });
   else if (k === 'search') go({ v: 'search', q: $('#q').value.trim() });
   else if (k === 'me') go({ v: 'me' });
+  // TikTok messages only work on TikTok's own site/app (they're end-to-end tied to it), so open them there.
+  else if (k === 'inbox') window.open('https://www.tiktok.com/messages', '_blank', 'noopener');
 });
 document.addEventListener('click', e => { if (e.target.closest('#sideSign,[data-signin]')) signIn(); });
 
@@ -395,8 +400,21 @@ function show(i) {
   F.el.querySelectorAll('.slide').forEach(s => { const k = +s.dataset.i; if (Math.abs(k - i) > 1) unmount(s); });
   mount(i, true); if (L.items[i + 1]) mount(i + 1, false);
   if (L.kind !== 'history') { D.history = [slim(v), ...D.history.filter(x => x.id !== v.id)].slice(0, 200); save(); }
-  if (L.hasMore && i >= L.items.length - 6) loadMore(L).then(() => F && F.L === L && build());
+  if (L.hasMore && i >= L.items.length - 6) moreUntil(L);
   if ($('#cm').classList.contains('open')) openComments(v);
+}
+// Keep loading in the background while you're near the end, retrying TikTok's empty answers.
+function moreUntil(L) {
+  if (L._more) return; L._more = true;
+  (async () => {
+    while (F && F.L === L && L.hasMore && F.idx >= L.items.length - 6) {
+      const n = L.items.length; await loadMore(L).catch(() => {});
+      if (F && F.L === L) build();
+      if (L.items.length === n) await new Promise(r => setTimeout(r, 2500));
+    }
+    L._more = false;
+    if (F && F.L === L && !L.hasMore) { const sp = F.el.querySelector('.more-sp'); if (sp) sp.remove(); F.el.insertAdjacentHTML('beforeend', `<div class="more-sp" style="height:100%;scroll-snap-align:start;display:grid;place-items:center"><div class="msg" style="position:static"><h3>TikTok paused sending videos</h3><p>Tap refresh for a new batch.</p><button class="btn" onclick="document.getElementById('fresh') && document.getElementById('fresh').click()">${I('refresh')}Refresh</button></div></div>`); }
+  })();
 }
 function unmount(s) { s.querySelectorAll('video,audio').forEach(m => { m.pause(); m.removeAttribute('src'); m.load(); m.remove(); }); const ph = s.querySelector('.ph'); if (ph) ph.remove(); const d = s.querySelector('.dots'); if (d) d.remove(); s.classList.add('wait'); s.classList.remove('paused'); s.dataset.m = ''; }
 function mount(i, play) {
