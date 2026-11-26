@@ -18,6 +18,18 @@
       return !!w;
     }
   };
+  // Smooth animations (Motion v2): auto | on | off, per device. Auto = off on slower devices (few CPU cores / little memory / data saver).
+  const M2 = { get() { try { return localStorage.getItem('sjlocal.motion2') || 'auto'; } catch { return 'auto'; } },
+    apply() { const v = this.get(), slow = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 3 || !!(navigator.connection && navigator.connection.saveData);
+      document.documentElement.dataset.motion2 = v === 'off' || (v === 'auto' && slow) ? 'off' : 'on'; } };
+  window.SJMotion2 = M2; M2.apply();
+  document.addEventListener('change', e => {
+    if (!e.target.classList || !e.target.classList.contains('motion2-sel')) return;
+    try { localStorage.setItem('sjlocal.motion2', e.target.value); } catch {}
+    M2.apply();
+    document.querySelectorAll('.motion2-sel').forEach(x => { if (x !== e.target) x.value = e.target.value; });
+    try { Toast.show('Smooth animations: ' + ({ auto: 'Auto', on: 'On', off: 'Off' })[e.target.value], document.documentElement.dataset.motion2 === 'on' ? 'Using the springy animations on this device.' : 'Using the lighter animations on this device.', 'info'); } catch {}
+  });
   document.addEventListener('change', e => {
     if (!e.target.classList || !e.target.classList.contains('cloak-sel')) return;
     SJCloak.set(e.target.value);
@@ -501,6 +513,21 @@ body.wm-busy iframe { pointer-events: none !important; }
 :where(.btn, .icon-btn, .tb-btn, .sm-row, .d-icon, .swatch, .wp-thumb, .at-card, .set-nav button, .tab, .seg button):active { transform: scale(.955); }
 :where(.btn, .icon-btn, .sm-row, .swatch, .wp-thumb, .at-card, .set-nav button, .tab, .seg button) { transition: transform .18s var(--spring), background-color .15s ease, color .15s ease, box-shadow .2s ease, border-color .15s ease; }
 .switch::after { transition: transform .32s var(--spring), background-color .2s ease !important; }
+/* Smooth animations OFF: the lighter animations from before (no blur, no spring, no press effects) */
+@keyframes winOpenLite { from { opacity: 0; transform: scale(.94) translateY(12px); } }
+@keyframes winCloseLite { to { opacity: 0; transform: scale(.95) translateY(8px); } }
+@keyframes popLite { from { opacity: 0; transform: scale(.97) translateY(-4px); } }
+@keyframes toastInLite { from { opacity: 0; transform: translateY(-16px); } }
+:root[data-motion2="off"] .window.opening { animation: winOpenLite .24s var(--out-quick); }
+:root[data-motion2="off"] .window.closing { animation: winCloseLite .16s ease forwards; }
+:root[data-motion2="off"] .window.anim { transition: left .22s var(--out-quick), top .22s var(--out-quick), width .22s var(--out-quick), height .22s var(--out-quick), transform .22s var(--out-quick), opacity .2s ease; }
+:root[data-motion2="off"] .window.minimized { filter: none; transition: transform .26s var(--out-quick), opacity .24s ease, visibility 0s linear .26s; }
+:root[data-motion2="off"] .window.restoring { animation: none; }
+:root[data-motion2="off"] :where(.btn, .icon-btn, .tb-btn, .sm-row, .d-icon, .swatch, .wp-thumb, .at-card, .set-nav button, .tab, .seg button):active { transform: none; }
+:root[data-motion2="off"] .ov-card, :root[data-motion2="off"] .dialog { animation: popLite .2s var(--out-quick); }
+:root[data-motion2="off"] .ctx { animation: popLite .13s var(--out-quick); }
+:root[data-motion2="off"] .toast { animation: toastInLite .3s var(--out-quick); }
+:root[data-motion2="off"] .switch::after { transition: transform .15s ease, background-color .15s ease !important; }
 
 .titlebar {
   position: relative; height: 44px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 9px 0 12px;
@@ -11208,6 +11235,7 @@ Apps.register({
         ${stack(
           row('Interface font', 'The typeface used across the whole desktop.', `<select class="input" data-set-select-str="font">${FONTS.map(([id, l, f]) => `<option value="${id}" style="font-family:${esc(f || 'Fira Sans')}">${l}</option>`).join('')}</select>`),
           row('Reduce animations', 'Turn off window, menu and dock animations.', sw('reduceMotion')),
+          row('Smooth animations', 'Springy windows with a soft blur, bouncy menus and press effects. Auto turns them off on slower devices. Saved on this device only.', `<select class="input motion2-sel">${[['auto', 'Auto'], ['on', 'On'], ['off', 'Off (lighter)']].map(([v, l]) => `<option value="${v}"${(() => { try { return (localStorage.getItem('sjlocal.motion2') || 'auto') === v; } catch { return v === 'auto'; } })() ? ' selected' : ''}>${l}</option>`).join('')}</select>`),
           row('Transparency effects', 'Frosted-glass blur behind the panel, dock, menus and widgets.', sw('blur')),
           row('Scrollbars', '', seg('scrollbars', [['auto', 'Normal'], ['thin', 'Thin'], ['accent', 'Accent'], ['hidden', 'Hidden']])))}
         <div class="set-card">
@@ -11631,6 +11659,7 @@ Apps.register({
           row('High contrast', 'Stronger borders and text so everything stands out.', sw('highContrast')),
           row('Large cursor', 'A bigger mouse pointer that’s easier to see.', sw('bigCursor')),
           row('Reduce animations', 'Turn off window, menu and dock animations.', sw('reduceMotion')),
+          row('Smooth animations', 'Springy windows with a soft blur, bouncy menus and press effects. Auto turns them off on slower devices. Saved on this device only.', `<select class="input motion2-sel">${[['auto', 'Auto'], ['on', 'On'], ['off', 'Off (lighter)']].map(([v, l]) => `<option value="${v}"${(() => { try { return (localStorage.getItem('sjlocal.motion2') || 'auto') === v; } catch { return v === 'auto'; } })() ? ' selected' : ''}>${l}</option>`).join('')}</select>`),
           row('Interface font', 'Pick a typeface you find easy to read.', `<select class="input" data-set-select-str="font">${FONTS.map(([id, l]) => `<option value="${id}">${l}</option>`).join('')}</select>`),
           row('Open in full screen', 'SanjivramOS fills the whole screen (no browser tabs or address bar) as soon as you first tap or press a key. Press Esc to leave; it stays off until you reload.', sw('autoFullscreen')),
           row('Colour filter', 'Tint the whole screen.', sels('colorFilter', [['none', 'None'], ['grayscale', 'Grayscale'], ['sepia', 'Sepia'], ['invert', 'Inverted'], ['vivid', 'Vivid'], ['warm', 'Warm'], ['cool', 'Cool'], ['contrast', 'Extra contrast']])),
