@@ -28,6 +28,9 @@ if dpkg -s nvidia-kernel-dkms >/dev/null 2>&1; then
   echo 'options nvidia-drm modeset=1 fbdev=1' > /etc/modprobe.d/sanjivramos-nvidia.conf
 fi
 
+# Hybrid graphics laptops: prime-run <app> runs it on the NVIDIA GPU.
+ln -sf /usr/lib/sanjivramos/prime-run /usr/local/bin/prime-run
+
 # Services
 systemctl enable NetworkManager.service sanjivramos-update.service sanjivramos-server.service sanjivramos-session.service
 systemctl disable getty@tty1.service || true

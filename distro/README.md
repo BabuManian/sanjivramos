@@ -12,6 +12,8 @@ GitHub Actions builds two ISOs every time `distro/` changes (**Releases → iso-
 - **`sanjivramos-amd64.iso`**: for most PCs. Has AMD and Intel graphics drivers (Mesa OpenGL/Vulkan + video decoding) and the open nouveau driver for NVIDIA.
 - **`sanjivramos-amd64-nvidia.iso`**: the same, plus NVIDIA's own driver (550) for GeForce GTX 900 series / RTX and newer cards.
 
+**Laptops with Intel + NVIDIA (e.g. Acer Aspire 5 with an MX150):** use the NVIDIA ISO. The screen and SanjivramOS run on the Intel GPU, which saves battery. Start games or heavy apps on the NVIDIA card with `prime-run <app>` (e.g. `prime-run supertuxkart`); `nvidia-smi` shows whether it's in use. The main ISO works on these laptops too, but only uses the Intel GPU.
+
 Both come with Wi-Fi and Bluetooth firmware for Intel, Realtek, Atheros/Qualcomm, MediaTek, Broadcom (brcmfmac), Marvell and TI chips. You can also start a build by hand under Actions → *Build SanjivramOS ISO* → Run workflow.
 
 Flash the ISO to a USB stick with balenaEtcher, Rufus or `dd`, then boot from it. The boot menu has **Live** (try it) and **Install** (Debian installer that copies the system to disk). It also runs in VirtualBox, QEMU or GNOME Boxes.

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Runs a program on the NVIDIA GPU of a hybrid-graphics laptop (Intel/AMD + NVIDIA, e.g. MX150), the rest stays on
+# the power-saving GPU.   prime-run <program> [args…]     e.g.  prime-run supertuxkart
+export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only VK_DRIVER_FILES="${VK_DRIVER_FILES:-}"
+[ -z "$VK_DRIVER_FILES" ] && unset VK_DRIVER_FILES
+# Open (nouveau/Mesa) driver: ask Mesa for the discrete GPU instead.
+lsmod 2>/dev/null | grep -q '^nvidia ' || { unset __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME __VK_LAYER_NV_optimus; export DRI_PRIME=1; }
+exec "$@"
