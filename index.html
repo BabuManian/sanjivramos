@@ -19734,6 +19734,19 @@ const LinuxSys = {
     Bus.on('settings', ({ key }) => { if (key && key.startsWith('lx')) { this.registerAll(); Bus.emit('apps'); Bus.emit('linuxapps'); } });
     // The server's features are known a moment after startup.
     setTimeout(() => this.maybeRefresh(), 3000);
+    // SanjivramOS Linux live USB: "Install SanjivramOS" on the desktop (see placeInstaller).
+    Bus.on('linuxapps', () => this.placeInstaller());
+    Bus.on('server', () => { if (SanjServer.native && SanjServer.shell) this.refresh().catch(() => {}); });
+  },
+  /** The SanjivramOS Linux live USB ships sanjivramos-install.desktop ("Install SanjivramOS"), which is only listed while the
+   *  installer exists. Put it on the desktop the first time it shows up (removing it keeps it removed); after installing to
+   *  disk the installer is gone, so the icon goes away by itself. */
+  placeInstaller() {
+    const a = this.all().find(x => x.id === 'sanjivramos-install' && !x.distro && x.installed);
+    if (!a || Store.get('desktop.installerPlaced', false)) return;
+    Store.set('desktop.installerPlaced', true);
+    const key = 'app:' + this.idOf(a);
+    if (Desktop.el) Desktop.add(key); else Desktop.addQuiet(key);
   }
 };
 
