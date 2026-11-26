@@ -29,6 +29,7 @@ function newDraft(template = 'platformer', example = true) {
 function openDraft(id) { const d = loadDrafts()[id]; if (!d) return; draftId = id; game = d.data; li = 0; undo = []; redo = []; renderEditor(); show('create'); }
 let saveT = null;
 function persist() {
+  view3dSoon();
   clearTimeout(saveT);
   saveT = setTimeout(() => { const d = loadDrafts(); d[draftId] = { ...(d[draftId] || {}), data: game, updated: Date.now() }; saveDrafts(d); try { localStorage.setItem('maker.last', draftId); } catch {} }, 300);
 }
@@ -90,11 +91,46 @@ function show(v) {
 $('tabs').onclick = e => { const b = e.target.closest('[data-v]'); if (b) show(b.dataset.v); };
 
 /* ---------------- editor ---------------- */
-const ed = $('ed'), eg = ed.getContext('2d'), TS = 32;
+const ed = $('ed'), eg = ed.getContext('2d', { willReadFrequently: true }), TS = 32;
+// If the browser ever drops the canvas (GPU reset), draw it again.
+ed.addEventListener('contextrestored', () => { try { drawEditor(); } catch {} });
 const L = () => game.levels[li];
 function renderEditor() {
   $('title').value = game.title || '';
-  renderPalette(); renderLevels(); renderSettings(); drawEditor();
+  renderPalette(); renderLevels(); renderSettings(); drawEditor(); view3dSync();
+}
+
+/* ---------------- live 3D view (3D games): the level you paint, as a 3D world you can turn around ---------------- */
+let v3 = null, v3T = 0, v3On = (() => { try { return localStorage.getItem('maker.view3d') !== '0'; } catch { return true; } })(), v3Big = false;
+function view3dSync() {
+  const want = game && game.template === '3d' && v3On && $('play').hidden && document.getElementById('v-create') && !$('v-create').hidden;
+  const btn = $('view3dBtn'); if (btn) { btn.hidden = !(game && game.template === '3d'); btn.classList.toggle('on', !!v3On); }
+  let box = $('view3d');
+  if (!want) { if (v3) { v3.stop(); v3 = null; } if (box) box.hidden = true; return; }
+  if (!box) {
+    box = document.createElement('div'); box.id = 'view3d';
+    box.innerHTML = `<div class="v3bar"><b>🧊 3D view</b><small>drag to turn · scroll to zoom</small><span class="sp"></span><button id="v3Reset" title="Reset the camera">⟲</button><button id="v3Size" title="Bigger / smaller">⤢</button><button id="v3Close" title="Hide the 3D view">✕</button></div><div id="v3Host"></div>`;
+    $('editWrap').appendChild(box);
+    $('v3Reset').onclick = () => v3 && v3.resetView();
+    $('v3Size').onclick = () => { v3Big = !v3Big; box.classList.toggle('big', v3Big); };
+    $('v3Close').onclick = () => { v3On = false; try { localStorage.setItem('maker.view3d', '0'); } catch {} view3dSync(); };
+    box.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+  }
+  box.hidden = false;
+  if (!v3) {
+    try { v3 = E3.run($('v3Host'), game, { preview: true, startLevel: li, nogl: !!window.__makerNoGL }); }
+    catch (e) { console.warn(e); $('v3Host').innerHTML = '<p class="v3msg">3D view isn’t available on this device.</p>'; return; }
+    if (!v3.hasGL) $('v3Host').insertAdjacentHTML('beforeend', '<p class="v3msg">This browser can’t draw 3D (no WebGL). Play test still works.</p>');
+  } else v3.reload(game, li);
+}
+function view3dSoon() { clearTimeout(v3T); if (v3) v3T = setTimeout(() => v3 && v3.reload(game, li), 220); }
+// Block icons are drawn once into an <img> (cached), so a GPU reset can't blank them and the palette builds faster.
+const iconCache = new Map();
+function tileIcon(ch) {
+  const key = ch + '|' + JSON.stringify((game.sprites || {})[ch] || '');
+  let url = iconCache.get(key);
+  if (!url) { const c = document.createElement('canvas'); c.width = c.height = 32; E.drawTile(c.getContext('2d', { willReadFrequently: true }), ch, 0, 0, 32, game.sprites, 0); url = c.toDataURL(); iconCache.set(key, url); }
+  const im = new Image(32, 32); im.src = url; im.alt = ''; im.draggable = false; return im;
 }
 function renderPalette() {
   const p = $('palette'), hadFocus = document.activeElement && document.activeElement.id === 'palQ'; p.innerHTML = '';
@@ -108,8 +144,7 @@ function renderPalette() {
     if (needle && !(name + ' ' + group + ' ' + help).toLowerCase().includes(needle)) continue;
     if (group !== grp) { grp = group; const h = document.createElement('h4'); h.textContent = group; p.appendChild(h); }
     const b = document.createElement('button'); b.className = 'pt' + (brush === ch ? ' on' : ''); b.title = help; b.dataset.ch = ch;
-    const c = document.createElement('canvas'); c.width = c.height = 32; E.drawTile(c.getContext('2d'), ch, 0, 0, 32, game.sprites, 0);
-    b.appendChild(c); const s = document.createElement('span'); s.textContent = name; b.appendChild(s);
+    b.appendChild(tileIcon(ch)); const s = document.createElement('span'); s.textContent = name; b.appendChild(s);
     const pen = document.createElement('button'); pen.className = 'ed'; pen.textContent = '🎨'; pen.title = 'Change how it looks'; pen.dataset.edit = ch; b.appendChild(pen);
     p.appendChild(b);
   }
@@ -124,7 +159,7 @@ function renderLevels() {
   t.innerHTML = game.levels.map((_, i) => `<button data-l="${i}" class="${i === li ? 'on' : ''}" title="Level ${i + 1}">${i + 1}</button>`).join('') + `<button id="lvMenu" title="Level options">⋯</button>`;
 }
 $('levelTabs').onclick = e => {
-  const b = e.target.closest('[data-l]'); if (b) { li = +b.dataset.l; undo = []; redo = []; renderLevels(); drawEditor(); return; }
+  const b = e.target.closest('[data-l]'); if (b) { li = +b.dataset.l; undo = []; redo = []; renderLevels(); drawEditor(); view3dSoon(); return; }
   if (e.target.id === 'lvMenu') levelMenu();
 };
 function levelMenu() {
@@ -420,7 +455,7 @@ $('settings').addEventListener('click', e => {
     return;
   }
   const key = b.parentElement.dataset.key, v = b.dataset.v;
-  if (key === 'template') { if (game.template === v) return; if (!confirm('Switch the game type? Your levels stay, but they play differently.')) return; game.template = v; if (v === 'topdown') game.settings.stomp = false; renderPalette(); }
+  if (key === 'template') { if (game.template === v) return; if (!confirm('Switch the game type? Your levels stay, but they play differently.')) return; game.template = v; if (v === 'topdown') game.settings.stomp = false; renderPalette(); setTimeout(view3dSync, 0); }
   else game.settings[key] = isNaN(+v) ? v : +v;
   persist(); renderSettings(); drawEditor();
 });
@@ -494,6 +529,7 @@ function play(gameData, ctx = {}) {
   }
   playCtx = ctx;
   if (runner) runner.stop();
+  if (v3) { v3.stop(); v3 = null; }
   $('pc').style.display = d3 ? 'none' : ''; $('viewPlay').style.display = d3 ? '' : 'none';
   runner = (d3 ? (o => E3.run($('play'), gameData, o)) : (o => E.run($('pc'), gameData, o)))({
     sfx, countdown: ctx.race ? 3 : 0, startLevel: ctx.startLevel || 0,
@@ -507,7 +543,7 @@ function play(gameData, ctx = {}) {
   try { window.MakerMusic.stop(); const sp = window.MakerMusic.specFor(gameData); if (sp && !(ctx.race && ctx.race.mute)) window.MakerMusic.play(Object.assign({}, sp, { vol: 0.16 })); } catch {}
   if (ctx.published && serverOk) api('play/' + ctx.published.id, { method: 'POST', body: '{}' }).catch(() => {});
 }
-function stopPlay() { try { window.MakerMusic.stop(); } catch {} if (runner) runner.stop(); runner = null; $('play').hidden = true; if (playCtx && playCtx.race) playCtx.race.leave(); playCtx = null; }
+function stopPlay() { setTimeout(() => { try { renderPalette(); drawEditor(); } catch {} }, 80); try { window.MakerMusic.stop(); } catch {} if (runner) runner.stop(); runner = null; $('play').hidden = true; setTimeout(view3dSync, 50); if (playCtx && playCtx.race) playCtx.race.leave(); playCtx = null; }
 $('exitPlay').onclick = stopPlay;
 async function finished(won, st) {
   const ctx = playCtx || {};
@@ -908,6 +944,7 @@ function claudeDialog(tab = 'new') {
 
 $('aiBtn').onclick = () => claudeDialog(game && game.levels.length ? 'edit' : 'new');
 $('onlineBtn').onclick = () => { game.title = $('title').value || game.title; race({ data: JSON.parse(JSON.stringify(game)), title: game.title || 'My game' }); };
+$('view3dBtn').onclick = () => { v3On = !v3On; try { localStorage.setItem('maker.view3d', v3On ? '1' : '0'); } catch {} view3dSync(); };
 $('viewPlay').onclick = () => { if (window.GL3D) { GL3D.view.toggle(); $('viewPlay').textContent = GL3D.view.fp ? '🎥' : '👁'; } };
 $('fsPlay').onclick = async () => {
   const el = document.documentElement;
@@ -926,5 +963,5 @@ refreshMe().then(() => {
   if (q.get('join')) race(null);
 });
 if (q.get('view')) show(q.get('view'));
-window.__maker = () => ({ TEMPLATES, checkGame, songMaker, setTool, copySel, flipSel, pasteAt, lineCells, get sel() { return sel; }, set sel(v) { sel = v; }, get clip() { return clip; }, cleanGame, cleanLevel, claudeDialog, race, get game() { return game; }, get runner() { return runner; }, setCell, newDraft, startPlay, api, refreshMe, loadDrafts, get me() { return me; }, show, openGame });
+window.__maker = () => ({ TEMPLATES, checkGame, songMaker, setTool, copySel, flipSel, pasteAt, lineCells, get sel() { return sel; }, set sel(v) { sel = v; }, get clip() { return clip; }, cleanGame, cleanLevel, claudeDialog, race, get game() { return game; }, get runner() { return runner; }, setCell, newDraft, startPlay, api, refreshMe, loadDrafts, get me() { return me; }, show, openGame, get v3() { return v3; }, view3dSync });
 })();

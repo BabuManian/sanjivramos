@@ -2,6 +2,42 @@
 <html lang="en" data-theme="dark" data-icons="dark">
 <head>
 <meta charset="UTF-8">
+<script>
+/* Open in about:blank / blob (Settings → Startup). Kept in "sjlocal.cloak" — only "webos.*" keys sync to accounts, so this stays on this device. */
+(() => {
+  let mode = 'off'; try { mode = localStorage.getItem('sjlocal.cloak') || 'off'; } catch {}
+  window.SJCloak = {
+    mode,
+    set(v) { try { localStorage.setItem('sjlocal.cloak', v); } catch {} this.mode = v; },
+    open(m) {
+      const src = location.href.replace(/[?&]cloaked=1/, '') + (location.search ? '&' : '?') + 'cloaked=1';
+      const html = '<!doctype html><html><head><meta charset="utf-8"><title>about:blank</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}</style></head><body><iframe src="' + src.replace(/"/g, '&quot;') + '" allow="autoplay; fullscreen; clipboard-read; clipboard-write; camera; microphone; display-capture; geolocation; screen-wake-lock" allowfullscreen></iframe></body></html>';
+      let w = null;
+      if (m === 'blob') w = window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+      else { w = window.open('about:blank', '_blank'); if (w) { w.document.open(); w.document.write(html); w.document.close(); } }
+      return !!w;
+    }
+  };
+  document.addEventListener('change', e => {
+    if (!e.target.classList || !e.target.classList.contains('cloak-sel')) return;
+    SJCloak.set(e.target.value);
+    try { Toast.show(e.target.value === 'off' ? 'Opens normally' : 'Opens in ' + (e.target.value === 'blob' ? 'a blob tab' : 'about:blank'), e.target.value === 'off' ? 'SanjivramOS opens in this tab from now on.' : 'Next time you open SanjivramOS, click once and it moves into the new tab. Saved on this device only.', 'info'); } catch {}
+  });
+  if (mode === 'off' || window.top !== window || /[?&](cloaked|nocloak)=1/.test(location.search)) return;
+  // Browsers only allow opening a tab after a click, so ask for one.
+  document.addEventListener('DOMContentLoaded', () => {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,#1f1b2e,#05050a);color:#fff;font:15px/1.5 system-ui,sans-serif;text-align:center;cursor:pointer';
+    d.innerHTML = '<div style="animation:sjcl .5s cubic-bezier(.2,.8,.2,1)"><div style="font-size:44px;margin-bottom:10px">🚀</div><b style="font-size:20px">Open SanjivramOS</b><p style="opacity:.7;margin:6px 0 16px">Click anywhere to open it in ' + (mode === 'blob' ? 'a blob tab' : 'an about:blank tab') + '.</p><button id="sjclHere" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:999px;padding:7px 16px;cursor:pointer;font:inherit">Use this tab instead</button></div><style>@keyframes sjcl{from{opacity:0;transform:translateY(12px) scale(.97)}}</style>';
+    d.addEventListener('click', e => {
+      if (e.target.id === 'sjclHere') { d.remove(); return; }
+      if (SJCloak.open(mode)) d.innerHTML = '<div><b style="font-size:18px">SanjivramOS opened in a new tab</b><p style="opacity:.7">You can close this one.</p></div>';
+      else d.querySelector('p').textContent = 'Your browser blocked the new tab — allow pop-ups for this site, then click again.';
+    });
+    document.body.appendChild(d);
+  });
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ichigo Kurosaki</title>
 <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
@@ -449,8 +485,22 @@ body.wm-busy iframe { pointer-events: none !important; }
 }
 .window.dragging .win-frame { box-shadow: 0 0 0 3px var(--accent), 0 30px 70px rgba(0, 0, 0, .45); }
 .window.tiled .rh { display: none; }
-@keyframes winOpen { from { opacity: 0; transform: scale(.92) translateY(14px); } }
-@keyframes winClose { to { opacity: 0; transform: scale(.94) translateY(8px); } }
+@keyframes winOpen { from { opacity: 0; transform: scale(.86) translateY(22px); filter: blur(8px); } 55% { opacity: 1; filter: blur(0); } 78% { transform: scale(1.012) translateY(-2px); } }
+@keyframes winClose { to { opacity: 0; transform: scale(.9) translateY(12px); filter: blur(5px); } }
+/* ---- Motion v2: springy, soft and quick. "Reduce motion" (Settings) still switches all of it off. ---- */
+:root { --spring: cubic-bezier(.2, 1.3, .35, 1); --spring-soft: cubic-bezier(.22, 1.12, .36, 1); --out-quick: cubic-bezier(.4, 0, .2, 1); }
+.window.opening { animation: winOpen .46s var(--spring-soft); transform-origin: 50% 65%; }
+.window.closing { animation: winClose .2s var(--out-quick) forwards; }
+.window.anim { transition: left .34s var(--spring-soft), top .34s var(--spring-soft), width .34s var(--spring-soft), height .34s var(--spring-soft), transform .34s var(--spring-soft), opacity .22s ease; }
+/* minimise: the window gets pulled down into its dock button; restoring springs back out of it */
+.window.minimized { transform-origin: 50% 100%; transition: transform .4s cubic-bezier(.55, 0, .75, .06), opacity .34s ease .04s, filter .34s ease, visibility 0s linear .4s; filter: blur(3px); }
+.window.restoring { animation: winRestore .5s var(--spring-soft); transform-origin: 50% 100%; }
+@keyframes winRestore { from { opacity: 0; transform: translate(var(--mx, 0px), var(--my, 400px)) scale(.12); filter: blur(4px); } 60% { opacity: 1; filter: blur(0); } }
+.window .win-frame { transition: box-shadow .25s ease; }
+/* everything you press gives a little */
+:where(.btn, .icon-btn, .tb-btn, .sm-row, .d-icon, .swatch, .wp-thumb, .at-card, .set-nav button, .tab, .seg button):active { transform: scale(.955); }
+:where(.btn, .icon-btn, .sm-row, .swatch, .wp-thumb, .at-card, .set-nav button, .tab, .seg button) { transition: transform .18s var(--spring), background-color .15s ease, color .15s ease, box-shadow .2s ease, border-color .15s ease; }
+.switch::after { transition: transform .32s var(--spring), background-color .2s ease !important; }
 
 .titlebar {
   position: relative; height: 44px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 9px 0 12px;
@@ -1011,7 +1061,7 @@ body.wm-busy iframe { pointer-events: none !important; }
   position: relative; width: 220px; height: 150px; border-radius: 14px; padding: 16px 12px 12px; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center;
   background: rgba(51, 49, 48, .92); border: 1px solid rgba(255, 255, 255, .08); box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
-  transition: transform .15s var(--ease), box-shadow .15s; animation: pop .22s var(--ease);
+  transition: transform .15s var(--ease), box-shadow .15s; animation: pop .3s var(--spring-soft);
 }
 .ov-card:hover { transform: translateY(-3px); box-shadow: 0 0 0 3px var(--accent), 0 14px 34px rgba(0, 0, 0, .4); }
 .ov-card .app-tile { width: 56px; height: 56px; border-radius: 15px; }
@@ -1029,9 +1079,9 @@ body.wm-busy iframe { pointer-events: none !important; }
 .ctx {
   position: fixed; z-index: 10010; min-width: 210px; padding: 6px; border-radius: 12px; border: 1px solid var(--glass-border);
   background: var(--menu-bg); box-shadow: var(--shadow); font-size: 13.5px;
-  animation: pop .13s var(--ease); max-height: 70vh; overflow-y: auto;
+  animation: pop .26s var(--spring-soft); max-height: 70vh; overflow-y: auto;
 }
-@keyframes pop { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+@keyframes pop { from { opacity: 0; transform: scale(.92) translateY(-6px); filter: blur(4px); } 70% { filter: blur(0); } }
 .ctx-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; cursor: default; white-space: nowrap; }
 .ctx-item:hover { background: var(--hover); }
 .ctx-item svg, .ctx-blank { width: 16px; height: 16px; flex: none; }
@@ -1047,7 +1097,7 @@ body.wm-busy iframe { pointer-events: none !important; }
 .toast {
   pointer-events: auto; width: min(390px, calc(100vw - 24px)); display: flex; gap: 12px; align-items: flex-start; padding: 12px 12px 12px 14px;
   border-radius: 14px; border: 1px solid var(--glass-border); background: var(--menu-bg); box-shadow: var(--shadow);
-  animation: toastIn .35s var(--ease); cursor: pointer;
+  animation: toastIn .5s var(--spring-soft); cursor: pointer;
 }
 .toast.out { animation: toastOut .25s ease forwards; }
 .toast-acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
@@ -1057,7 +1107,7 @@ body.wm-busy iframe { pointer-events: none !important; }
 .toast-ico img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .tb-btn[data-badge]::after { content: attr(data-badge); position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #ef4444; color: #fff; font: 700 11px/18px var(--font); text-align: center; box-shadow: 0 0 0 2px var(--dock-bg); pointer-events: none; }
 .tb-btn { position: relative; }
-@keyframes toastIn { from { opacity: 0; transform: translateY(-18px) scale(.98); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-22px) scale(.94); filter: blur(4px); } 60% { filter: blur(0); } }
 @keyframes toastOut { to { opacity: 0; transform: translateY(-14px); } }
 .toast-ico { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; background: rgba(var(--accent-rgb), .18); color: var(--accent); }
 .toast-ico svg { width: 17px; height: 17px; }
@@ -1073,7 +1123,7 @@ body.wm-busy iframe { pointer-events: none !important; }
 @keyframes fadeOut { to { opacity: 0; } }
 .dialog {
   width: min(420px, 100%); padding: 24px; border-radius: 16px; border: 1px solid var(--glass-border);
-  background: var(--menu-bg); box-shadow: var(--shadow); animation: pop .2s var(--ease); text-align: center;
+  background: var(--menu-bg); box-shadow: var(--shadow); animation: pop .3s var(--spring-soft); text-align: center;
 }
 .dialog-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
 .dialog-msg { font-size: 13.5px; color: var(--text-2); line-height: 1.5; margin-bottom: 16px; }
@@ -6189,7 +6239,7 @@ const WM = {
     if (!this.wins.has(win.id)) return;
     if (!this.onWs(win)) this.switchWs(win.ws, { keepFocus: true });
     let changed = false;
-    if (win.minimized) { win.minimized = false; win.el.classList.remove('minimized'); changed = true; this.retile(); }
+    if (win.minimized) { win.minimized = false; win.el.classList.remove('minimized'); win.el.classList.add('restoring'); setTimeout(() => win.el.classList.remove('restoring'), 520); changed = true; this.retile(); }
     if (win.z !== this.z) { win.z = ++this.z; win.el.style.zIndex = win.z + (win.onTop ? 1000000 : 0); changed = true; }
     if (this.active !== win) {
       this.wins.forEach(w => w.el.classList.toggle('active', w === win));
@@ -11448,7 +11498,8 @@ Apps.register({
           row('Startup & lock sounds', '', sw('startupSound')),
           row('Preview boot', 'Restart to see the boot screen (windows close).', `<button class="btn boot-preview">${svg('reload')}Restart</button>`))}
         <h3 class="cust-h">When you sign in</h3>
-        ${stack(row('Restore my windows', 'Reopen the apps you had open last time.', sw('restoreSession')))}
+        ${stack(row('Restore my windows', 'Reopen the apps you had open last time.', sw('restoreSession')),
+          row('Open in an about:blank or blob tab', 'SanjivramOS opens inside a blank tab (the address bar shows about:blank or a blob: link). Saved only on this device, never in your account.', `<select class="input cloak-sel">${[['off', 'Off'], ['blank', 'about:blank'], ['blob', 'Blob tab']].map(([v, l]) => `<option value="${v}"${(() => { try { return (localStorage.getItem('sjlocal.cloak') || 'off') === v; } catch { return v === 'off'; } })() ? ' selected' : ''}>${l}</option>`).join('')}</select>`))}
         <div class="set-card">
           ${row('Startup apps', 'These open automatically every time you sign in.', `<span class="cust-presets"><select class="input su-app-pick">${appOpts().map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select><button class="btn primary su-app-add">${svg('plus')}Add</button></span>`)}
           <div class="wl-list">${(Settings.get('startupApps') || []).filter(id => Apps.get(id)).map(id => `<div class="wl-row">${tile(Apps.get(id).icon, Apps.get(id).color)}<b>${esc(Apps.get(id).name)}</b><button class="btn sm" data-su-del="${id}">${svg('close')}Remove</button></div>`).join('') || '<div class="set-desc">No startup apps.</div>'}</div>

@@ -41,7 +41,7 @@
     host.insertBefore(cv, host.firstChild);
     const tags = document.createElement('div'); tags.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'; host.insertBefore(tags, cv.nextSibling);
     let R = null; if (!o.nogl) try { R = G3.create(cv, { maxDpr: 1.5 }); } catch (e) { console.warn(e); }
-    const IN = G3.Input(cv);
+    const IN = G3.Input(cv, o.preview ? { lock: false } : {});
     const set = Object.assign({ speed: 2, jump: 2, lives: 3, timer: 0, win: 'goal', theme: 0, enemySpeed: 2, doubleJump: false }, game.settings || {});
     const input = { l: false, r: false, u: false, d: false, a: false, b: false, aPressed: false, bPressed: false };
     let li = o.startLevel || 0, W = null, coins = 0, totalCoins = 0, keys = 0, lives = set.lives || Infinity, deaths = 0, levelT = 0, totalT = 0, state = 'count', countT = o.countdown || 0, raf = 0, last = performance.now(), doors = [], teles = [], signs = [], npcs = [], tpCool = 0, speedT = 0, timeLeft = 0, signShown = null;
@@ -120,7 +120,7 @@
     }
     let bannerT = 0, bannerTxt = '';
     const banner = t => { bannerTxt = t; bannerT = 2.5; };
-    function onDie() { deaths++; o.sfx && o.sfx('hurt'); if (lives !== Infinity) { lives--; if (lives <= 0) { state = 'over'; setTimeout(() => o.onLose && o.onLose(stats()), 700); } } }
+    function onDie() { if (o.preview) { W.respawn && setTimeout(() => W.respawn(), 300); return; } deaths++; o.sfx && o.sfx('hurt'); if (lives !== Infinity) { lives--; if (lives <= 0) { state = 'over'; setTimeout(() => o.onLose && o.onLose(stats()), 700); } } }
     function levelDone() {
       if (state !== 'play') return;
       o.sfx && o.sfx('win');
@@ -128,10 +128,28 @@
       else { state = 'won'; setTimeout(() => o.onWin && o.onWin(stats()), 600); }
     }
     const stats = () => ({ ms: Math.round(totalT * 1000), time: totalT, coins, deaths, levels: game.levels.length, level: li });
+    // Editor preview: no player control, a camera that orbits the level (drag to turn, wheel to zoom, slowly spins by itself).
+    const pv = { yaw: 0.7, pitch: -0.78, dist: 0, idle: 0 };
+    function previewFrame(dt, raw) {
+      W.update(dt, { mx: 0, mz: 0, jump: false, lookX: 0, lookY: 0 });
+      const L = game.levels[li] || { w: 10, h: 10 };
+      if (!pv.dist) pv.dist = Math.max(L.w, L.h) * T * 0.75 + 6;
+      if (raw.lookX || raw.lookY) { pv.yaw -= raw.lookX * 0.006; pv.pitch = Math.max(-1.45, Math.min(-0.15, pv.pitch - raw.lookY * 0.005)); pv.idle = 0; }
+      else if ((pv.idle += dt) > 2.5) pv.yaw += dt * 0.12;
+      if (raw.wheel) { pv.dist = Math.max(6, Math.min(Math.max(L.w, L.h) * T * 2.2 + 20, pv.dist * (1 + raw.wheel * 0.08))); pv.idle = 0; }
+      const tgt = [L.w * T / 2, 0, L.h * T / 2], f = GL3D.dirOf(pv.yaw, pv.pitch);
+      const cam = { eye: [tgt[0] - f[0] * pv.dist, tgt[1] - f[1] * pv.dist, tgt[2] - f[2] * pv.dist], yaw: pv.yaw, pitch: pv.pitch, fov: 1.05, far: 600 };
+      if (R) W.render(cam, Object.assign({ fog: [pv.dist * 1.2, pv.dist * 3], view: 400 }, SKIES[set.theme] || SKIES[0]), r => {
+        for (const t of teles) { r.box(t.x - 0.7, 0.01, t.z - 0.7, t.x + 0.7, 0.08, t.z + 0.7, '#a78bfa', 1, 0.8); }
+        for (const n of npcs) r.person(n.ch === 'd' ? null : (NPC_LOOK[n.ch] || null), n.x, n.y, n.z, 0, { walk: 0, speed: 0 });
+      });
+      IN.endFrame();
+    }
     function frame(now) {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       const raw = IN.frame();
+      if (o.preview) return previewFrame(dt, raw);
       const mx = raw.mx + (input.r ? 1 : 0) - (input.l ? 1 : 0), mz = raw.mz + (input.d ? 1 : 0) - (input.u ? 1 : 0);
       const jump = IN.hit('Space') || input.aPressed || IN.hit('Tap'); input.aPressed = false;
       const inp = { mx: Math.max(-1, Math.min(1, mx)), mz: Math.max(-1, Math.min(1, mz)), run: raw.run, jump: state === 'play' && jump, jumpHeld: IN.down('Space') || input.a, lookX: raw.lookX, lookY: raw.lookY, wheel: raw.wheel };
@@ -175,7 +193,10 @@
     return {
       input,
       stop() { cancelAnimationFrame(raf); cv.remove(); tags.remove(); if (W) W.clear(); if (document.pointerLockElement) document.exitPointerLock(); },
-      restartLevel() { lives = set.lives || Infinity; loadLevel(li); state = 'play'; }, get W() { return W; }, get state() { return state; }, step(n, dt = 1 / 60, inp = {}) { for (let i = 0; i < n; i++) { W.update(dt, Object.assign({ mx: 0, mz: 0, jump: false, lookX: 0, lookY: 0 }, inp)); } }, stats, levelDone,
+      restartLevel() { lives = set.lives || Infinity; loadLevel(li); state = 'play'; },
+      // editor preview: rebuild after an edit (keeps the camera where you left it)
+      reload(g, i = li) { game = g; Object.assign(set, g.settings || {}); try { loadLevel(Math.min(i, g.levels.length - 1)); } catch (e) { console.warn(e); } },
+      resetView() { pv.dist = 0; pv.yaw = 0.7; pv.pitch = -0.78; }, get hasGL() { return !!R; }, get W() { return W; }, get state() { return state; }, step(n, dt = 1 / 60, inp = {}) { for (let i = 0; i < n; i++) { W.update(dt, Object.assign({ mx: 0, mz: 0, jump: false, lookX: 0, lookY: 0 }, inp)); } }, stats, levelDone,
     };
   }
   window.MakerEngine3D = { run, example, T };
