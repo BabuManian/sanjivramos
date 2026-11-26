@@ -324,6 +324,26 @@ body:not(.paused) .viz.live i{animation-play-state:running}
 .dlg input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.22)}
 /* the full-screen Now Playing keeps its original look */
 #np{--red:#fa2d48;--font:var(--apple);font-family:var(--apple)}
+/* ======================= Liquid Glass (follows the OS Liquid Glass icon styles, or the header button) ======================= */
+#gbg{display:none}
+:root[data-glass] #gbg{display:block;position:fixed;inset:0;z-index:0;overflow:hidden;background:radial-gradient(circle at 18% 22%,rgba(var(--accent-rgb),.55),transparent 45%),radial-gradient(circle at 82% 78%,color-mix(in srgb,var(--accent) 50%,#7c3aed),transparent 50%),var(--surface)}
+:root[data-glass] #gbg img{position:absolute;width:70%;height:80%;object-fit:cover;filter:blur(70px) saturate(1.8);opacity:.85;transform:translateZ(0)}
+:root[data-glass] #gbg img:nth-child(1){left:-10%;top:-15%}:root[data-glass] #gbg img:nth-child(2){right:-10%;bottom:-20%;opacity:.7}
+:root[data-glass][data-dark] #gbg:after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.35)}
+:root[data-glass]:not([data-dark]) #gbg:after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.35)}
+:root[data-glass] #app{position:relative;z-index:1;background:transparent}
+:root[data-glass] #main{background:transparent}
+:root[data-glass] #side,:root[data-glass] #top,:root[data-glass] #bar,:root[data-glass] #mini,:root[data-glass] #tabs{background:color-mix(in srgb,var(--surface) 38%,transparent);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
+:root[data-glass] #bar{position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(255,255,255,.08),0 18px 44px rgba(0,0,0,.3)}
+:root[data-glass] #bar:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.22),transparent 45%)}
+:root[data-glass] #top .sbox{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+:root[data-glass] .songs,:root[data-glass] .qpi,:root[data-glass] .stc,:root[data-glass] .bars,:root[data-glass] .topres,:root[data-glass] .ah,:root[data-glass] .notice{background:color-mix(in srgb,var(--surface) 30%,transparent);border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
+:root[data-glass] .qpi:hover,:root[data-glass] .card:hover{background:rgba(255,255,255,.12)}
+:root[data-glass] .pill.ghost,:root[data-glass] .chip,:root[data-glass] .sh .more,:root[data-glass] #top .ib{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+:root[data-glass] .pill,:root[data-glass] #bPlay{box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 6px 18px rgba(var(--accent-rgb),.45)}
+:root[data-glass] .ni.on{background:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+:root[data-glass] #menu,:root[data-glass] #toast{background:color-mix(in srgb,var(--surface) 55%,transparent);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7)}
+#bGlass.on{color:var(--accent);background:rgba(var(--accent-rgb),.18)}
 /* ---------- now playing (full screen) ---------- */
 #np{position:fixed;inset:0;z-index:20;color:#fff;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .45s cubic-bezier(.32,.72,0,1);overflow:hidden;background:#111}
 #np.open{transform:none}
@@ -473,6 +493,7 @@ body:not(.paused) .viz.live i{animation-play-state:running}
 }
 </style></head>
 <body>
+<div id="gbg"><img alt=""><img alt=""></div>
 <div id="app">
   <aside id="side">
     <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 17.5a2.5 2.5 0 1 1-2-2.45V5.8l11-2.3v11.95a2.5 2.5 0 1 1-2-2.45V7.1L9 8.6v8.9z"/></svg></span><div>Kush Music<small>for SanjivramOS</small></div></div>
@@ -482,7 +503,7 @@ body:not(.paused) .viz.live i{animation-play-state:running}
   <header id="top">
     <button class="ib" id="gBack" title="Back" disabled></button><button class="ib" id="gFwd" title="Forward" disabled></button>
     <label class="sbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="q" placeholder="Search songs, artists and albums  ( / )" autocomplete="off" spellcheck="false"></label>
-    <div class="hint" id="hint"><i></i><span>Connecting…</span></div>
+    <div class="hint" id="hint"><i></i><span>Connecting…</span></div><button class="ib" id="bGlass" title="Liquid Glass"></button>
   </header>
   <main id="main"><div id="page"></div></main>
   <footer id="bar">
@@ -548,6 +569,7 @@ const P = {
   yt: '<rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m10 9.2 5 2.8-5 2.8z" fill="currentColor"/>',
   expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
   stats: '<path d="M5 20V11M12 20V5M19 20v-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
+  glass: '<path d="M12 3.5c3 3.6 6 7.2 6 10.5a6 6 0 0 1-12 0c0-3.3 3-6.9 6-10.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9.2 14.5a2.9 2.9 0 0 0 2.3 2.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   share: '<path d="M12 15V4m-4 4 4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 const I = (n, extra = '') => `<svg viewBox="0 0 24 24" ${extra}>${P[n] || ''}</svg>`;
@@ -569,6 +591,10 @@ function syncTheme() {
     }
   } catch {}
   document.documentElement.toggleAttribute('data-dark', dark);
+  let icons = ''; try { icons = (pd && pd.dataset.icons) || ''; } catch {}
+  const glass = D.set.glass === 'on' || (D.set.glass !== 'off' && /^liquid/.test(icons));
+  document.documentElement.toggleAttribute('data-glass', glass);
+  const gb = document.getElementById('bGlass'); if (gb) { gb.classList.toggle('on', glass); gb.title = 'Liquid Glass: ' + (glass ? 'on' : 'off') + (D.set.glass ? '' : ' (following SanjivramOS)'); }
 }
 
 /* ======================= your library (webos.* keys sync to your SanjivramOS account) ======================= */
@@ -577,7 +603,7 @@ const DEF = { songs: [], albums: [], artists: [], playlists: [], recent: [], rec
 let D; try { D = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY)) || {}); D.set = Object.assign({}, DEF.set, D.set || {}); D.stats = Object.assign({ plays: {}, artists: {}, secs: 0, since: Date.now() }, D.stats || {}); } catch { D = JSON.parse(JSON.stringify(DEF)); }
 let saveT = 0; const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { if (Object.keys(D.map).length > 1500) D.map = Object.fromEntries(Object.entries(D.map).slice(-1000)); localStorage.setItem(KEY, JSON.stringify(D)); } catch {} }, 300); };
 syncTheme();
-try { if (parent !== window) new parent.MutationObserver(syncTheme).observe(parent.document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'data-scheme'] }); } catch {}
+try { if (parent !== window) new parent.MutationObserver(syncTheme).observe(parent.document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'data-scheme', 'data-icons'] }); } catch {}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncTheme);
 const CC = (D.set.country || (navigator.language.split('-')[1] || 'us')).toLowerCase().replace(/[^a-z]/g, '').slice(0, 2) || 'us';
 const slim = t => ({ id: t.id, title: t.title, artist: t.artist, artistId: t.artistId, album: t.album, albumId: t.albumId, art: t.art, dur: t.dur, preview: t.preview, yt: t.yt, ex: t.ex });
@@ -789,6 +815,7 @@ function renderNow() {
   $('#lcd').innerHTML = t ? `<img class="art" src="${esc(coverOf(t, 120))}" alt="" data-np="1" title="Open the full screen player"><div class="meta" data-np="1"><div class="t">${esc(t.title)}${t.ex ? '<span class="ex">E</span>' : ''}${previewMode ? '<span class="badge">PREVIEW</span>' : ''}</div><div class="a">${esc(t.artist)}${t.album ? ' — ' + esc(t.album) : ''}</div></div><button class="ib sm ${isLiked(t) ? 'on' : ''}" id="bLike" title="Favourite">${I(isLiked(t) ? 'heartf' : 'heart')}</button>` : `<div class="empty"><span class="ph">${I('note')}</span>Pick something to play</div>`;
   const bl = $('#bLike'); if (bl) bl.onclick = () => { toggleLike(cur); renderNow(); };
   $('#viz').classList.toggle('live', !!t);
+  { const c = t ? coverOf(t, 300) : ''; $$('#gbg img').forEach(im => { if (c) { if (im.getAttribute('src') !== c) im.src = c; im.style.display = ''; } else im.style.display = 'none'; }); }
   const mini = $('#mini'); mini.hidden = !t;
   if (t) mini.innerHTML = `<img src="${esc(coverOf(t, 100))}" alt="" data-np="1"><div class="tx" data-np="1"><div class="t">${esc(t.title)}</div><div class="a">${esc(t.artist)}</div></div><button class="ib big" id="mPlay">${I(au.paused ? 'play' : 'pause')}</button><button class="ib" id="mNext">${I('next')}</button>`;
   if (t) { $('#mPlay').onclick = toggle; $('#mNext').onclick = () => next(); }
@@ -1198,6 +1225,8 @@ addEventListener('resize', () => { if ($('#np').classList.contains('open')) rend
 
 /* ======================= start ======================= */
 $('#gBack').onclick = back; $('#gFwd').onclick = forward;
+$('#bGlass').innerHTML = I('glass'); $('#bGlass').onclick = () => { D.set.glass = document.documentElement.hasAttribute('data-glass') ? 'off' : 'on'; save(); syncTheme(); toast('Liquid Glass ' + (D.set.glass === 'on' ? 'on' : 'off'), 'glass'); };
+syncTheme();
 function renderHint(done) { const h = $('#hint'); if (!h) return; const full = ytState === 'ok'; h.classList.toggle('full', full); h.querySelector('span').textContent = full ? 'Full songs' : ytState === 'signin' ? 'Previews only: sign in for full songs' : (done || ytState !== 'unknown') ? '30-second previews' : 'Connecting…'; }
 renderNav(); renderNow(); renderPlayState(); render();
 ytApi('status').catch(() => {}).finally(() => { renderHint(true); if (route.v === 'home' && ytState === 'signin') render(); });
