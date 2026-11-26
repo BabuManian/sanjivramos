@@ -247,7 +247,8 @@ const isSaved = v => D.saved.some(x => x.id === v.id);
 let ME = null, BLOCK = '';
 async function api(path, body) {
   const r = await fetch('/tt/api/' + path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
-  const j = await r.json().catch(() => ({ error: 'The server didn’t answer' }));
+  const j = await r.json().catch(() => ({ error: r.status === 404 ? 'Kushtok needs a server update: run “sanjivramos restart” in Termux, then reopen Kushtok.' : 'The server didn’t answer. Try again.' }));
+  if (r.status === 404 && !j.signin && /restart/.test(j.error || '')) { BLOCK = j.error; throw Object.assign(new Error(j.error), { block: true }); }
   if (r.status === 403 || r.status === 503) { BLOCK = j.error; throw Object.assign(new Error(j.error), { block: true }); }
   if (!r.ok) throw Object.assign(new Error(j.error || 'Something went wrong'), { signin: j.signin });
   return j;
@@ -537,7 +538,7 @@ function signIn() {
   async function qrLoop() {
     if (!alive || mode !== 'qr') return;
     try { const j = await api('login/qr', {}); if (!alive || mode !== 'qr') return; if (j.done) return done(j); const q = body.querySelector('.qr'); if (q && j.img) q.innerHTML = `<img src="${j.img}" alt="QR code">`; }
-    catch (e) { const q = body.querySelector('.qr'); if (q) q.innerHTML = `<p style="color:#000;padding:16px;text-align:center">${esc(e.message)}</p>`; }
+    catch (e) { const q = body.querySelector('.qr'); if (q) q.innerHTML = `<p style="color:#000;padding:16px;text-align:center;font-size:13px">${esc(e.message)}</p>`; if (e.block) return; }
     timer = setTimeout(qrLoop, 2500);
   }
   let busy = false;
@@ -552,7 +553,7 @@ function signIn() {
   function start() {
     clearTimeout(timer);
     if (mode === 'qr') {
-      body.innerHTML = `<div class="qr"><div class="spin"></div></div><ol class="steps"><li>Open the <b>TikTok</b> app on your phone</li><li>Tap the <b>scan</b> icon (in Search, or Profile → Add friends)</li><li>Point it at this code and confirm on your phone</li></ol><p class="fine">The code refreshes by itself. This window closes when you’re in.</p>`;
+      body.innerHTML = `<div class="qr"><div style="display:grid;justify-items:center;gap:10px;color:#555;font-size:12.5px"><div class="spin"></div>Getting a code from TikTok…</div></div><ol class="steps"><li>Open the <b>TikTok</b> app on your phone</li><li>Tap the <b>scan</b> icon (in Search, or Profile → Add friends)</li><li>Point it at this code and confirm on your phone</li></ol><p class="fine">The code refreshes by itself. This window closes when you’re in.</p>`;
       qrLoop();
     } else {
       body.innerHTML = `<div class="live" id="lv"><div class="spin"></div></div><div class="lrow"><input id="lt" placeholder="Type here, then press Enter" autocomplete="off"><button class="btn ghost" id="lb" title="Back">${I('left')}</button><button class="btn ghost" id="lr" title="Start over">${I('refresh')}</button></div><p class="fine">This is TikTok’s real login page. Tap it to pick fields, type in the box above, and drag to solve puzzles. What you type goes straight to TikTok; Kushtok never saves it.</p>`;
