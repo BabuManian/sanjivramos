@@ -3,6 +3,7 @@
 xset s off -dpms s noblank 2>/dev/null
 xsetroot -solid black 2>/dev/null
 # Apps started by the server (same user) find this screen and session bus.
+printf 'SJ_SESSION=x11\nDISPLAY=%s\nXDG_SESSION_TYPE=x11\n' "$DISPLAY" > "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/sanjivramos-session.env"
 command -v dbus-update-activation-environment >/dev/null && dbus-update-activation-environment --systemd DISPLAY XAUTHORITY 2>/dev/null
 /usr/lib/sanjivramos/openbox-setup.sh 0 0 0 0
 openbox --sm-disable &

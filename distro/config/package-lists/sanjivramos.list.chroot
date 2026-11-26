@@ -90,3 +90,13 @@ x11-utils
 dbus-user-session
 dbus-x11
 perl
+
+# Wayland session (default): labwc compositor, XWayland for X11 apps, Qt Wayland, window control
+labwc
+xwayland
+wlrctl
+wlr-randr
+qt6-wayland
+qtwayland5
+xdg-desktop-portal-wlr
+xdg-desktop-portal-gtk

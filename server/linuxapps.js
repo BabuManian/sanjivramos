@@ -13,6 +13,23 @@ const DISTRO = /^[a-z0-9][\w.-]{0,40}$/i;
 /** SanjivramOS Linux (the distro): apps open as real windows on this computer's own screen instead of the noVNC display. */
 export const NATIVE = process.env.SANJIVRAM_NATIVE === '1';
 const APPS_DISPLAY = NATIVE ? (process.env.DISPLAY || ':0') : ':3';
+/** SanjivramOS Linux: the running desktop session (X11 or Wayland) writes its display variables here. */
+let sessCache = { at: 0, env: {} };
+export function sessionEnv() {
+  if (!NATIVE) return {};
+  if (Date.now() - sessCache.at < 2000) return sessCache.env;
+  const env = {};
+  try {
+    const dir = process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid()}`;
+    for (const line of fs.readFileSync(path.join(dir, 'sanjivramos-session.env'), 'utf8').split('\n')) {
+      const m = /^([A-Z_][A-Z0-9_]*)=(.*)$/.exec(line.trim());
+      if (m && m[2] !== '') env[m[1]] = m[2];
+    }
+  } catch {}
+  sessCache = { at: Date.now(), env };
+  return env;
+}
+const wayland = () => sessionEnv().SJ_SESSION === 'wayland';
 const ID = /^lx-[a-z0-9]{1,24}$/;
 
 /** Checks an app description from the browser; returns null when it's unusable. */
@@ -34,7 +51,7 @@ export function parseSpec(o) {
  *  inside a proot-distro Linux when one is chosen. */
 export function buildScript(spec) {
   const inner = [];
-  if (spec.mode === 'gui' && !spec.fromMenu) inner.push(`export DISPLAY=${APPS_DISPLAY}`);   // the apps display (menu launchers keep their own)
+  if (spec.mode === 'gui' && !spec.fromMenu && !NATIVE) inner.push(`export DISPLAY=${APPS_DISPLAY}`);   // the apps display (menu launchers keep their own)
   if (spec.cwd) inner.push(`cd ${spec.cwd.startsWith('~/') ? '"$HOME"/' + q(spec.cwd.slice(2)) : q(spec.cwd)} || exit 1`);
   if (spec.setup) {
     const bin = (spec.cmd.match(/^\s*([^\s=;&|<>()]+)(\s|$)/) || [])[1];
@@ -72,7 +89,8 @@ function appsBus() {
 }
 
 export function runGui(spec, logFile) {
-  const env = { ...process.env, DISPLAY: APPS_DISPLAY, ...(NATIVE ? {} : appsBus()) };
+  const env = NATIVE ? { ...process.env, DISPLAY: APPS_DISPLAY, ...sessionEnv() } : { ...process.env, DISPLAY: APPS_DISPLAY, ...appsBus() };
+  if (NATIVE && wayland()) trackWayland(spec);
   delete env.SITE_PASSWORD;
   return new Promise(resolve => {
     let out = '';
@@ -134,11 +152,38 @@ export function readJson(req, limit = 1024 * 1024) {
 }
 
 /* ===================== Native app windows (SanjivramOS Linux: Openbox on the real screen) ===================== */
-const run = (cmd, args) => new Promise(res => execFile(cmd, args, { env: { ...process.env, DISPLAY: APPS_DISPLAY }, timeout: 4000, maxBuffer: 1 << 20 }, (err, out) => res(err ? '' : String(out))));
+const xenv = () => ({ ...process.env, DISPLAY: APPS_DISPLAY, ...sessionEnv() });
+const run = (cmd, args) => new Promise(res => execFile(cmd, args, { env: xenv(), timeout: 4000, maxBuffer: 1 << 20 }, (err, out) => res(err ? '' : String(out))));
+const runOk = (cmd, args) => new Promise(res => execFile(cmd, args, { env: xenv(), timeout: 3000 }, err => res(!err)));
+
+/* Wayland (labwc): no tool here can list every window, so SanjivramOS follows the apps it started, by app_id,
+   with wlrctl (wlr-foreign-toplevel). Each app gets a few likely app_ids: desktop file name, WM class, program name. */
+const wlApps = new Map();   // key → { name, cands, at, seen }
+function trackWayland(spec) {
+  const bin = ((spec.cmd.match(/^\s*(?:env\s+(?:\S+=\S+\s+)*)?("[^"]+"|\S+)/) || [])[1] || '').replace(/"/g, '').split('/').pop();
+  const cands = new Set([bin, bin.toLowerCase(), spec.name, spec.name.toLowerCase()].filter(Boolean));
+  const hit = scanCache && scanCache.data.apps.find(a => a.exec === spec.cmd);
+  if (hit) { const id = path.basename(hit.file || '', '.desktop'); if (id) cands.add(id); if (hit.wmclass) { cands.add(hit.wmclass); cands.add(hit.wmclass.toLowerCase()); } }
+  const list = [...cands].filter(c => /^[\w.+-]{1,100}$/.test(c));
+  if (list.length) wlApps.set(list[0], { name: spec.name, cands: list, at: Date.now(), seen: 0 });
+}
+async function listWayland() {
+  const wins = [];
+  for (const [key, a] of wlApps) {
+    let found = null;
+    for (const c of a.cands) if (await runOk('wlrctl', ['toplevel', 'find', `app_id:${c}`])) { found = c; break; }
+    if (!found) { if (Date.now() - (a.seen || a.at) > 45000) wlApps.delete(key); continue; }
+    a.seen = Date.now();
+    const [minimized, active] = await Promise.all([runOk('wlrctl', ['toplevel', 'find', `app_id:${found}`, 'state:minimized']), runOk('wlrctl', ['toplevel', 'find', `app_id:${found}`, 'state:active'])]);
+    wins.push({ id: 'wl:' + found, pid: 0, instance: found, cls: found, title: a.name, minimized, active });
+  }
+  return { wins, session: 'wayland' };
+}
 const XID = /^0x[0-9a-f]{1,8}$/i;
 /** Open app windows: id, pid, class, title, minimized, active. The SanjivramOS window itself is left out. */
 export async function listXWins() {
   if (!NATIVE) return { wins: [] };
+  if (wayland()) return listWayland();
   const [list, act] = await Promise.all([run('wmctrl', ['-lpx']), run('xprop', ['-root', '_NET_ACTIVE_WINDOW'])]);
   const active = (/0x[0-9a-f]+/i.exec(act.split('#')[1] || '') || [''])[0];
   const wins = [];
@@ -158,6 +203,12 @@ export async function listXWins() {
 }
 /** activate | minimize | close | maximize */
 export async function xwinOp(id, op) {
+  if (NATIVE && /^wl:[\w.+-]{1,100}$/.test(String(id))) {
+    const m = `app_id:${String(id).slice(3)}`, act = { activate: 'focus', minimize: 'minimize', close: 'close', maximize: 'maximize' }[op];
+    if (!act) throw new Error('bad op');
+    await runOk('wlrctl', ['toplevel', act, m]);
+    return { ok: true };
+  }
   if (!NATIVE || !XID.test(String(id))) throw new Error('bad window');
   if (op === 'activate') await run('wmctrl', ['-ia', id]);
   else if (op === 'close') await run('wmctrl', ['-ic', id]);
@@ -171,9 +222,10 @@ let lastMargins = '';
 export async function setXMargins(m) {
   if (!NATIVE) return { ok: false };
   const v = ['top', 'bottom', 'left', 'right'].map(k => String(Math.max(0, Math.min(2000, m[k] | 0))));
-  if (v.join(' ') === lastMargins) return { ok: true, same: true };
-  lastMargins = v.join(' ');
-  await run('/usr/lib/sanjivramos/openbox-setup.sh', v);
+  const wl = wayland(), key = (wl ? 'wl ' : 'x ') + v.join(' ');
+  if (key === lastMargins) return { ok: true, same: true };
+  lastMargins = key;
+  await run(wl ? '/usr/lib/sanjivramos/labwc-setup.sh' : '/usr/lib/sanjivramos/openbox-setup.sh', v);
   return { ok: true };
 }
 
@@ -289,7 +341,7 @@ export function scanApps(force = false) {
           id: (distro ? distro + ':' : '') + fileId.replace(/\.desktop$/, ''), name: e.Name, generic: e.GenericName || '', comment: e.Comment || '',
           exec, terminal: e.Terminal === 'true', cats, section: sectionOf(cats), keywords: (e.Keywords || '').replace(/;/g, ' ').trim(),
           hidden: e.NoDisplay === 'true' || (!!e.OnlyShowIn && !/XFCE|LXDE|LXQt|GNOME|KDE|MATE/i.test(e.OnlyShowIn)),
-          installed: bin ? onPath(bin, distro) : true, distro, iconName: icon, file
+          installed: bin ? onPath(bin, distro) : true, distro, iconName: icon, file, wmclass: e.StartupWMClass || ''
         });
       }
     }

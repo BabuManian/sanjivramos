@@ -1,0 +1,12 @@
+#!/bin/sh
+# Switch the SanjivramOS desktop between X11 and Wayland:   sudo sanjivramos-session wayland|x11   (no argument: show it)
+F=/etc/sanjivramos/session
+case "${1:-}" in
+  '') cat "$F" 2>/dev/null || echo wayland; exit 0;;
+  x11|wayland) ;;
+  *) echo "usage: sudo sanjivramos-session [x11|wayland]"; exit 1;;
+esac
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+echo "$1" > "$F"; rm -f /dev/shm/sanjivramos-wayland-failed
+echo "Switching to $1…"
+systemctl restart sanjivramos-session.service

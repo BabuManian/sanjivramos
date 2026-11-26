@@ -25,11 +25,14 @@ git clone --depth 1 -b "$SJ_BRANCH" "$SJ_REPO" /opt/sanjivramos/app
 # NVIDIA ISO: make sure the driver was really built for the ISO's kernel, and turn on kernel modesetting.
 if dpkg -s nvidia-kernel-dkms >/dev/null 2>&1; then
   ls /lib/modules/*/updates/dkms/nvidia*.ko* >/dev/null 2>&1 || { echo "NVIDIA kernel module was not built"; dkms status; exit 1; }
-  echo 'options nvidia-drm modeset=1 fbdev=1' > /etc/modprobe.d/sanjivramos-nvidia.conf
+  # Debian calls the modules nvidia-current*, so set both names. Modesetting is needed for Wayland.
+  printf 'options nvidia-drm modeset=1 fbdev=1\noptions nvidia-current-drm modeset=1 fbdev=1\n' > /etc/modprobe.d/sanjivramos-nvidia.conf
 fi
 
 # Hybrid graphics laptops: prime-run <app> runs it on the NVIDIA GPU.
 ln -sf /usr/lib/sanjivramos/prime-run /usr/local/bin/prime-run
+# Switch between Wayland (default) and X11: sudo sanjivramos-session x11
+ln -sf /usr/lib/sanjivramos/sanjivramos-session /usr/local/bin/sanjivramos-session
 
 # Services
 systemctl enable NetworkManager.service sanjivramos-update.service sanjivramos-server.service sanjivramos-session.service

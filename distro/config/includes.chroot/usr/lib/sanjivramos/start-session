@@ -1,0 +1,24 @@
+#!/bin/sh
+# Starts the SanjivramOS desktop on tty1: Wayland (labwc, the default) or X11 (Openbox).
+# Pick with /etc/sanjivramos/session ("wayland" or "x11"), the boot option sj.session=x11, or: sudo sanjivramos-session x11
+# If Wayland can't start on this PC (it quits within 15 s, twice in a row), it falls back to X11 by itself.
+S=wayland
+FAIL=/dev/shm/sanjivramos-wayland-failed   # tmpfs: forgotten at the next boot, so Wayland is tried again
+[ -f /etc/sanjivramos/session ] && S=$(tr -dc 'a-z0-9' < /etc/sanjivramos/session)
+for a in $(cat /proc/cmdline); do case $a in sj.session=*) S=${a#sj.session=};; esac; done
+# NVIDIA's own driver: wlroots needs software cursors on some cards.
+[ -e /proc/driver/nvidia/version ] && export WLR_NO_HARDWARE_CURSORS=1
+if [ "$S" = wayland ] && command -v labwc >/dev/null; then
+  export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=SanjivramOS:wlroots
+  export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM="wayland;xcb" ELECTRON_OZONE_PLATFORM_HINT=auto _JAVA_AWT_WM_NONREPARENTING=1 CLUTTER_BACKEND=wayland
+  /usr/lib/sanjivramos/labwc-setup.sh 0 0 0 0
+  if [ "$(cat "$FAIL" 2>/dev/null || echo 0)" -lt 2 ]; then
+    start=$(date +%s)
+    labwc -S /usr/lib/sanjivramos/session-wayland
+    if [ $(( $(date +%s) - start )) -lt 15 ]; then echo $(( $(cat "$FAIL" 2>/dev/null || echo 0) + 1 )) > "$FAIL"; else rm -f "$FAIL"; fi
+    exit 0   # the service starts the desktop again (Wayland, or X11 after two quick failures)
+  fi
+  echo "Wayland didn't start on this PC — using X11" >&2
+fi
+export XDG_SESSION_TYPE=x11
+exec /usr/bin/startx /usr/lib/sanjivramos/session -- :0 vt1 -keeptty -nolisten tcp

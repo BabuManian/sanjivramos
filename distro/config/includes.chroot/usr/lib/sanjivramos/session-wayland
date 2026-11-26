@@ -1,0 +1,10 @@
+#!/bin/sh
+# Wayland session (run by labwc): the SanjivramOS Electron shell, natively on Wayland. X11 apps use XWayland.
+ENVF="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/sanjivramos-session.env"
+printf 'SJ_SESSION=wayland\nWAYLAND_DISPLAY=%s\nDISPLAY=%s\nLABWC_PID=%s\nXDG_SESSION_TYPE=wayland\nMOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM=wayland;xcb\nELECTRON_OZONE_PLATFORM_HINT=auto\n' \
+  "$WAYLAND_DISPLAY" "$DISPLAY" "$LABWC_PID" > "$ENVF"
+command -v dbus-update-activation-environment >/dev/null && dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY XDG_SESSION_TYPE XDG_CURRENT_DESKTOP 2>/dev/null
+SHELL_DIR=/opt/sanjivramos/app/distro/shell
+ELECTRON="$SHELL_DIR/node_modules/electron/dist/electron"
+[ -x "$ELECTRON" ] || exec xterm -maximized -e sh -c 'echo "SanjivramOS shell is missing. Connect to the internet and run: sudo systemctl restart sanjivramos-update"; exec bash'
+exec "$ELECTRON" "$SHELL_DIR" --ozone-platform=wayland --enable-wayland-ime

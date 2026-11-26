@@ -17,7 +17,7 @@ UtmpIdentifier=tty1
 UtmpMode=user
 WorkingDirectory=~
 Environment=XDG_SESSION_TYPE=x11
-ExecStart=/usr/bin/startx /usr/lib/sanjivramos/session -- :0 vt1 -keeptty -nolisten tcp
+ExecStart=/usr/lib/sanjivramos/start-session
 Restart=always
 RestartSec=2
 

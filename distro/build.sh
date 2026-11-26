@@ -11,7 +11,7 @@ WORK="${WORK:-/var/tmp/sanjivramos-build}"
 # SJ_VARIANT=nvidia adds NVIDIA's own driver (a separate ISO, so the main one keeps working on older NVIDIA cards with nouveau).
 SJ_VARIANT="${SJ_VARIANT:-standard}"
 SUFFIX=""; EXTRA_BOOT=""
-if [ "$SJ_VARIANT" = nvidia ]; then SUFFIX="-nvidia"; EXTRA_BOOT=" nvidia-drm.modeset=1"; fi
+if [ "$SJ_VARIANT" = nvidia ]; then SUFFIX="-nvidia"; EXTRA_BOOT=" nvidia-drm.modeset=1 nvidia-current-drm.modeset=1"; fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
