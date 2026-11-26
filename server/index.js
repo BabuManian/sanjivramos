@@ -13,6 +13,7 @@ import { handleVnc, handleVncPort } from './vnc.js';
 import { handleClaude, claudeAsk, handleDesktopRelay } from './claude.js';
 import { slanderAction, serveSlander } from './slander.js';
 import { handleVip, chromiumPath } from './vip.js';
+import { ttApi } from './tiktok.js';
 import { handleFiles } from './files.js';
 import { handleRestore } from './restore.js';
 import { serveGame, gameRedirect, installedGames, gamesApi } from './games.js';
@@ -115,6 +116,8 @@ const server = http.createServer((req, res) => {
   if (playApi(req, res, url)) return;
   if (url.pathname.startsWith('/maker/api/')) { makerApi(req, res, url); return; }
   if (url.pathname.startsWith('/ai/api/')) { aiApi(req, res, url).catch(e => { if (!res.headersSent) { res.writeHead(500); res.end(e.message); } }); return; }
+  // Kushtok (TikTok client): this machine's headless Chromium, own network only.
+  if (url.pathname.startsWith('/tt/')) { ttApi(req, res, url, shellOk(req)).catch(e => { if (!res.headersSent) { res.writeHead(500); res.end(e.message); } }); return; }
   if (url.pathname.startsWith('/yt/')) { ytApi(req, res, url).catch(e => { if (!res.headersSent) { res.writeHead(500); res.end(e.message); } }); return; }
   // Files: the native file manager for this machine (and Linux files as wallpapers).
   if (url.pathname.startsWith('/linux-fs/')) { handleFiles(req, res, url, shellOk(req), readJson); return; }
