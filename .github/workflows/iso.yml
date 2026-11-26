@@ -46,4 +46,6 @@ jobs:
           Both include Wi-Fi firmware (Intel, Realtek, Atheros/Qualcomm, MediaTek, Broadcom, Marvell, TI). Flash one to a USB stick (balenaEtcher, Rufus or dd) and boot it. Login/sudo password: sanjivram. It downloads the newest SanjivramOS from GitHub on every boot."
       - name: Build log on failure
         if: failure()
-        run: sudo grep -nE '^E: |error|Error|failed' distro/work/build.log | tail -n 60 || true; sudo tail -n 120 distro/work/build.log 2>/dev/null || true
+        run: |
+          sudo grep -nE '^E: |error|Error|failed' distro/work/build.log | tail -n 60 || true
+          sudo tail -n 120 distro/work/build.log 2>/dev/null || true
