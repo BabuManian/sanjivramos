@@ -1,0 +1,23 @@
+[Unit]
+Description=SanjivramOS desktop
+After=systemd-user-sessions.service plymouth-quit-wait.service getty@tty1.service
+Conflicts=getty@tty1.service
+
+[Service]
+# The user comes from sanjivramos-session.service.d/user.conf (the live user, or the one made by the installer).
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+WorkingDirectory=~
+ExecStart=/usr/lib/sanjivramos/start-session
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical.target

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wi-Fi
+Comment=Connect to a Wi-Fi network
+Exec=/usr/lib/sanjivramos/system/run wifi
+Icon=network-wireless
+Categories=Settings;Network;
+Keywords=wifi;wireless;network;internet;

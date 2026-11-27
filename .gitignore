@@ -4,3 +4,5 @@ node_modules/
 .sanjivramos/
 distro/out/
 distro/work/
+distro-ubuntu/out/
+distro-ubuntu/work/

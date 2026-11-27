@@ -1,0 +1,18 @@
+#!/bin/sh
+# The X session: Openbox (manages real Linux app windows) + the SanjivramOS Electron shell under them.
+xset s off -dpms s noblank 2>/dev/null
+xsetroot -solid black 2>/dev/null
+printf 'SJ_SESSION=x11\nDISPLAY=%s\nXDG_SESSION_TYPE=x11\n' "$DISPLAY" > "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/sanjivramos-session.env"
+command -v dbus-update-activation-environment >/dev/null && dbus-update-activation-environment --systemd DISPLAY XAUTHORITY 2>/dev/null
+/usr/lib/sanjivramos/openbox-setup.sh 0 0 0 0
+openbox --sm-disable &
+/usr/lib/sanjivramos/display-restore   # screen settings from Settings → This Computer → Display
+/usr/lib/sanjivramos/live-installer 12 &
+SHELL_DIR=/opt/sanjivramos/app/distro/shell
+ELECTRON="$SHELL_DIR/node_modules/electron/dist/electron"
+# While the boot updater is replacing the app, Electron can be briefly missing: wait for it (at most 6 minutes).
+if [ ! -x "$ELECTRON" ]; then
+  for i in $(seq 360); do [ -e /run/sanjivramos/done ] && break; systemctl -q is-active sanjivramos-update.service || break; sleep 1; done
+fi
+[ -x "$ELECTRON" ] || exec xterm -fa 'Fira Mono' -fs 11 -maximized -e sh -c 'echo "SanjivramOS shell is missing. Connect to the internet and run: sudo systemctl restart sanjivramos-update"; exec bash'
+exec "$ELECTRON" "$SHELL_DIR" --ozone-platform=x11

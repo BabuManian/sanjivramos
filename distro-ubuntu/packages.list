@@ -1,0 +1,21 @@
+# Packages installed into the SanjivramOS (Ubuntu) image, without "recommends". One per line; # comments.
+# Kernel, boot, live USB
+linux-generic linux-headers-generic linux-firmware intel-microcode amd64-microcode
+casper initramfs-tools plymouth plymouth-label plymouth-theme-spinner
+grub-efi-amd64-bin grub-efi-amd64-signed grub-pc-bin grub2-common shim-signed mokutil efibootmgr
+# System
+systemd-sysv systemd-resolved systemd-timesyncd dbus-user-session dbus-x11 polkitd sudo locales tzdata keyboard-configuration console-setup
+coreutils-from-uutils procps psmisc less nano htop file unzip xz-utils rsync jq curl wget git ca-certificates openssh-client
+pciutils usbutils kmod util-linux mount e2fsprogs dosfstools parted gdisk squashfs-tools fastfetch bash-completion
+# Network, Wi-Fi, Bluetooth
+network-manager wpasupplicant iw rfkill iproute2 iputils-ping bluez broadcom-sta-dkms dkms
+# Sound
+pipewire-audio wireplumber alsa-utils
+# Graphics and desktop session (labwc on Wayland, Openbox on X11)
+labwc xwayland wlr-randr wlrctl openbox xinit xserver-xorg-core xserver-xorg-legacy xserver-xorg-input-libinput xserver-xorg-video-all
+x11-utils x11-xserver-utils xdotool wmctrl xterm xdg-utils xdg-desktop-portal-gtk xdg-desktop-portal-wlr qt6-wayland qtwayland5
+mesa-utils mesa-vulkan-drivers libgl1-mesa-dri mesa-libgallium libgbm1 vainfo brightnessctl
+# Electron needs these
+libgtk-3-0t64 libnss3 libxss1 libxshmfence1 libsecret-1-0 libnotify4 libnotify-bin libasound2t64
+# Fonts
+fonts-dejavu fonts-noto-core fonts-noto-color-emoji fonts-ubuntu

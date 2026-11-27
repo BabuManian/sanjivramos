@@ -1,0 +1,137 @@
+#!/bin/bash
+# SanjivramOS installer backend. Run as root by the installer app (sudo); reads its settings as JSON on stdin:
+#   {"disk":"/dev/sda","fullname":"…","username":"…","hostname":"…","password":"…","lock":true,"timezone":"Area/City","xkb_layout":"us","xkb_variant":""}
+# Test/CI only: SJ_SQUASHFS=<image> picks the system image, SJ_NO_NVRAM=1 leaves the firmware boot entries alone,
+# SJ_TEST_LOOP=1 allows a loop device as the disk.
+# Erases the disk and installs: GPT with a BIOS boot partition, an EFI system partition and an ext4 root, so the disk
+# boots on both UEFI (Secure Boot too) and older BIOS PCs. Prints "PROGRESS <percent> <text>" lines, "ERROR <text>" on failure.
+set -Eeuo pipefail
+LOG=/var/log/sanjivramos-install.log
+exec 2> >(tee -a "$LOG" >&2)
+T=/target
+STEP="starting"
+say() { STEP="$2"; echo "PROGRESS $1 $2"; echo "== $1% $2" >> "$LOG"; }
+fail() { echo "ERROR $*"; exit 1; }
+cleanup() {
+  for m in sys/firmware/efi/efivars sys dev/pts dev proc run boot/efi; do mountpoint -q "$T/$m" 2>/dev/null && umount -l "$T/$m" || true; done
+  mountpoint -q "$T" 2>/dev/null && umount -l "$T" || true
+}
+trap 'rc=$?; if [ $rc -ne 0 ]; then echo "ERROR Installation stopped while: $STEP. Details are in $LOG"; fi; cleanup' EXIT
+[ "$(id -u)" = 0 ] || fail "The installer must run as root."
+
+# ---- settings ----
+J=$(cat)
+get() { jq -r --arg k "$1" '.[$k] // ""' <<<"$J"; }
+DISK=$(get disk); FULL=$(get fullname); USERN=$(get username); HOST=$(get hostname); PASS=$(get password)
+TZ=$(get timezone); KBL=$(get xkb_layout); KBV=$(get xkb_variant); LOCK=$(jq -r 'if .lock == false then "no" else "yes" end' <<<"$J")
+[ -b "$DISK" ] && { [ "$(lsblk -dno TYPE "$DISK")" = disk ] || [ -n "${SJ_TEST_LOOP:-}" ]; } || fail "$DISK isn't a disk."
+[[ $USERN =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || fail "That username can't be used."
+[[ $HOST =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]] || fail "That computer name can't be used."
+[ -n "$PASS" ] || fail "A password is needed."
+[[ $PASS != *$'\n'* && $PASS != *:* ]] || fail "The password can't contain a colon or a line break."
+[ -e "/usr/share/zoneinfo/$TZ" ] || TZ=UTC
+[[ $KBL =~ ^[a-z,]{2,20}$ ]] || KBL=us
+[[ $KBV =~ ^[a-z0-9,]{0,20}$ ]] || KBV=""
+FULL=$(tr -d ':,\n' <<<"$FULL")
+
+# The system image to copy: the live USB's filesystem.squashfs.
+SQ="${SJ_SQUASHFS:-}"
+[ -n "$SQ" ] || for f in /cdrom/casper/filesystem.squashfs /run/casper/medium/casper/filesystem.squashfs /isodevice/casper/filesystem.squashfs; do [ -f "$f" ] && { SQ=$f; break; }; done
+[ -n "$SQ" ] || SQ=$(losetup -lnO BACK-FILE | grep -m1 'filesystem.squashfs' || true)
+[ -n "$SQ" ] && [ -f "$SQ" ] || fail "Couldn't find the SanjivramOS system image on the USB stick."
+# Never erase the disk we're running from.
+SRC_DISK=$(lsblk -no PKNAME "$(df --output=source "$SQ" | tail -1)" 2>/dev/null | head -1 || true)
+[ -n "$SRC_DISK" ] && [ "/dev/$SRC_DISK" = "$DISK" ] && fail "That's the USB stick SanjivramOS is running from."
+
+# ---- 1. disk ----
+say 2 "Preparing the disk"
+swapoff -a 2>/dev/null || true
+for p in $(lsblk -lnpo NAME "$DISK" | tail -n +2); do umount -l "$p" 2>/dev/null || true; done
+wipefs -af "$DISK" >/dev/null
+sgdisk --zap-all "$DISK" >/dev/null
+sgdisk -n1:0:+1M -t1:ef02 -c1:"BIOS boot" -n2:0:+512M -t2:ef00 -c2:"EFI" -n3:0:0 -t3:8304 -c3:"SanjivramOS" "$DISK" >/dev/null
+partprobe "$DISK" 2>/dev/null || true; udevadm settle || true
+P=$DISK; [[ $DISK =~ [0-9]$ ]] && P=${DISK}p
+ESP=${P}2; ROOT=${P}3
+for i in $(seq 20); do [ -b "$ESP" ] && [ -b "$ROOT" ] && break; sleep 0.5; done
+[ -b "$ROOT" ] || fail "The new partitions didn't appear."
+say 5 "Formatting"
+mkfs.vfat -F 32 -n EFI "$ESP" >/dev/null
+mkfs.ext4 -F -q -L SanjivramOS "$ROOT"
+mkdir -p "$T"; mount "$ROOT" "$T"
+
+# ---- 2. copy the system ----
+say 8 "Copying SanjivramOS"
+last=-1
+unsquashfs -f -percentage -d "$T" "$SQ" 2>>"$LOG" | while read -r pct; do
+  pct=${pct%%.*}; [[ $pct =~ ^[0-9]+$ ]] || continue
+  p=$((8 + pct * 70 / 100)); [ $p -ne $last ] && { echo "PROGRESS $p Copying SanjivramOS"; last=$p; }
+done
+[ -x "$T/usr/bin/bash" ] || fail "Copying the system failed."
+mkdir -p "$T/boot/efi"; mount "$ESP" "$T/boot/efi"
+
+# ---- 3. configure ----
+say 80 "Setting up your account"
+cat > "$T/etc/fstab" <<EOF
+# SanjivramOS
+UUID=$(blkid -s UUID -o value "$ROOT")  /          ext4  errors=remount-ro  0 1
+UUID=$(blkid -s UUID -o value "$ESP")  /boot/efi  vfat  umask=0077         0 1
+EOF
+echo "$HOST" > "$T/etc/hostname"
+printf '127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n' "$HOST" > "$T/etc/hosts"
+ln -sf "/usr/share/zoneinfo/$TZ" "$T/etc/localtime"; echo "$TZ" > "$T/etc/timezone"
+sed -i "s/^XKBLAYOUT=.*/XKBLAYOUT=\"$KBL\"/; s/^XKBVARIANT=.*/XKBVARIANT=\"$KBV\"/" "$T/etc/default/keyboard"
+grep -q '^XKBOPTIONS=' "$T/etc/default/keyboard" || echo 'XKBOPTIONS=""' >> "$T/etc/default/keyboard"
+if [[ $KBL == *,* ]]; then sed -i 's/^XKBOPTIONS=.*/XKBOPTIONS="grp:alt_shift_toggle"/' "$T/etc/default/keyboard"; fi
+# Wi-Fi networks joined on the live USB keep working after the install. NetworkManager on Ubuntu saves them as netplan
+# files (/etc/netplan/90-NM-*.yaml); older setups use keyfiles in system-connections.
+if [ -d /etc/NetworkManager/system-connections ]; then mkdir -p "$T/etc/NetworkManager/system-connections"; cp -a /etc/NetworkManager/system-connections/. "$T/etc/NetworkManager/system-connections/" 2>/dev/null || true; fi
+for f in /etc/netplan/90-NM-*.yaml; do [ -f "$f" ] && { mkdir -p "$T/etc/netplan"; install -m 600 "$f" "$T/etc/netplan/"; }; done
+# A new identity for this computer (the image's machine ID would be the same on every install).
+: > "$T/etc/machine-id"; rm -f "$T/var/lib/dbus/machine-id"
+# "Ask for my password when SanjivramOS starts" (the SanjivramOS lock screen checks your Linux password).
+mkdir -p "$T/etc/sanjivramos"
+if [ "$LOCK" = no ]; then touch "$T/etc/sanjivramos/no-lock"; else rm -f "$T/etc/sanjivramos/no-lock"; fi
+# Live-USB-only pieces
+rm -f "$T/usr/share/applications/sanjivramos-install.desktop" "$T/etc/casper.conf"
+
+for d in dev dev/pts proc sys run; do mount --bind "/$d" "$T/$d"; done
+[ -d /sys/firmware/efi/efivars ] && mount --bind /sys/firmware/efi/efivars "$T/sys/firmware/efi/efivars" 2>/dev/null || true
+ch() { chroot "$T" env DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 "$@"; }
+ch dpkg --purge casper >>"$LOG" 2>&1 || true
+groups=""; for g in sudo adm audio video input render netdev plugdev lpadmin dialout; do ch getent group "$g" >/dev/null && groups="$groups,$g"; done
+ch useradd -m -s /bin/bash -c "$FULL" -G "${groups#,}" "$USERN"
+printf '%s:%s\n' "$USERN" "$PASS" | ch chpasswd
+for s in session server; do printf '[Service]\nUser=%s\nGroup=%s\n' "$USERN" "$USERN" > "$T/etc/systemd/system/sanjivramos-$s.service.d/user.conf"; done
+rm -rf "$T/var/lib/sanjivramos"
+ch systemd-machine-id-setup >>"$LOG" 2>&1 || true
+# Swap file (helps on computers with little memory): as big as the memory, 1–4 GB, if the disk has room.
+ramk=$(awk '/^MemTotal/{print $2}' /proc/meminfo); swapm=$(( ramk / 1024 )); [ $swapm -lt 1024 ] && swapm=1024; [ $swapm -gt 4096 ] && swapm=4096
+if [ "$(lsblk -bdno SIZE "$DISK")" -gt 40000000000 ] && fallocate -l "${swapm}M" "$T/swapfile" 2>>"$LOG"; then
+  chmod 600 "$T/swapfile" && mkswap -q "$T/swapfile" >>"$LOG" 2>&1 && echo '/swapfile  none  swap  sw  0 0' >> "$T/etc/fstab" || rm -f "$T/swapfile"
+fi
+
+# ---- 4. boot loader ----
+say 86 "Installing the boot loader"
+ch update-initramfs -u -k all >>"$LOG" 2>&1
+NVRAM=--no-nvram
+if [ -d /sys/firmware/efi ]; then
+  # Signed GRUB + shim (Secure Boot). The firmware boot entry is added below with the SanjivramOS name.
+  ch grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --uefi-secure-boot $NVRAM >>"$LOG" 2>&1
+fi
+# Fallback path (EFI/BOOT/BOOTX64.EFI): boots even if the firmware forgets its boot entries, and on UEFI from a BIOS-installed disk.
+ch grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --uefi-secure-boot --removable --no-nvram >>"$LOG" 2>&1 || true
+[ -f "$T/boot/efi/EFI/ubuntu/grub.cfg" ] && [ -d "$T/boot/efi/EFI/BOOT" ] && cp "$T/boot/efi/EFI/ubuntu/grub.cfg" "$T/boot/efi/EFI/BOOT/grub.cfg"
+# Older BIOS PCs
+ch grub-install --target=i386-pc "$DISK" >>"$LOG" 2>&1 || true
+ch update-grub >>"$LOG" 2>&1
+if [ -d /sys/firmware/efi ] && [ -z "${SJ_NO_NVRAM:-}" ] && command -v efibootmgr >/dev/null; then
+  for n in $(efibootmgr | sed -n 's/^Boot\([0-9A-F]\{4\}\)\*\? \+\(SanjivramOS\|ubuntu\)\b.*/\1/p'); do efibootmgr -q -b "$n" -B || true; done
+  efibootmgr -q -c -d "$DISK" -p 2 -L SanjivramOS -l '\EFI\ubuntu\shimx64.efi' >>"$LOG" 2>&1 || true
+fi
+
+say 97 "Finishing"
+sync
+cleanup; trap - EXIT
+say 100 "SanjivramOS is installed"
+exit 0

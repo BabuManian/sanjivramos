@@ -1,10 +1,8 @@
 # Builds the SanjivramOS Linux ISO (Debian trixie + Electron) and publishes it as the "iso-latest" release.
 name: Build SanjivramOS ISO
+# Old Debian edition: only built by hand now (Actions → Run workflow). The Ubuntu edition is ubuntu-iso.yml.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['distro/**', '.github/workflows/iso.yml']
 permissions:
   contents: write
 jobs:

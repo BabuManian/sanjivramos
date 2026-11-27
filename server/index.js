@@ -100,9 +100,32 @@ const localTerminal = req => process.env.SANJIVRAM_LOCAL_TERMINAL === '1' && isL
 const linuxUser = () => {
   try {
     const u = os.userInfo(), line = fs.readFileSync('/etc/passwd', 'utf8').split('\n').find(l => l.split(':')[0] === u.username) || '';
-    return { username: u.username, name: (line.split(':')[4] || '').split(',')[0].trim() || u.username };
+    const lockOff = fs.existsSync('/etc/sanjivramos/no-lock');   // installer: "Sign in without a password"
+    return { username: u.username, name: (line.split(':')[4] || '').split(',')[0].trim() || u.username, password: !lockOff && linuxHasPassword() };
   } catch { return null; }
 };
+
+/** Checks a password for the Linux user the server runs as with PAM's unix_chkpwd helper (the same check login and sudo do).
+ *  It can only check its own user, never anyone else's. SANJIVRAM_CHKPWD overrides the helper (tests). */
+const CHKPWD = process.env.SANJIVRAM_CHKPWD || ['/usr/sbin/unix_chkpwd', '/sbin/unix_chkpwd'].find(f => fs.existsSync(f)) || '';
+const linuxCheckPassword = pw => new Promise(resolve => {
+  if (!CHKPWD) return resolve(false);
+  let done = false; const end = v => { if (!done) { done = true; resolve(v); } };
+  try {
+    const c = spawn(CHKPWD, [os.userInfo().username, 'nullok'], { stdio: ['pipe', 'ignore', 'ignore'] });
+    c.on('error', () => end(false)); c.on('exit', code => end(code === 0));
+    setTimeout(() => { try { c.kill(); } catch {} end(false); }, 8000);
+    c.stdin.on('error', () => {}); c.stdin.end(Buffer.concat([Buffer.from(String(pw), 'utf8'), Buffer.from([0])]));
+  } catch { end(false); }
+});
+// Live USB users have an empty password: then there's nothing to ask for. Cached (it only changes with passwd).
+let hasPwCache = null, hasPwAt = 0;
+const linuxHasPassword = () => {
+  if (Date.now() - hasPwAt > 30000) { hasPwAt = Date.now(); linuxCheckPassword('').then(empty => { hasPwCache = !empty; }); }
+  return hasPwCache !== false;
+};
+if (NATIVE) linuxHasPassword();
+let unlockFails = 0, unlockWait = 0;
 
 const authorized = req => {
   if (!PASSWORD || isLocalBrowser(req)) return true;
@@ -147,6 +170,20 @@ const server = http.createServer((req, res) => {
     if (!f) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'content-type': TYPES[path.extname(f).toLowerCase()] || ({ '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' })[path.extname(f).toLowerCase()] || 'application/octet-stream', 'cache-control': 'private, max-age=86400', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" });
     fs.createReadStream(f).pipe(res);
+    return;
+  }
+  // SanjivramOS Linux lock screen: your Linux password (the one from the installer). Only for the computer's own screen.
+  if (url.pathname === '/sanjivram-linux-unlock' && req.method === 'POST') {
+    const reply = (code, o) => { res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(o)); };
+    if (!NATIVE || !isLocalBrowser(req)) { reply(403, { error: 'Not available here.' }); return; }
+    readJson(req, 4096).then(async j => {
+      const wait = unlockWait - Date.now();
+      if (wait > 0) { reply(429, { error: `Too many tries. Wait ${Math.ceil(wait / 1000)} s.` }); return; }
+      const ok = await linuxCheckPassword(String((j && j.password) || ''));
+      if (ok) { unlockFails = 0; reply(200, { ok: true }); return; }
+      unlockFails++; if (unlockFails >= 5) unlockWait = Date.now() + Math.min(60, 5 * (unlockFails - 4)) * 1000;
+      setTimeout(() => reply(401, { error: 'Wrong password, try again.' }), 700);
+    }).catch(() => reply(400, { error: 'Bad request' }));
     return;
   }
   if (url.pathname === '/sanjivram-server.json') {

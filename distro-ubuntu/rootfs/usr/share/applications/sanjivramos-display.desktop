@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Display
+Comment=Screen resolution, scaling, rotation and brightness
+Exec=/usr/lib/sanjivramos/system/run display
+Icon=video-display
+Categories=Settings;System;
+Keywords=display;settings;

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Power
+Comment=Power off, restart or sleep
+Exec=/usr/lib/sanjivramos/system/run power
+Icon=system-shutdown
+Categories=System;
+Keywords=shutdown;power;restart;reboot;off;sleep;

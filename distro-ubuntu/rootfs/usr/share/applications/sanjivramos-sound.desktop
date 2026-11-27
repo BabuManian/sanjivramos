@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Sound
+Comment=Volume, speakers and microphone
+Exec=/usr/lib/sanjivramos/system/run sound
+Icon=audio-volume-high
+Categories=Settings;System;
+Keywords=sound;settings;

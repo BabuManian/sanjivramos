@@ -1,0 +1,4 @@
+# SanjivramOS settings app: admin users may change their own password, keyboard, time zone and computer name
+# without typing their password again (sjos-admin only acts on the user who runs it and asks for the password itself
+# where it matters).
+%sudo ALL=(root) NOPASSWD: /usr/lib/sanjivramos/system/sjos-admin

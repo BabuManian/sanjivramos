@@ -1,0 +1,18 @@
+[Unit]
+Description=SanjivramOS server
+After=network.target sanjivramos-update.service
+
+[Service]
+# The user comes from sanjivramos-server.service.d/user.conf (the live user, or the one made by the installer).
+StateDirectory=sanjivramos
+StateDirectoryMode=0750
+# Wait (at most 6 minutes) while the boot updater replaces /opt/sanjivramos/app.
+ExecStartPre=/bin/sh -c 'for i in $(seq 360); do [ -e /run/sanjivramos/done ] && exit 0; systemctl -q is-active sanjivramos-update.service || exit 0; sleep 1; done'
+TimeoutStartSec=420
+Environment=SANJIVRAM_LOCAL_TERMINAL=1
+ExecStart=/usr/lib/sanjivramos/server.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

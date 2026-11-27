@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>SanjivramOS</title>
+<style>
+:root {
+  --accent: #faa41a; --accent-rgb: 250, 164, 26; --on-accent: #1b1a19;
+  --bg: #1b1a19; --surface: #2b2928; --surface-2: #333130; --surface-3: #43403e;
+  --text: #f2f0ee; --text-2: #b3ada8; --text-3: #857f7a;
+  --border: rgba(255, 255, 255, .08); --hover: rgba(255, 255, 255, .06);
+  --danger: #ef5b4c; --ok: #5fcf80; --radius: 10px;
+  --font: "Fira Sans", "Noto Sans", "DejaVu Sans", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 14px/1.45 var(--font); color: var(--text); background: var(--bg); user-select: none; overflow: hidden; -webkit-font-smoothing: antialiased; }
+input, select { user-select: text; }
+button, input, select { font: inherit; color: inherit; }
+h1 { font-size: 26px; font-weight: 600; margin: 0 0 6px; letter-spacing: -.2px; }
+h2 { font-size: 19px; font-weight: 600; margin: 0 0 4px; }
+p { margin: 0 0 10px; color: var(--text-2); }
+.muted { color: var(--text-3); font-size: 13px; }
+
+/* layout */
+.app { display: flex; height: 100vh; }
+.side { width: 230px; flex: none; background: var(--surface); border-right: 1px solid var(--border); padding: 26px 18px; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; margin-bottom: 28px; }
+.brand img { width: 34px; height: 34px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.steps li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--text-3); }
+.steps li .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--surface-3); display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
+.steps li.on { color: var(--text); background: var(--hover); }
+.steps li.on .dot { border-color: var(--accent); color: var(--accent); }
+.steps li.done { color: var(--text-2); }
+.steps li.done .dot { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.side .foot { margin-top: auto; font-size: 12px; color: var(--text-3); }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.page { flex: 1; overflow: auto; padding: 34px 40px 20px; }
+.bar { display: flex; gap: 10px; justify-content: flex-end; align-items: center; padding: 16px 40px 22px; border-top: 1px solid var(--border); }
+.bar .left { margin-right: auto; }
+
+/* controls */
+.btn { border: 0; border-radius: 8px; padding: 9px 18px; background: var(--surface-2); cursor: pointer; font-weight: 500; transition: background .15s, transform .05s; }
+.btn:hover { background: var(--surface-3); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.primary:hover { background: #ffb43d; }
+.btn.danger { background: var(--danger); color: #fff; font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; transform: none; }
+.btn.big { padding: 13px 26px; font-size: 15px; }
+label.f { display: block; margin: 0 0 14px; }
+label.f > span { display: block; font-size: 12.5px; color: var(--text-2); margin-bottom: 5px; font-weight: 500; }
+.in, select.in { width: 100%; background: #242221; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.in:focus { border-color: rgba(var(--accent-rgb), .8); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18); }
+.in.bad { border-color: var(--danger); }
+.hint { font-size: 12px; color: var(--text-3); margin-top: 4px; min-height: 16px; }
+.hint.bad { color: var(--danger); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.check { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius); background: rgba(239, 91, 76, .1); border: 1px solid rgba(239, 91, 76, .35); cursor: pointer; margin-top: 14px; }
+.check input { accent-color: var(--danger); width: 17px; height: 17px; margin: 1px 0 0; flex: none; }
+
+/* welcome */
+.welcome { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px;
+  background: radial-gradient(900px 500px at 50% -10%, rgba(var(--accent-rgb), .16), transparent 60%), var(--bg); }
+.welcome img { width: 120px; height: 120px; margin-bottom: 18px; filter: drop-shadow(0 14px 30px rgba(var(--accent-rgb), .25)); }
+.welcome h1 { font-size: 32px; }
+.welcome p { max-width: 460px; }
+.welcome .acts { display: flex; gap: 12px; margin-top: 22px; }
+
+/* disks */
+.disks { display: grid; gap: 10px; margin-top: 16px; }
+.disk { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 2px solid transparent; cursor: pointer; transition: border-color .15s, background .15s; }
+.disk:hover { background: var(--surface-2); }
+.disk.sel { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+.disk .ic { width: 42px; height: 42px; border-radius: 10px; background: var(--surface-3); display: grid; place-items: center; flex: none; }
+.disk .ic svg { width: 24px; height: 24px; }
+.disk .nm { font-weight: 600; }
+.disk .sz { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.disk.small { opacity: .5; cursor: not-allowed; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--surface-3); color: var(--text-2); margin-left: 6px; font-weight: 500; vertical-align: 1px; }
+.empty { padding: 26px; text-align: center; border-radius: var(--radius); background: var(--surface); color: var(--text-2); }
+
+/* review & progress */
+.review { display: grid; grid-template-columns: max-content 1fr; gap: 10px 22px; margin: 18px 0; padding: 18px 20px; background: var(--surface); border-radius: var(--radius); }
+.review dt { color: var(--text-3); }
+.review dd { margin: 0; font-weight: 500; }
+.progress { height: 10px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin: 22px 0 10px; }
+.progress > i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #f7941d, var(--accent)); transition: width .6s ease; }
+.log { margin-top: 16px; background: #121110; border-radius: 8px; padding: 10px 12px; height: 170px; overflow: auto; font: 12px/1.5 "Fira Mono", "DejaVu Sans Mono", monospace; color: var(--text-2); white-space: pre-wrap; display: none; user-select: text; }
+.log.on { display: block; }
+.link { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; }
+.big-ic { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 16px; }
+.big-ic svg { width: 40px; height: 40px; }
+.err-box { background: rgba(239, 91, 76, .1); border: 1px solid rgba(239, 91, 76, .35); border-radius: var(--radius); padding: 12px 14px; margin-top: 12px; color: #ffb3aa; }
+
+/* wifi & power */
+.tool { height: 100vh; display: flex; flex-direction: column; }
+.tool header { display: flex; align-items: center; gap: 12px; padding: 20px 22px 14px; }
+.tool header h2 { margin: 0; flex: 1; }
+.switch { position: relative; width: 44px; height: 24px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch i { position: absolute; inset: 0; background: var(--surface-3); border-radius: 99px; cursor: pointer; transition: background .2s; }
+.switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.switch input:checked + i { background: var(--accent); }
+.switch input:checked + i::after { transform: translateX(20px); }
+.nets { flex: 1; overflow: auto; padding: 0 14px 14px; }
+.net { border-radius: var(--radius); margin-bottom: 4px; }
+.net .hd { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: var(--radius); cursor: pointer; }
+.net .hd:hover { background: var(--hover); }
+.net.open { background: var(--surface); }
+.net .ssid { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.net .st { font-size: 12px; color: var(--accent); }
+.net svg { width: 20px; height: 20px; flex: none; }
+.net .body { padding: 2px 12px 12px; display: flex; gap: 8px; }
+.net .body .in { flex: 1; }
+.status { padding: 0 22px 10px; font-size: 13px; color: var(--text-2); min-height: 26px; }
+.power { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 10px 22px 22px; }
+.pw { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 10px; border-radius: 14px; background: var(--surface); border: 0; cursor: pointer; font-weight: 500; transition: background .15s; }
+.pw:hover { background: var(--surface-2); }
+.pw svg { width: 30px; height: 30px; color: var(--accent); }
+.spin { width: 18px; height: 18px; border: 2px solid var(--surface-3); border-top-color: var(--accent); border-radius: 50%; animation: sp .8s linear infinite; display: inline-block; vertical-align: -4px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* settings pages */
+.tool .scroll { flex: 1; overflow: auto; padding: 4px 22px 22px; }
+.card { background: var(--surface); border-radius: 12px; padding: 4px 16px; margin-bottom: 14px; }
+.card > h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); margin: 12px 0 2px; font-weight: 600; }
+.row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border); }
+.card > h3 + .row, .card > .row:first-child { border-top: 0; }
+.row .lb { flex: 1; min-width: 0; }
+.row .lb b { display: block; font-weight: 500; }
+.row .lb small { display: block; color: var(--text-3); font-size: 12.5px; margin-top: 1px; }
+.row select.in, .row .in { width: auto; min-width: 180px; max-width: 280px; padding: 7px 10px; }
+.slider { display: flex; align-items: center; gap: 10px; flex: 1; }
+.slider input[type=range] { flex: 1; accent-color: var(--accent); height: 4px; }
+.slider .v { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 13px; }
+.icbtn { border: 0; background: var(--surface-2); border-radius: 8px; width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer; flex: none; color: var(--text); }
+.icbtn:hover { background: var(--surface-3); }
+.icbtn svg { width: 18px; height: 18px; }
+.icbtn.on { color: var(--danger); }
+.keep { display: flex; align-items: center; gap: 12px; background: rgba(var(--accent-rgb), .12); border: 1px solid rgba(var(--accent-rgb), .4); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.keep span { flex: 1; }
+.msg { font-size: 13px; min-height: 18px; margin: 6px 0 0; color: var(--text-2); }
+.msg.bad { color: #ff8f82; } .msg.good { color: var(--ok); }
+.bigclock { font-size: 44px; font-weight: 300; letter-spacing: -1px; font-variant-numeric: tabular-nums; margin: 4px 0 0; }
+.about-hd { display: flex; gap: 16px; align-items: center; padding: 8px 0 16px; }
+.about-hd img { width: 64px; height: 64px; }
+.about-hd h2 { font-size: 22px; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 9px 20px; padding: 12px 0; }
+.kv dt { color: var(--text-3); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.netbox { background: var(--surface); border-radius: 12px; padding: 8px; max-height: 330px; overflow: auto; margin-top: 12px; }
+.netbox .net.open { background: var(--surface-2); }
+.ok-line { display: flex; gap: 12px; align-items: center; padding: 16px; border-radius: 12px; background: rgba(95, 207, 128, .1); border: 1px solid rgba(95, 207, 128, .35); margin-top: 14px; }
+.ok-line svg { width: 26px; height: 26px; color: var(--ok); flex: none; }
+.opt { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 14px; cursor: pointer; }
+.opt input { accent-color: var(--accent); width: 17px; height: 17px; margin: 2px 0 0; flex: none; }
+.opt small { display: block; color: var(--text-3); }
+svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const root = $('#root');
+const Q = new URLSearchParams(location.search);
+const PAGE = Q.get('page') || 'install', LIVE = Q.get('live') === '1';
+const LOGO = 'file:///usr/share/sanjivramos/logo.png';
+const I = {
+  disk: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h18"/><circle cx="17" cy="17" r=".6" fill="currentColor"/></svg>',
+  usb: '<svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="7" rx="1"/><path d="M5 9h14v9a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--text-3)"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  off: '<svg viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>',
+  restart: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg>',
+  sleep: '<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+  chip: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg>',
+  wired: '<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M5 16v-4h14v4M12 12V8"/></svg>',
+  vol: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  mute: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>',
+  mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  play: '<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>',
+};
+const wifiIc = s => { const b = s > 70 ? 4 : s > 45 ? 3 : s > 20 ? 2 : 1; const a = n => n <= b ? 'currentColor' : 'rgba(255,255,255,.22)';
+  return `<svg viewBox="0 0 24 24"><path d="M12 19.5h.01" stroke="${a(1)}" stroke-width="3"/><path d="M8.5 16a5 5 0 0 1 7 0" stroke="${a(2)}"/><path d="M5.5 12.7a9 9 0 0 1 13 0" stroke="${a(3)}"/><path d="M2.5 9.3a13 13 0 0 1 19 0" stroke="${a(4)}"/></svg>`; };
+const gb = n => n >= 1e12 ? (n / 1e12).toFixed(n >= 1e13 ? 0 : 1) + ' TB' : n >= 1e9 ? Math.round(n / 1e9) + ' GB' : Math.round(n / 1e6) + ' MB';
+const MIN_DISK = 16e9;
+const toolHead = title => `<header><img src="${LOGO}" style="width:28px;height:28px" alt=""><h2>${esc(title)}</h2></header>`;
+const sw = (id, on, attrs = '') => `<label class="switch"><input type="checkbox" id="${id}"${on ? ' checked' : ''} ${attrs}><i></i></label>`;
+const setMsg = (el, text, kind) => { if (!el) return; el.textContent = text || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); };
+
+/* ======================= Wi-Fi list (used by the Wi-Fi page and the installer) ======================= */
+/** Draws the Wi-Fi networks into `box` and keeps them fresh. opts.onChange(state) is called after every refresh. */
+function WifiList(box, opts = {}) {
+  let open = null, busy = '', msg = '', msgKind = '', nets = [], st = null, saved = [], timer = 0, alive = true, other = false;
+  const draw = () => {
+    if (!alive || !box.isConnected) { alive = false; clearInterval(timer); return; }
+    const wired = st && st.devices.find(d => d.type === 'ethernet' && d.state === 'connected');
+    const status = msg || (!st ? 'Checking…' : wired ? `Connected by cable${st.online ? ' — you’re online' : ''}` : !st.hasWifi ? 'No Wi-Fi adapter found on this computer.' : !st.enabled ? 'Wi-Fi is off.' : nets.some(n => n.active) ? `Connected to ${nets.find(n => n.active).ssid}${st.online ? ' — you’re online' : ''}` : 'Choose a network');
+    box.innerHTML = `
+      ${opts.header !== false ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><span class="msg ${msgKind}" style="flex:1;margin:0">${esc(status)}</span>
+        <button class="icbtn" data-w="refresh" title="Scan again">${I.refresh}</button>${st && st.hasWifi ? sw('w-radio', st.enabled, 'title="Wi-Fi on/off"') : ''}</div>` : ''}
+      ${st && st.hasWifi && st.enabled ? `<div class="netbox">${!nets.length ? '<div class="empty"><span class="spin"></span>&nbsp; Looking for networks…</div>' : nets.map((n, i) => `
+        <div class="net${open === n.ssid ? ' open' : ''}"><div class="hd" data-net="${i}">${wifiIc(n.signal)}<span class="ssid">${esc(n.ssid)}</span>${n.active ? '<span class="st">Connected</span>' : saved.includes(n.ssid) ? '<span class="muted">Saved</span>' : ''}${n.secure ? I.lock : ''}</div>
+        ${open === n.ssid ? `<div class="body">${n.active ? '<button class="btn" data-w="forget">Forget</button><button class="btn" data-w="disc" style="margin-left:auto">Disconnect</button>'
+          : n.enterprise ? '<span class="muted" style="flex:1">This is a work or school network (802.1X). It isn’t supported here yet.</span>'
+          : `${n.secure && !saved.includes(n.ssid) ? '<input class="in" type="password" id="wpw" placeholder="Wi-Fi password" autocomplete="off" spellcheck="false">' : `<span class="muted" style="flex:1;align-self:center">${saved.includes(n.ssid) ? 'Password saved' : 'Open network'}</span>`}${saved.includes(n.ssid) ? '<button class="btn" data-w="forget">Forget</button>' : ''}<button class="btn primary" data-w="conn"${busy ? ' disabled' : ''}>${busy === n.ssid ? '<span class="spin"></span>' : 'Connect'}</button>`}</div>
+          ${n.secure && !saved.includes(n.ssid) && !n.active ? '<label class="opt" style="margin:0 12px 10px"><input type="checkbox" id="wshow"><span>Show password</span></label>' : ''}` : ''}
+        </div>`).join('')}
+        <div class="net${other ? ' open' : ''}"><div class="hd" data-w="other"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="ssid">Other network…</span></div>
+        ${other ? `<div class="body" style="flex-wrap:wrap"><input class="in" id="wss" placeholder="Network name" spellcheck="false"><input class="in" type="password" id="wpw2" placeholder="Password (empty if open)"><button class="btn primary" data-w="conn2"${busy ? ' disabled' : ''}>${busy ? '<span class="spin"></span>' : 'Connect'}</button></div>` : ''}</div>
+      </div>` : ''}`;
+    const pw = $('#wpw', box); if (pw) { pw.focus(); pw.onkeydown = e => { if (e.key === 'Enter') $('[data-w="conn"]', box).click(); }; }
+    const show = $('#wshow', box); if (show) show.onchange = () => { $('#wpw', box).type = show.checked ? 'text' : 'password'; };
+    const radio = $('#w-radio', box); if (radio) radio.onchange = async () => { await window.sys.wifiRadio(radio.checked); msg = ''; setTimeout(() => refresh(true), 1500); };
+  };
+  const refresh = async rescan => {
+    st = await window.sys.wifiState();
+    if (st.enabled && st.hasWifi) { const r = await window.sys.wifiList(rescan); nets = r.nets || []; if (!r.ok && !msg) { msg = r.err; msgKind = 'bad'; } }
+    saved = ((await window.sys.wifiSaved()) || {}).names || [];
+    draw(); if (opts.onChange) opts.onChange(st, nets);
+  };
+  const connect = async (ssid, pw, hidden) => {
+    busy = ssid; msg = `Connecting to ${ssid}…`; msgKind = ''; draw();
+    const r = await window.sys.wifiConnect(ssid, pw, hidden);
+    busy = ''; msg = r.ok ? `Connected to ${ssid}` : r.err; msgKind = r.ok ? 'good' : 'bad';
+    if (r.ok) { open = null; other = false; }
+    await refresh();
+  };
+  box.addEventListener('click', async e => {
+    const h = e.target.closest('[data-net]');
+    if (h) { const n = nets[+h.dataset.net]; open = open === n.ssid ? null : n.ssid; other = false; msg = ''; return draw(); }
+    const b = e.target.closest('[data-w]'); if (!b || b.disabled) return;
+    const a = b.dataset.w;
+    if (a === 'refresh') { msg = ''; return refresh(true); }
+    if (a === 'other') { other = !other; open = null; draw(); const s = $('#wss', box); if (s) s.focus(); return; }
+    if (a === 'conn') return connect(open, $('#wpw', box) ? $('#wpw', box).value : '');
+    if (a === 'conn2') { const s = $('#wss', box).value.trim(); if (!s) return; return connect(s, $('#wpw2', box).value, true); }
+    if (a === 'disc') { await window.sys.wifiDisconnect(open); open = null; msg = ''; return refresh(); }
+    if (a === 'forget') { await window.sys.wifiForget(open); open = null; msg = ''; return refresh(); }
+  });
+  refresh();
+  timer = setInterval(() => { if (!open && !busy && !other) refresh(); }, 8000);
+  return { refresh, stop() { alive = false; clearInterval(timer); } };
+}
+
+/* ======================= Installer ======================= */
+const KEYBOARDS = [
+  ['us', '', 'English (US)'], ['gb', '', 'English (UK)'], ['us', 'intl', 'English (US, international with dead keys)'], ['us', 'dvorak', 'English (Dvorak)'], ['us', 'colemak', 'English (Colemak)'],
+  ['us,in', ',tam', 'Tamil (India) + English'], ['us,in', ',', 'Hindi (India) + English'], ['us,in', ',tel', 'Telugu + English'], ['us,in', ',mal', 'Malayalam + English'], ['us,in', ',kan', 'Kannada + English'], ['us,in', ',ben', 'Bengali + English'],
+  ['es', '', 'Spanish'], ['latam', '', 'Spanish (Latin America)'], ['fr', '', 'French'], ['ca', '', 'French (Canada)'], ['be', '', 'Belgian'], ['ch', '', 'Swiss German'], ['de', '', 'German'], ['it', '', 'Italian'],
+  ['pt', '', 'Portuguese'], ['br', '', 'Portuguese (Brazil)'], ['nl', '', 'Dutch'], ['se', '', 'Swedish'], ['no', '', 'Norwegian'], ['dk', '', 'Danish'], ['fi', '', 'Finnish'], ['pl', '', 'Polish'], ['cz', '', 'Czech'],
+  ['hu', '', 'Hungarian'], ['tr', '', 'Turkish'], ['gr', '', 'Greek'], ['us,ru', ',', 'Russian + English'], ['us,ua', ',', 'Ukrainian + English'], ['us,ara', ',', 'Arabic + English'], ['us,il', ',', 'Hebrew + English'],
+  ['jp', '', 'Japanese'], ['kr', '', 'Korean'], ['cn', '', 'Chinese'], ['th', '', 'Thai'], ['vn', '', 'Vietnamese'],
+];
+const ZONES = (() => { try { return Intl.supportedValuesOf('timeZone'); } catch { return ['UTC']; } })();
+const guessZone = () => { const z = Intl.DateTimeFormat().resolvedOptions().timeZone; return z && z !== 'UTC' && z !== 'Etc/UTC' ? z : 'America/New_York'; };
+const STEPS = ['Welcome', 'Internet', 'Keyboard & time', 'Disk', 'Your account', 'Review', 'Installing'];
+const cfg = { keyboard: 0, timezone: guessZone(), disk: null, fullname: '', username: '', hostname: 'sanjivramos', password: '', password2: '', lock: true, ack: false };
+let step = 0, disks = null, ram = 0, logLines = [], wifiInst = null;
+
+function shell(body, buttons) {
+  if (wifiInst) { wifiInst.stop(); wifiInst = null; }
+  root.innerHTML = `<div class="app">
+    <aside class="side"><div class="brand"><img src="${LOGO}" alt="">SanjivramOS</div>
+      <ol class="steps">${STEPS.map((s, i) => `<li class="${i === step ? 'on' : i < step ? 'done' : ''}"><span class="dot">${i < step ? '✓' : i + 1}</span>${s}</li>`).join('')}</ol>
+      <div class="foot">${LIVE ? 'Running from USB' : ''}</div></aside>
+    <main class="main"><div class="page">${body}</div><div class="bar">${buttons}</div></main></div>`;
+}
+const backBtn = '<button class="btn left" data-a="back">Back</button>';
+
+function render() {
+  if (step === 0) return welcome();
+  if (step === 1) return internet();
+  if (step === 2) return keyboardTime();
+  if (step === 3) return diskPage();
+  if (step === 4) return account();
+  if (step === 5) return review();
+}
+
+function welcome() {
+  if (wifiInst) { wifiInst.stop(); wifiInst = null; }
+  root.innerHTML = `<div class="welcome"><img src="${LOGO}" alt=""><h1>Welcome to SanjivramOS</h1>
+    <p>${LIVE ? 'You can try SanjivramOS straight from this USB stick without changing your computer, or install it on a disk.' : 'Install SanjivramOS on a disk.'}</p>
+    <div class="acts">${LIVE ? '<button class="btn big" data-a="try">Try SanjivramOS</button>' : ''}<button class="btn big primary" data-a="next">Install SanjivramOS</button></div>
+    <p class="muted" style="margin-top:22px">You can open this again from <b>Install SanjivramOS</b> on the desktop.</p></div>`;
+}
+
+function internet() {
+  shell(`<h2>Connect to the internet</h2>
+    <p>Connect now so SanjivramOS can get the newest version and set the clock. Your Wi‑Fi stays connected after installing. You can also install without internet.</p>
+    <div id="inet" style="max-width:560px;margin-top:16px"></div>`,
+    backBtn + '<button class="btn" data-a="next" id="skip">Skip</button><button class="btn primary" data-a="next" id="nx" disabled>Next</button>');
+  wifiInst = WifiList($('#inet'), {
+    onChange: (st, nets) => {
+      const online = st.online || st.devices.some(d => /^(ethernet|wifi)$/.test(d.type) && d.state === 'connected');
+      const nx = $('#nx'), skip = $('#skip'); if (!nx) return;
+      nx.disabled = !online; skip.hidden = online;
+    },
+  });
+}
+
+function keyboardTime() {
+  shell(`<h2>Keyboard & time zone</h2><p>Pick your keyboard layout and where you are.</p>
+    <div style="max-width:460px;margin-top:18px">
+      <label class="f"><span>Keyboard layout</span><select class="in" id="kb">${KEYBOARDS.map((k, i) => `<option value="${i}"${i === cfg.keyboard ? ' selected' : ''}>${esc(k[2])}</option>`).join('')}</select></label>
+      <label class="f"><span>Try your keyboard here</span><input class="in" placeholder="Type something…"><div class="hint">Your keyboard switches to this layout after installing.</div></label>
+      <label class="f"><span>Time zone</span><select class="in" id="tz">${ZONES.map(z => `<option${z === cfg.timezone ? ' selected' : ''}>${esc(z)}</option>`).join('')}</select></label>
+      <div class="hint" id="clock"></div>
+    </div>`, backBtn + '<button class="btn primary" data-a="next">Next</button>');
+  const clock = () => { const el = $('#clock'); if (el) el.textContent = 'Time there now: ' + new Date().toLocaleString([], { timeZone: cfg.timezone, weekday: 'short', hour: 'numeric', minute: '2-digit' }); };
+  $('#kb').onchange = e => { cfg.keyboard = +e.target.value; };
+  $('#tz').onchange = e => { cfg.timezone = e.target.value; clock(); };
+  clock();
+}
+
+async function diskPage() {
+  const partsText = d => !d.parts.length ? 'empty' : d.parts.length + ' partition' + (d.parts.length > 1 ? 's' : '') + (d.parts.some(p => p.label) ? ' (' + esc([...new Set(d.parts.map(p => p.label).filter(Boolean))].slice(0, 3).join(', ')) + ')' : '');
+  const list = () => !disks ? '<div class="empty"><span class="spin"></span>&nbsp; Looking for disks…</div>'
+    : !disks.length ? '<div class="empty">No disk was found to install on.<br><span class="muted">The USB stick SanjivramOS is running from is never shown.</span></div>'
+    : disks.map((d, i) => { const small = d.size < MIN_DISK;
+        return `<div class="disk${cfg.disk === d.path ? ' sel' : ''}${small ? ' small' : ''}" data-disk="${i}">
+          <div class="ic">${d.tran === 'usb' || d.removable ? I.usb : I.disk}</div>
+          <div><div class="nm">${esc(d.model)}${d.tran ? `<span class="tag">${esc(d.tran.toUpperCase())}</span>` : ''}${d.parts.some(p => p.label === 'Windows') ? '<span class="tag" style="background:rgba(239,91,76,.2);color:#ffb3aa">Windows</span>' : ''}</div>
+          <div class="muted">${esc(d.path)} · ${partsText(d)}${small ? ' · too small (16 GB minimum)' : ''}</div></div>
+          <div class="sz">${gb(d.size)}</div></div>`; }).join('');
+  const chosen = () => disks && disks.find(d => d.path === cfg.disk);
+  const draw = () => {
+    shell(`<h2>Where should SanjivramOS go?</h2><p>Choose the disk to install on. <b>Everything on it will be erased</b>, including any other operating system.</p>
+      <div class="disks">${list()}</div>
+      ${chosen() ? `<label class="check"><input type="checkbox" id="ack"${cfg.ack ? ' checked' : ''}><span>I understand that <b>everything on ${esc(chosen().model)} (${gb(chosen().size)})</b> will be permanently erased.</span></label>` : ''}
+      <div style="margin-top:12px"><button class="link" data-a="rescan">Rescan disks</button></div>`,
+      backBtn + `<button class="btn primary" data-a="next"${chosen() && cfg.ack ? '' : ' disabled'}>Next</button>`);
+    $$('[data-disk]').forEach(el => el.onclick = () => { const d = disks[+el.dataset.disk]; if (d.size < MIN_DISK) return; if (cfg.disk !== d.path) cfg.ack = false; cfg.disk = d.path; draw(); });
+    const ack = $('#ack'); if (ack) ack.onchange = () => { cfg.ack = ack.checked; draw(); };
+  };
+  draw();
+  if (!disks) {
+    const r = await window.sys.disks(); disks = r.ok ? r.disks : []; ram = r.ram || 0;
+    if (disks.filter(d => d.size >= MIN_DISK).length === 1 && !cfg.disk) cfg.disk = disks.find(d => d.size >= MIN_DISK).path;
+    if (step === 3) draw();
+  }
+}
+
+const userOk = u => /^[a-z_][a-z0-9_-]{0,31}$/.test(u) && !['root', 'daemon', 'bin', 'sys', 'sync', 'games', 'man', 'nobody', 'admin', 'sudo'].includes(u);
+const hostOk = h => /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(h);
+const pwBad = p => /[:\n]/.test(p);
+function account() {
+  shell(`<h2>Your account</h2><p>This is how you sign in to SanjivramOS. The same password is used to make changes to the computer.</p>
+    <div style="max-width:540px;margin-top:18px">
+      <label class="f"><span>Your name</span><input class="in" id="fullname" value="${esc(cfg.fullname)}" placeholder="Your name" autofocus></label>
+      <div class="row2">
+        <label class="f"><span>Username</span><input class="in" id="username" value="${esc(cfg.username)}" placeholder="e.g. alex" spellcheck="false" autocapitalize="off"><div class="hint" id="h-user"></div></label>
+        <label class="f"><span>Computer name</span><input class="in" id="hostname" value="${esc(cfg.hostname)}" spellcheck="false"><div class="hint" id="h-host"></div></label>
+      </div>
+      <div class="row2">
+        <label class="f"><span>Password</span><input class="in" id="password" type="password" value="${esc(cfg.password)}"><div class="hint" id="h-pw"></div></label>
+        <label class="f"><span>Confirm password</span><input class="in" id="password2" type="password" value="${esc(cfg.password2)}"><div class="hint" id="h-pw2"></div></label>
+      </div>
+      <label class="opt"><input type="checkbox" id="showpw"><span>Show password</span></label>
+      <label class="opt"><input type="checkbox" id="lock"${cfg.lock ? ' checked' : ''}><span>Ask for my password when SanjivramOS starts<small>Turn this off to go straight to the desktop. You can change it later in Settings → This Computer.</small></span></label>
+    </div>`, backBtn + '<button class="btn primary" data-a="next" id="nx">Next</button>');
+  let userTouched = !!cfg.username;
+  const check = () => {
+    const u = cfg.username, h = cfg.hostname, p = cfg.password, p2 = cfg.password2;
+    const set = (id, bad, msg) => { const el = $('#' + id); el.textContent = msg; el.className = 'hint' + (bad ? ' bad' : ''); };
+    set('h-user', u && !userOk(u), u && !userOk(u) ? 'Lowercase letters, numbers, - and _' : '');
+    set('h-host', h && !hostOk(h), h && !hostOk(h) ? 'Letters, numbers and -' : '');
+    set('h-pw', p && pwBad(p), p ? (pwBad(p) ? 'A password can’t contain “:”' : p.length < 6 ? 'Short — 6 or more characters is safer' : p.length >= 10 ? 'Strong' : 'OK') : '');
+    set('h-pw2', p2 && p2 !== p, p2 && p2 !== p ? "Passwords don't match" : p2 ? 'Matches' : '');
+    $('#nx').disabled = !(cfg.fullname.trim() && userOk(u) && hostOk(h) && p.length >= 1 && !pwBad(p) && p === p2);
+  };
+  for (const id of ['fullname', 'username', 'hostname', 'password', 'password2']) {
+    $('#' + id).oninput = e => {
+      cfg[id] = e.target.value;
+      if (id === 'username') userTouched = true;
+      if (id === 'fullname' && !userTouched) { cfg.username = (cfg.fullname.trim().split(/\s+/)[0] || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9_-]/g, '').replace(/^[^a-z_]+/, ''); $('#username').value = cfg.username; }
+      check();
+    };
+  }
+  $('#showpw').onchange = e => { $('#password').type = $('#password2').type = e.target.checked ? 'text' : 'password'; };
+  $('#lock').onchange = e => { cfg.lock = e.target.checked; };
+  check();
+}
+
+function review() {
+  const d = disks.find(x => x.path === cfg.disk), kb = KEYBOARDS[cfg.keyboard];
+  shell(`<h2>Ready to install</h2><p>Check that everything looks right.</p>
+    <dl class="review">
+      <dt>Install on</dt><dd>${esc(d.model)} · ${gb(d.size)} <span class="muted">(${esc(d.path)})</span></dd>
+      <dt>Your name</dt><dd>${esc(cfg.fullname)}</dd>
+      <dt>Username</dt><dd>${esc(cfg.username)}</dd>
+      <dt>Computer name</dt><dd>${esc(cfg.hostname)}</dd>
+      <dt>Sign in</dt><dd>${cfg.lock ? 'With your password' : 'Automatically, no password'}</dd>
+      <dt>Keyboard</dt><dd>${esc(kb[2])}</dd>
+      <dt>Time zone</dt><dd>${esc(cfg.timezone)}</dd>
+    </dl>
+    <div class="err-box" style="color:var(--text)"><b style="color:#ff8f82">Everything on ${esc(d.model)} will be erased.</b> This can't be undone.</div>`,
+    backBtn + '<button class="btn danger" data-a="install">Erase disk and install</button>');
+}
+
+async function doInstall() {
+  step = 6; logLines = [];
+  const pageBody = (pct, text) => `<h2>Installing SanjivramOS</h2><p>This takes about 5–15 minutes. You can keep using SanjivramOS meanwhile.</p>
+    <div class="progress"><i id="pg" style="width:${pct}%"></i></div><div style="display:flex;justify-content:space-between"><span id="pt">${esc(text)}</span><span class="muted" id="pp">${pct}%</span></div>
+    <div style="margin-top:18px"><button class="link" data-a="log">Show details</button></div><pre class="log" id="log"></pre>`;
+  shell(pageBody(0, 'Starting…'), '');
+  window.sys.onProgress(({ pct, text }) => { const g = $('#pg'); if (!g) return; g.style.width = pct + '%'; $('#pt').textContent = text; $('#pp').textContent = pct + '%'; });
+  window.sys.onLog(l => { logLines.push(l); if (logLines.length > 400) logLines.shift(); const el = $('#log'); if (el) { el.textContent = logLines.join('\n'); el.scrollTop = el.scrollHeight; } });
+  const kb = KEYBOARDS[cfg.keyboard];
+  const r = await window.sys.install({ disk: cfg.disk, fullname: cfg.fullname.trim(), username: cfg.username, hostname: cfg.hostname, password: cfg.password, lock: cfg.lock, timezone: cfg.timezone, xkb_layout: kb[0], xkb_variant: kb[1] });
+  if (r.ok) {
+    cfg.password = cfg.password2 = '';
+    step = 7;
+    root.innerHTML = `<div class="welcome"><div class="big-ic" style="background:rgba(95,207,128,.15);color:var(--ok)">${I.check}</div><h1>SanjivramOS is installed</h1>
+      <p>Restart the computer and take out the USB stick when the screen goes dark. SanjivramOS will start from the disk${cfg.lock ? ` — sign in as <b>${esc(cfg.username)}</b> with the password you just chose` : ''}.</p>
+      <div class="acts"><button class="btn big" data-a="close">Keep trying</button><button class="btn big primary" data-a="reboot">Restart now</button></div></div>`;
+  } else {
+    root.innerHTML = `<div class="welcome"><div class="big-ic" style="background:rgba(239,91,76,.15);color:var(--danger)">${I.x}</div><h1>Installation didn't finish</h1>
+      <p>${esc(r.err || 'Something went wrong.')}</p><pre class="log on" style="width:min(640px,90vw);text-align:left">${esc((r.tail || logLines).slice(-40).join('\n'))}</pre>
+      <div class="acts"><button class="btn big" data-a="close">Close</button><button class="btn big primary" data-a="retry">Try again</button></div></div>`;
+  }
+}
+
+/* ======================= Wi-Fi page ======================= */
+function wifiPage() {
+  root.innerHTML = `<div class="tool">${toolHead('Wi‑Fi')}<div class="scroll" id="wbox"></div></div>`;
+  WifiList($('#wbox'));
+}
+
+/* ======================= Power ======================= */
+async function power() {
+  const info = await window.sys.info();
+  root.innerHTML = `<div class="tool">${toolHead('Power')}
+    <div class="power"><button class="pw" data-pw="off">${I.off}Power off</button><button class="pw" data-pw="restart">${I.restart}Restart</button><button class="pw" data-pw="sleep">${I.sleep}Sleep</button></div>
+    ${info.uefi ? `<div style="padding:0 22px 6px"><button class="link" data-pw="firmware">Restart into the PC’s firmware settings (BIOS/UEFI)</button></div>` : ''}
+    <div class="status" id="pmsg"></div></div>`;
+  $$('[data-pw]').forEach(b => b.onclick = async () => { const r = await window.sys.power(b.dataset.pw); if (!r.ok) $('#pmsg').textContent = r.err || 'That didn’t work.'; else if (b.dataset.pw === 'sleep') window.sys.close(); });
+}
+
+/* ======================= Display ======================= */
+const ROT = [['normal', 'Normal'], ['90', 'Rotated left'], ['180', 'Upside down'], ['270', 'Rotated right']];
+const SCALES = [1, 1.25, 1.5, 1.75, 2];
+let dispKeep = null;
+async function display() {
+  root.innerHTML = `<div class="tool">${toolHead('Display')}<div class="scroll" id="dbox"><div class="empty"><span class="spin"></span>&nbsp; Reading the screens…</div></div></div>`;
+  const d = await window.sys.displayGet();
+  const box = $('#dbox');
+  if (!d.ok && !d.backlight) { box.innerHTML = `<div class="err-box">${esc(d.err)}</div>`; return; }
+  const outs = d.outputs.filter(o => o.modes.length || o.enabled);
+  const res = o => { const m = new Map(); for (const x of o.modes) { const k = x.width + 'x' + x.height; if (!m.has(k)) m.set(k, { w: x.width, h: x.height, pref: false, rates: [] }); const e = m.get(k); e.pref = e.pref || x.preferred; if (!e.rates.includes(x.refresh)) e.rates.push(x.refresh); } return [...m.values()].sort((a, b) => b.w * b.h - a.w * a.h); };
+  const cur = o => o.modes.find(m => m.current) || o.modes.find(m => m.preferred) || o.modes[0] || {};
+  const state = outs.map(o => { const c = cur(o); return { name: o.name, width: c.width, height: c.height, refresh: c.refresh, scale: o.scale || 1, transform: o.transform || 'normal', enabled: o.enabled }; });
+  const draw = () => {
+    box.innerHTML = `${dispKeep ? `<div class="keep"><span>Keep these display settings? Going back in <b id="kcount">${dispKeep.left}</b> s.</span><button class="btn" data-d="revert">Go back</button><button class="btn primary" data-d="keep">Keep</button></div>` : ''}
+      ${d.backlight ? `<div class="card"><h3>Brightness</h3><div class="row"><span style="color:var(--text-3)">${I.sun}</span><div class="slider"><input type="range" min="5" max="100" value="${d.backlight.percent}" id="bl"><span class="v" id="blv">${d.backlight.percent}%</span></div></div></div>` : ''}
+      ${outs.map((o, i) => { const s = state[i], R = res(o), r = R.find(x => x.w === s.width && x.h === s.height) || R[0] || { rates: [] };
+        return `<div class="card"><h3>${esc(o.description || o.name)}${o.description ? ` <span style="text-transform:none;letter-spacing:0">· ${esc(o.name)}</span>` : ''}</h3>
+          ${outs.length > 1 ? `<div class="row"><div class="lb"><b>Use this screen</b></div>${sw('en' + i, s.enabled, `data-i="${i}" data-k="enabled"`)}</div>` : ''}
+          <div class="row"><div class="lb"><b>Resolution</b><small>Higher shows more and sharper.</small></div><select class="in" data-i="${i}" data-k="res">${R.map(x => `<option value="${x.w}x${x.h}"${x.w === s.width && x.h === s.height ? ' selected' : ''}>${x.w} × ${x.h}${x.pref ? ' (recommended)' : ''}</option>`).join('')}</select></div>
+          ${r.rates.length > 1 ? `<div class="row"><div class="lb"><b>Refresh rate</b><small>Higher is smoother.</small></div><select class="in" data-i="${i}" data-k="refresh">${r.rates.sort((a, b) => b - a).map(x => `<option value="${x}"${Math.abs(x - s.refresh) < .01 ? ' selected' : ''}>${x.toFixed(2).replace(/\.?0+$/, '')} Hz</option>`).join('')}</select></div>` : ''}
+          ${d.wayland ? `<div class="row"><div class="lb"><b>Scale</b><small>Makes everything bigger or smaller.</small></div><select class="in" data-i="${i}" data-k="scale">${[...new Set([...SCALES, s.scale])].sort((a, b) => a - b).map(x => `<option value="${x}"${Math.abs(x - s.scale) < .01 ? ' selected' : ''}>${Math.round(x * 100)}%</option>`).join('')}</select></div>`
+            : `<div class="row"><div class="lb"><b>Scale</b><small>On the X11 desktop, make things bigger in SanjivramOS Settings → Display & Sound (or switch to the Wayland desktop).</small></div></div>`}
+          <div class="row"><div class="lb"><b>Rotation</b></div><select class="in" data-i="${i}" data-k="transform">${ROT.map(([v, l]) => `<option value="${v}"${v === s.transform ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+          <div class="row" style="justify-content:flex-end"><span class="msg" id="dm${i}" style="flex:1;margin:0"></span><button class="btn primary" data-d="apply" data-i="${i}">Apply</button></div>
+        </div>`; }).join('') || '<div class="empty">No screen settings were found.</div>'}`;
+    $$('select[data-k], input[data-k]', box).forEach(el => el.onchange = () => {
+      const s = state[+el.dataset.i], k = el.dataset.k;
+      if (k === 'res') { const [w, h] = el.value.split('x').map(Number); s.width = w; s.height = h; const R = res(outs[+el.dataset.i]).find(x => x.w === w && x.h === h); s.refresh = R ? Math.max(...R.rates) : 0; draw(); }
+      else if (k === 'enabled') s.enabled = el.checked;
+      else if (k === 'refresh' || k === 'scale') s[k] = +el.value;
+      else s[k] = el.value;
+    });
+    const bl = $('#bl', box); if (bl) bl.oninput = () => { $('#blv').textContent = bl.value + '%'; window.sys.brightness(+bl.value); d.backlight.percent = +bl.value; };
+  };
+  const apply = async (i, s, save) => window.sys.displayApply({ ...s, save });
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('[data-d]'); if (!b) return;
+    if (b.dataset.d === 'apply') {
+      const i = +b.dataset.i, o = outs[i], c = cur(o);
+      const before = { name: o.name, width: c.width, height: c.height, refresh: c.refresh, scale: o.scale || 1, transform: o.transform || 'normal', enabled: o.enabled };
+      if (outs.filter((x, j) => (j === i ? state[i].enabled : x.enabled)).length === 0) return setMsg($('#dm' + i), 'At least one screen has to stay on.', 'bad');
+      const r = await apply(i, state[i], true);
+      if (!r.ok) return setMsg($('#dm' + i), r.err, 'bad');
+      clearInterval(dispKeep && dispKeep.t);
+      dispKeep = { left: 15, before, t: setInterval(async () => { dispKeep.left--; const k = $('#kcount'); if (k) k.textContent = dispKeep.left; if (dispKeep.left <= 0) { clearInterval(dispKeep.t); const bf = dispKeep.before; dispKeep = null; await apply(0, bf, true); display(); } }, 1000) };
+      draw();
+    } else if (b.dataset.d === 'revert') { clearInterval(dispKeep.t); const bf = dispKeep.before; dispKeep = null; await apply(0, bf, true); display(); }
+    else if (b.dataset.d === 'keep') { clearInterval(dispKeep.t); dispKeep = null; display(); }
+  });
+  draw();
+}
+
+/* ======================= Sound ======================= */
+async function sound() {
+  root.innerHTML = `<div class="tool">${toolHead('Sound')}<div class="scroll" id="sbox"><div class="empty"><span class="spin"></span>&nbsp; Looking for speakers…</div></div></div>`;
+  const box = $('#sbox');
+  let d = await window.sys.soundGet();
+  const section = (title, list, ic, kind) => {
+    const def = list.find(x => x.default) || list[0];
+    if (!def) return `<div class="card"><h3>${title}</h3><div class="row"><span class="muted">Nothing found.</span></div></div>`;
+    const v = Math.round(def.volume * 100);
+    return `<div class="card"><h3>${title}</h3>
+      ${list.length > 1 ? `<div class="row"><div class="lb"><b>${kind === 'out' ? 'Play sound through' : 'Record from'}</b></div><select class="in" data-s="dev">${list.map(x => `<option value="${x.id}"${x === def ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select></div>` : `<div class="row"><div class="lb"><b>${esc(def.label)}</b></div></div>`}
+      <div class="row"><button class="icbtn${def.muted ? ' on' : ''}" data-s="mute" data-id="${def.id}" data-m="${def.muted ? 1 : 0}" title="${def.muted ? 'Unmute' : 'Mute'}">${def.muted ? I.mute : ic}</button>
+        <div class="slider"><input type="range" min="0" max="100" value="${Math.min(v, 100)}" data-s="vol" data-id="${def.id}"><span class="v">${v}%</span></div>
+        ${kind === 'out' ? `<button class="btn" data-s="test" title="Play a test sound">${I.play.replace('<svg', '<svg style="width:14px;height:14px;vertical-align:-2px"')} Test</button>` : ''}</div></div>`;
+  };
+  const draw = () => {
+    if (!d.ok) { box.innerHTML = `<div class="err-box">${esc(d.err)}</div>`; return; }
+    box.innerHTML = section('Output', d.sinks, I.vol, 'out') + section('Input', d.sources, I.mic, 'in');
+  };
+  box.addEventListener('input', e => { const el = e.target.closest('[data-s="vol"]'); if (!el) return; el.nextElementSibling.textContent = el.value + '%'; window.sys.soundVolume(+el.dataset.id, el.value / 100); });
+  box.addEventListener('change', async e => { const el = e.target.closest('[data-s="dev"]'); if (!el) return; await window.sys.soundDefault(+el.value); d = await window.sys.soundGet(); draw(); });
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    if (b.dataset.s === 'mute') { await window.sys.soundMute(+b.dataset.id, b.dataset.m !== '1'); d = await window.sys.soundGet(); draw(); }
+    if (b.dataset.s === 'test') { const ac = new AudioContext(); [523.25, 659.25, 783.99].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0, ac.currentTime + i * .18); g.gain.linearRampToValueAtTime(.25, ac.currentTime + i * .18 + .02); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + i * .18 + .5); o.connect(g).connect(ac.destination); o.start(ac.currentTime + i * .18); o.stop(ac.currentTime + i * .18 + .55); }); setTimeout(() => ac.close(), 1500); }
+  });
+  draw();
+}
+
+/* ======================= Keyboard ======================= */
+async function keyboard() {
+  const k = await window.sys.keyboardGet();
+  let idx = KEYBOARDS.findIndex(x => x[0] === k.layout && x[1] === k.variant);
+  const list = idx >= 0 ? KEYBOARDS : [[k.layout, k.variant, `${k.layout}${k.variant ? ' (' + k.variant + ')' : ''} (current)`], ...KEYBOARDS];
+  if (idx < 0) idx = 0;
+  root.innerHTML = `<div class="tool">${toolHead('Keyboard')}<div class="scroll">
+    <div class="card"><div class="row"><div class="lb"><b>Keyboard layout</b>${list[idx][0].includes(',') ? '<small>Switch between layouts with Alt+Shift.</small>' : ''}</div><select class="in" id="kb">${list.map((x, i) => `<option value="${i}"${i === idx ? ' selected' : ''}>${esc(x[2])}</option>`).join('')}</select></div>
+      <div class="row"><input class="in" style="max-width:none;flex:1" placeholder="Try typing here…"></div></div>
+    <div style="display:flex;align-items:center;gap:10px"><span class="msg" id="km" style="flex:1;margin:0"></span><button class="btn primary" id="kapply">Apply</button></div></div></div>`;
+  $('#kapply').onclick = async () => {
+    const x = list[+$('#kb').value]; setMsg($('#km'), 'Saving…');
+    const r = await window.sys.keyboardSet({ layout: x[0], variant: x[1], options: '' });
+    setMsg($('#km'), r.ok ? 'Done. The new layout works now.' : r.err, r.ok ? 'good' : 'bad');
+  };
+}
+
+/* ======================= Date & time ======================= */
+async function datetime() {
+  let d = await window.sys.datetimeGet();
+  const zones = d.zones.length ? d.zones : ZONES;
+  const pad = n => String(n).padStart(2, '0');
+  const draw = () => {
+    const now = new Date();
+    root.innerHTML = `<div class="tool">${toolHead('Date & time')}<div class="scroll">
+      <div class="card" style="padding:14px 16px"><div class="bigclock" id="clk"></div><div class="muted" id="cld"></div></div>
+      <div class="card">
+        <div class="row"><div class="lb"><b>Time zone</b></div><select class="in" id="tz">${zones.map(z => `<option${z === d.timezone ? ' selected' : ''}>${esc(z)}</option>`).join('')}</select></div>
+        <div class="row"><div class="lb"><b>Set the time automatically</b><small>${d.ntp ? (d.synced ? 'In sync with internet time.' : 'Waiting for internet time…') : 'Uses internet time servers.'}</small></div>${sw('ntp', d.ntp, d.canNtp ? '' : 'disabled')}</div>
+        ${!d.ntp ? `<div class="row"><div class="lb"><b>Date and time</b></div><input class="in" type="date" id="dd" style="min-width:0" value="${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}"><input class="in" type="time" id="dt" style="min-width:0" value="${pad(now.getHours())}:${pad(now.getMinutes())}"><button class="btn" id="dset">Set</button></div>` : ''}
+      </div><div class="msg" id="tm"></div></div></div>`;
+    const tick = () => { const c = $('#clk'); if (!c) return; const t = new Date(); c.textContent = t.toLocaleTimeString([], { timeZone: d.timezone, hour: 'numeric', minute: '2-digit', second: '2-digit' }); $('#cld').textContent = t.toLocaleDateString([], { timeZone: d.timezone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + ' · ' + d.timezone; };
+    tick(); clearInterval(window._clk); window._clk = setInterval(tick, 1000);
+    const done = async r => { if (!r.ok) return setMsg($('#tm'), r.err, 'bad'); d = await window.sys.datetimeGet(); draw(); setMsg($('#tm'), 'Saved.', 'good'); };
+    $('#tz').onchange = async e => done(await window.sys.datetimeSet({ timezone: e.target.value }));
+    $('#ntp').onchange = async e => done(await window.sys.datetimeSet({ ntp: e.target.checked }));
+    const ds = $('#dset'); if (ds) ds.onclick = async () => done(await window.sys.datetimeSet({ time: `${$('#dd').value} ${$('#dt').value}:00` }));
+  };
+  draw();
+}
+
+/* ======================= Password & sign-in ======================= */
+async function accountPage() {
+  const a = await window.sys.accountGet();
+  root.innerHTML = `<div class="tool">${toolHead('Password & sign-in')}<div class="scroll">
+    <div class="card"><div class="row"><div class="lb"><b>${esc(a.name)}</b><small>Username: ${esc(a.username)}</small></div></div></div>
+    ${a.live ? '<div class="card"><div class="row"><div class="lb"><b>You’re using the live USB</b><small>It has no password. You choose your password when you install SanjivramOS.</small></div></div></div>' : `
+    <div class="card"><h3>Change password</h3>
+      <div class="row"><div class="lb"><b>Current password</b></div><input class="in" type="password" id="po"></div>
+      <div class="row"><div class="lb"><b>New password</b></div><input class="in" type="password" id="pn"></div>
+      <div class="row"><div class="lb"><b>Confirm new password</b></div><input class="in" type="password" id="pn2"></div>
+      <div class="row"><span class="msg" id="pm" style="flex:1;margin:0"></span><button class="btn primary" id="pchg">Change password</button></div></div>
+    <div class="card"><h3>Signing in</h3>
+      <div class="row"><div class="lb"><b>Ask for my password when SanjivramOS starts</b><small>Also when you lock the screen. Without it, anyone at this computer can use it.</small></div>${sw('lk', a.lock)}</div>
+      <div class="row" id="lkpw" hidden><input class="in" type="password" id="lkp" placeholder="Your password" style="max-width:none;flex:1"><button class="btn primary" id="lkgo">Turn off</button></div>
+      <div class="msg" id="lm" style="padding-bottom:10px"></div></div>`}
+  </div></div>`;
+  if (a.live) return;
+  $('#pchg').onclick = async () => {
+    const o = $('#po').value, n = $('#pn').value, n2 = $('#pn2').value, m = $('#pm');
+    if (!n) return setMsg(m, 'Type a new password.', 'bad');
+    if (n !== n2) return setMsg(m, 'The new passwords don’t match.', 'bad');
+    if (/[:\n]/.test(n)) return setMsg(m, 'A password can’t contain “:”.', 'bad');
+    setMsg(m, 'Changing…');
+    const r = await window.sys.accountPassword({ old: o, new: n });
+    setMsg(m, r.ok ? 'Your password was changed.' : r.err, r.ok ? 'good' : 'bad');
+    if (r.ok) $('#po').value = $('#pn').value = $('#pn2').value = '';
+  };
+  $('#lk').onchange = async e => {
+    if (e.target.checked) { const r = await window.sys.accountLock({ on: true }); setMsg($('#lm'), r.ok ? 'SanjivramOS will ask for your password.' : r.err, r.ok ? 'good' : 'bad'); $('#lkpw').hidden = true; return; }
+    e.target.checked = true; $('#lkpw').hidden = false; $('#lkp').focus(); setMsg($('#lm'), 'Type your password to turn this off.');
+  };
+  const off = async () => { const r = await window.sys.accountLock({ on: false, password: $('#lkp').value }); if (r.ok) { $('#lk').checked = false; $('#lkpw').hidden = true; setMsg($('#lm'), 'SanjivramOS won’t ask for a password any more.', 'good'); } else setMsg($('#lm'), r.err, 'bad'); $('#lkp').value = ''; };
+  $('#lkgo').onclick = off; $('#lkp').onkeydown = e => { if (e.key === 'Enter') off(); };
+}
+
+/* ======================= About ======================= */
+async function about() {
+  const a = await window.sys.aboutGet();
+  const up = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} h ${m} min` : `${m} min`; };
+  root.innerHTML = `<div class="tool">${toolHead('About this computer')}<div class="scroll">
+    <div class="about-hd"><img src="${LOGO}" alt=""><div><h2>${esc(a.os)}</h2><div class="muted">${a.commit ? 'SanjivramOS version ' + esc(a.commit) + ' · ' : ''}${a.live ? 'running from USB' : 'installed'}</div></div></div>
+    <div class="card"><dl class="kv">
+      ${a.model ? `<dt>Computer</dt><dd>${esc(a.model)}</dd>` : ''}
+      <dt>Processor</dt><dd>${esc(a.cpu)} · ${a.cores} cores</dd>
+      <dt>Memory</dt><dd>${gb(a.memory)}</dd>
+      <dt>Graphics</dt><dd>${a.gpus.length ? a.gpus.map(esc).join('<br>') : 'Unknown'}</dd>
+      <dt>Disk</dt><dd>${gb(a.disk.size)} (${gb(a.disk.free)} free)</dd>
+      <dt>Starts with</dt><dd>${esc(a.boot)}</dd>
+      <dt>Desktop</dt><dd>${esc(a.session)}</dd>
+      <dt>Linux kernel</dt><dd>${esc(a.kernel)}</dd>
+      <dt>Running for</dt><dd>${up(a.uptime)}</dd>
+    </dl></div>
+    <div class="card"><div class="row"><div class="lb"><b>Computer name</b><small>How this computer shows up on your network.</small></div><input class="in" id="hn" value="${esc(a.hostname)}" spellcheck="false" style="min-width:140px"><button class="btn" id="hset">Rename</button></div><div class="msg" id="hm" style="padding-bottom:8px"></div></div>
+  </div></div>`;
+  $('#hset').onclick = async () => { const r = await window.sys.setHostname($('#hn').value.trim()); setMsg($('#hm'), r.ok ? 'Renamed.' : r.err, r.ok ? 'good' : 'bad'); };
+}
+
+/* ======================= actions ======================= */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
+  const a = b.dataset.a;
+  if (a === 'try' || a === 'close') return window.sys.close();
+  if (a === 'next') { step++; return render(); }
+  if (a === 'back') { step--; return render(); }
+  if (a === 'rescan') { disks = null; return diskPage(); }
+  if (a === 'install') return doInstall();
+  if (a === 'retry') { step = 3; disks = null; return render(); }
+  if (a === 'reboot') return window.sys.power('restart');
+  if (a === 'log') { $('#log').classList.toggle('on'); b.textContent = $('#log').classList.contains('on') ? 'Hide details' : 'Show details'; return; }
+});
+
+({ wifi: wifiPage, power, display, sound, keyboard, datetime, account: accountPage, about }[PAGE] || render)();
+</script>
+</body>
+</html>

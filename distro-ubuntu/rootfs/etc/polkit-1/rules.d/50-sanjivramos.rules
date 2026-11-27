@@ -1,0 +1,12 @@
+// SanjivramOS: the person at the computer manages Wi-Fi/networks, power, time and keyboard without a password prompt
+// (there's no desktop password dialog). Admin (sudo group) users only. The SanjivramOS desktop runs its apps from the
+// SanjivramOS server, a system service outside the login session, so this doesn't require an "active" session.
+polkit.addRule(function (action, subject) {
+  if (!subject.isInGroup("sudo") && !subject.isInGroup("netdev")) return;
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) return polkit.Result.YES;
+  if (!subject.isInGroup("sudo")) return;
+  if (/^org\.freedesktop\.login1\.(power-off|reboot|suspend|hibernate|set-reboot-to-firmware-setup)/.test(action.id)) return polkit.Result.YES;
+  if (action.id.indexOf("org.freedesktop.timedate1.") === 0) return polkit.Result.YES;
+  if (action.id === "org.freedesktop.locale1.set-keyboard") return polkit.Result.YES;
+  if (action.id === "org.freedesktop.hostname1.set-static-hostname" || action.id === "org.freedesktop.hostname1.set-hostname") return polkit.Result.YES;
+});

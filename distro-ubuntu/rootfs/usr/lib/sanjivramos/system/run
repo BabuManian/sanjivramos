@@ -1,0 +1,10 @@
+#!/bin/sh
+# SanjivramOS system app:  run install | wifi | power | display | sound | keyboard | datetime | account | about
+ELECTRON=/opt/sanjivramos/app/distro/shell/node_modules/electron/dist/electron
+ENVF="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/sanjivramos-session.env"
+get() { sed -n "s/^$1=//p" "$ENVF" 2>/dev/null; }
+[ -n "$WAYLAND_DISPLAY" ] || WAYLAND_DISPLAY=$(get WAYLAND_DISPLAY)
+[ -n "$DISPLAY" ] || DISPLAY=$(get DISPLAY)
+export WAYLAND_DISPLAY DISPLAY
+OZ=x11; [ "$(get SJ_SESSION)" = wayland ] && OZ=wayland
+exec "$ELECTRON" /usr/lib/sanjivramos/system --ozone-platform=$OZ "--sj-page=${1:-install}"

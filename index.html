@@ -7181,6 +7181,9 @@ const Setup = {
     const u = SanjServer.native && SanjServer.linuxUser;
     if (!u || !u.name) return false;
     Settings.set('username', String(u.name).slice(0, 40));
+    // No SanjivramOS online account: the lock screen uses your Linux password instead (Account.mode() → 'linux').
+    Settings.set('localOnly', true);
+    if (u.password) { Settings.set('setupDone', true); Settings.set('firstLogin', true); $('#setup').hidden = true; Session.showLock(); return true; }   // sign in with that password first
     this.finish();
     return true;
   },
@@ -7564,6 +7567,7 @@ const Session = {
     $('#lock-pin').hidden = true; $('#lock-btn').hidden = false; $('#pin-in').value = ''; $('#pin-msg').textContent = '';
     $('#lock-acct').hidden = true; $('#lock-pass').hidden = true;
     $('#lock').classList.remove('hidden');
+    if (SanjServer.native) SanjServer.detect().then(() => Account.prepareLock());   // password/sign-in setting may have changed
     // after signing in on another screen (the page reloads with your desktop), go straight in
     try { if (sessionStorage.getItem('sj.autologin')) { sessionStorage.removeItem('sj.autologin'); setTimeout(() => this.login(true), 60); return; } } catch {}
     Account.prepareLock();
@@ -7597,7 +7601,9 @@ const Session = {
     if (this.state !== 'lock') return;
     // don't decide "no account" before we've asked the server whether you're signed in
     if (!force && !Social.checked && !Social.unavailable && PAGE_MODE === 'main' && location.protocol !== 'file:') { if (!this._waitAcct) { this._waitAcct = Date.now(); const tick = () => { if (Social.checked || Social.unavailable || Date.now() - this._waitAcct > 4000) { this._waitAcct = 0; this.login(); } else setTimeout(tick, 100); }; tick(); } return; }
-    if (!force) { const m = Account.mode(); if (m === 'signin') { Account.showSignIn(); return; } if (m === 'account') { if (Settings.get('lockPin')) { this.askPin(); return; } Account.showPassword(); return; } }
+    // SanjivramOS Linux: know whether this is the computer's own screen (password lock) before letting anyone in
+    if (!force && SanjServer.server === null && SanjServer.web() && !(this._waitSrv && Date.now() - this._waitSrv > 5000)) { if (!this._waitSrv) { this._waitSrv = Date.now(); const tick = () => { if (SanjServer.server !== null || Date.now() - this._waitSrv > 5000) { this.login(); this._waitSrv = 0; } else setTimeout(tick, 100); }; tick(); } return; }
+    if (!force) { const m = Account.mode(); if (m === 'signin') { Account.showSignIn(); return; } if (m === 'linux') { Account.showPassword(); return; } if (m === 'account') { if (Settings.get('lockPin')) { this.askPin(); return; } Account.showPassword(); return; } }
     if (Settings.get('lockPin') && !force) { this.askPin(); return; }
     this.state = 'desktop';
     $('#lock').classList.add('hidden');
@@ -11315,11 +11321,12 @@ Apps.register({
       computer: () => !SanjServer.native ? `<h2>This Computer</h2><div class="set-card"><div class="st-empty">${tile('app-settings', 'linear-gradient(135deg,#fde68a,#f59e0b)')}<b>For SanjivramOS Linux</b><span>On a computer running SanjivramOS Linux, its screen, sound, Wi‑Fi, keyboard, time and power settings are here.</span></div></div>` : `<h2>This Computer</h2>
         <p class="set-desc">Settings for this computer itself. Each one opens in its own window.</p>
         ${stack(
-          row('Display', 'Resolution, scaling (make everything bigger or smaller), refresh rate and rotation.', `<button class="btn" data-sys="display">${svg('sun')}Open</button>`),
+          row('Display', 'Resolution, scaling (make everything bigger or smaller), refresh rate, rotation and brightness.', `<button class="btn" data-sys="display">${svg('sun')}Open</button>`),
           row('Sound', 'Volume, mute, and which speakers, headphones or microphone to use.', `<button class="btn" data-sys="sound">${svg('volume')}Open</button>`),
           row('Wi‑Fi', 'Connect to a wireless network.', `<button class="btn" data-sys="wifi">${svg('wifi')}Open</button>`),
           row('Keyboard', 'Keyboard layout and languages.', `<button class="btn" data-sys="keyboard">${svg('keyboard')}Open</button>`),
           row('Date & time', 'Time zone and automatic time.', `<button class="btn" data-sys="datetime">${svg('clock')}Open</button>`),
+          row('Password & sign-in', 'Change your password, or choose whether SanjivramOS asks for it when it starts.', `<button class="btn" data-sys="account">${svg('lock')}Open</button>`),
           row('Power', 'Power off, restart or sleep.', `<button class="btn" data-sys="power">${svg('power')}Open</button>`),
           row('About this computer', 'Processor, memory, graphics, disk and version.', `<button class="btn" data-sys="about">${svg('info')}Open</button>`))}`,
       desktopapp: () => !Desk.ok ? `<h2>Desktop App</h2><div class="set-card"><div class="st-empty ex2-web">${tile('app-localfiles', 'linear-gradient(135deg,#bae6fd,#0369a1)')}<b>You’re using SanjivramOS in a web browser</b><span>The SanjivramOS desktop app (AppImage, .deb or Windows .exe) adds multi-monitor support, real Python with GUI windows, a system shell, your real files, Chrome extensions, a tray icon, screenshots and more.</span></div></div>` : `<h2>Desktop App</h2>
@@ -12054,7 +12061,7 @@ ${cat}`;
         setTimeout(() => { if (section === 'desktopapp') renderDesktopApp(); }, 500);
         return;
       }
-      if ((el = pick('[data-sys]'))) { const p = el.dataset.sys.replace(/[^a-z]/g, ''); NativeWins.run({ id: 'sys-' + p, name: ({ display: 'Display', sound: 'Sound', wifi: 'Wi‑Fi', keyboard: 'Keyboard', datetime: 'Date & time', power: 'Power', about: 'About this computer' })[p] || 'Settings', cmd: '/usr/lib/sanjivramos/system/run ' + p, mode: 'gui', distro: '' }); return; }
+      if ((el = pick('[data-sys]'))) { const p = el.dataset.sys.replace(/[^a-z]/g, ''); NativeWins.run({ id: 'sys-' + p, name: ({ display: 'Display', sound: 'Sound', wifi: 'Wi‑Fi', keyboard: 'Keyboard', datetime: 'Date & time', account: 'Password & sign-in', power: 'Power', about: 'About this computer' })[p] || 'Settings', cmd: '/usr/lib/sanjivramos/system/run ' + p, mode: 'gui', distro: '' }); return; }
       if ((el = pick('[data-more]'))) { More.action(el.dataset.more, el, main, render); return; }
       if ((el = pick('[data-offline]'))) { Offline.action(el.dataset.offline, el, main); return; }
       if (pick('.wp-random')) { randomPhotoWallpaper(); return; }
@@ -21855,6 +21862,8 @@ const Account = {
   setMeta(m) { try { localStorage.setItem(this.META, JSON.stringify(m)); } catch {} },
   /** 'account' (signed in), 'signin' (accounts available, not signed in), 'local' (no accounts / chose local) */
   mode() {
+    // SanjivramOS Linux: unless you signed in to an online account, unlock with your Linux password (from the installer).
+    if (PAGE_MODE === 'main' && SanjServer.native && SanjServer.linuxUser && !Social.me) return SanjServer.linuxUser.password ? 'linux' : 'local';
     if (PAGE_MODE !== 'main' || location.protocol === 'file:' || Social.unavailable) return 'local';
     if (Social.me) return 'account';
     if (!Social.checked) return 'local';
@@ -21943,6 +21952,18 @@ const Account = {
       if (e.key !== 'Enter') { if (e.key === 'Escape') { $('#lock-pass').hidden = true; $('#lock-btn').hidden = false; } return; }
       e.preventDefault(); const pw = lp.value; if (!pw) return;
       $('#lp-msg').textContent = '';
+      if (this.mode() === 'linux') {
+        lp.disabled = true;
+        try {
+          const r = await fetch('sanjivram-linux-unlock', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j.ok) { lp.value = ''; Session.login(true); return; }
+          $('#lp-msg').textContent = j.error || 'Wrong password, try again.';
+        } catch { $('#lp-msg').textContent = 'Can’t check the password right now. Try again in a moment.'; }
+        finally { lp.disabled = false; }
+        lp.value = ''; setTimeout(() => lp.focus(), 30); const b = $('#lock-pass'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+        return;
+      }
       try {
         const r = await fetch('social/api/verify', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: pw }) });
         if (r.ok) { lp.value = ''; this.start(); Session.login(true); this.pull().then(x => { if (x === 'applied') this.reloadIn(); }); return; }
@@ -21962,9 +21983,15 @@ const Account = {
     $('#la-mode').textContent = this.creating ? 'I already have an account' : 'Create an account';
     $('#la-msg').textContent = this.creating ? 'Same account as Messages: 3–24 letters/numbers, a password of 6+ characters.' : '';
   },
-  prepareLock() { Session.syncUser(); const m = this.mode(); $('.lock-hint').textContent = m === 'signin' ? 'Click to sign in to your account' : m === 'account' ? 'Click or press Enter, then type your password' : 'Click anywhere or press Enter to sign in'; },
+  prepareLock() { Session.syncUser(); const m = this.mode(); $('.lock-hint').textContent = m === 'signin' ? 'Click to sign in to your account' : m === 'account' || m === 'linux' ? 'Click or press Enter, then type your password' : 'Click anywhere or press Enter to sign in'; },
   showSignIn() { $('#lock-btn').hidden = true; $('#lock-pass').hidden = true; $('#lock-acct').hidden = false; this.renderSignIn(); setTimeout(() => $('#la-user').focus(), 40); },
-  showPassword() { $('#lock-btn').hidden = true; $('#lock-acct').hidden = true; $('#lock-pass').hidden = false; $('#lp-pin').hidden = !Settings.get('lockPin'); $('#lp-msg').textContent = ''; setTimeout(() => $('#lp-in').focus(), 40); },
+  showPassword() {
+    const linux = this.mode() === 'linux';
+    $('#lock-btn').hidden = true; $('#lock-acct').hidden = true; $('#lock-pass').hidden = false; $('#lp-pin').hidden = !Settings.get('lockPin'); $('#lp-msg').textContent = '';
+    $('#lp-out').hidden = linux;
+    $('#lp-in').placeholder = linux ? `Password for ${SanjServer.linuxUser.username}` : 'Password';
+    setTimeout(() => $('#lp-in').focus(), 40);
+  },
   /* ----- Settings → Account ----- */
   renderCard(main) {
     const box = document.createElement('div'); main.appendChild(box);

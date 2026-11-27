@@ -1,0 +1,80 @@
+#!/bin/bash
+# SanjivramOS system settings helper. The settings app runs it with `sudo -n` (allowed for admin users by
+# /etc/sudoers.d/sanjivramos) for the few settings that change the whole computer. It only ever acts on the user who
+# ran sudo ($SUDO_USER). Settings come as JSON on stdin; prints {"ok":true} or {"ok":false,"err":"…"}.
+#   sjos-admin password   {"old":"…","new":"…"}          change your own password (needs the current one)
+#   sjos-admin lock       {"on":true|false,"password":"…"}  ask for your password when SanjivramOS starts / don't
+#   sjos-admin keyboard   {"layout":"us","variant":"","options":""}
+#   sjos-admin timezone   {"timezone":"Area/City"}
+#   sjos-admin ntp        {"on":true|false}
+#   sjos-admin time       {"time":"YYYY-MM-DD HH:MM:SS"}
+#   sjos-admin hostname   {"hostname":"…"}
+set -uo pipefail
+export LC_ALL=C.UTF-8
+ok() { echo '{"ok":true}'; exit 0; }
+fail() { jq -cn --arg e "$*" '{ok:false,err:$e}'; exit 1; }
+[ "$(id -u)" = 0 ] || fail "This needs to run with sudo."
+U="${SUDO_USER:-}"
+[ -n "$U" ] && [ "$U" != root ] && id "$U" >/dev/null 2>&1 || fail "Unknown user."
+J=$(head -c 65536)
+get() { jq -r --arg k "$1" '.[$k] // "" | tostring' <<<"$J" 2>/dev/null; }
+
+# Checks a password for $U the same way login and sudo do (PAM's unix_chkpwd; as root it can check any user).
+check_pw() {
+  local h; h=$(command -v unix_chkpwd || echo /usr/sbin/unix_chkpwd)
+  printf '%s\0' "$1" | "$h" "$U" nullok >/dev/null 2>&1
+}
+
+case "${1:-}" in
+  password)
+    OLD=$(get old); NEW=$(get new)
+    [ -n "$NEW" ] || fail "Type a new password."
+    [ ${#NEW} -le 200 ] || fail "That password is too long."
+    [[ $NEW != *$'\n'* && $NEW != *:* ]] || fail "The password can't contain a colon or a line break."
+    check_pw "$OLD" || { sleep 1; fail "Your current password isn't right."; }
+    printf '%s:%s\n' "$U" "$NEW" | chpasswd || fail "Couldn't change the password."
+    rm -f /etc/sanjivramos/no-lock 2>/dev/null
+    ok;;
+  lock)
+    ON=$(get on)
+    if [ "$ON" = true ]; then rm -f /etc/sanjivramos/no-lock; ok; fi
+    check_pw "$(get password)" || { sleep 1; fail "That password isn't right."; }
+    mkdir -p /etc/sanjivramos && touch /etc/sanjivramos/no-lock && ok
+    fail "Couldn't save that.";;
+  keyboard)
+    L=$(get layout); V=$(get variant); O=$(get options)
+    [[ $L =~ ^[a-z]{2,8}(,[a-z]{2,8}){0,3}$ ]] || fail "Unknown keyboard layout."
+    [[ $V =~ ^[a-z0-9_,-]{0,40}$ ]] || fail "Unknown keyboard variant."
+    [[ $O =~ ^[a-z0-9_:,-]{0,120}$ ]] || fail "Unknown keyboard option."
+    [[ $L == *,* && -z $O ]] && O="grp:alt_shift_toggle"
+    F=/etc/default/keyboard
+    [ -f "$F" ] || printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\nBACKSPACE="guess"\n' > "$F"
+    for kv in "XKBLAYOUT=$L" "XKBVARIANT=$V" "XKBOPTIONS=$O"; do
+      k=${kv%%=*}; v=${kv#*=}
+      if grep -q "^$k=" "$F"; then sed -i "s|^$k=.*|$k=\"$v\"|" "$F"; else echo "$k=\"$v\"" >> "$F"; fi
+    done
+    command -v setupcon >/dev/null && setupcon -k --force >/dev/null 2>&1 || true   # text consoles too
+    ok;;
+  timezone)
+    TZ=$(get timezone)
+    [[ $TZ =~ ^[A-Za-z0-9_+/-]{1,60}$ ]] && [ -f "/usr/share/zoneinfo/$TZ" ] || fail "Unknown time zone."
+    timedatectl set-timezone "$TZ" 2>/dev/null || { ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime && echo "$TZ" > /etc/timezone; } || fail "Couldn't set the time zone."
+    ok;;
+  ntp)
+    if [ "$(get on)" = true ]; then timedatectl set-ntp true 2>&1 || fail "Automatic time isn't available on this computer."; else timedatectl set-ntp false 2>&1 || fail "Couldn't turn off automatic time."; fi
+    ok;;
+  time)
+    T=$(get time)
+    [[ $T =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}(:[0-9]{2})?$ ]] || fail "Bad date or time."
+    timedatectl set-ntp false >/dev/null 2>&1 || true
+    timedatectl set-time "$T" 2>/dev/null || date -s "$T" >/dev/null || fail "Couldn't set the time."
+    hwclock --systohc >/dev/null 2>&1 || true
+    ok;;
+  hostname)
+    H=$(get hostname)
+    [[ $H =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]] || fail "Letters, numbers and - only."
+    hostnamectl set-hostname "$H" 2>/dev/null || echo "$H" > /etc/hostname
+    if grep -q '^127\.0\.1\.1' /etc/hosts; then sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$H/" /etc/hosts; else printf '127.0.1.1\t%s\n' "$H" >> /etc/hosts; fi
+    ok;;
+  *) fail "Unknown setting.";;
+esac

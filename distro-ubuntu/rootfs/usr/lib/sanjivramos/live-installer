@@ -1,0 +1,8 @@
+#!/bin/sh
+# Live USB only: opens "Install SanjivramOS" over the desktop a few seconds after it starts (it has a "Try SanjivramOS" button).
+grep -qw 'boot=casper' /proc/cmdline || exit 0
+[ -e /usr/share/applications/sanjivramos-install.desktop ] || exit 0
+[ -e "${XDG_RUNTIME_DIR:-/tmp}/sanjivramos-installer-shown" ] && exit 0
+touch "${XDG_RUNTIME_DIR:-/tmp}/sanjivramos-installer-shown"
+sleep "${1:-10}"
+exec /usr/lib/sanjivramos/system/run install

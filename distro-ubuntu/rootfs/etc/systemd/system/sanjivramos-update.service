@@ -1,0 +1,12 @@
+[Unit]
+Description=Download the latest SanjivramOS from GitHub
+# Runs in the background: the desktop starts right away and shows its progress.
+
+[Service]
+Type=exec
+ExecStart=/usr/lib/sanjivramos/update.sh
+TimeoutStartSec=0
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

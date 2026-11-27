@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install SanjivramOS
+Comment=Install SanjivramOS on this computer's disk
+Exec=/usr/lib/sanjivramos/system/run install
+Icon=/usr/share/sanjivramos/logo.png
+Categories=System;
+Keywords=install;installer;setup;disk;

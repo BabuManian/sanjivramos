@@ -1,0 +1,30 @@
+#!/bin/sh
+# Puts back the screen settings saved in Settings → This Computer → Display (~/.config/sanjivramos/display.json).
+# Run by the session scripts before the desktop starts. Settings: {"outputs":{"HDMI-A-1":{"mode":"1920x1080","refresh":60,
+# "scale":1.25,"transform":"normal","enabled":true,"x":0,"y":0}}}
+F="$HOME/.config/sanjivramos/display.json"
+[ -f "$F" ] && command -v jq >/dev/null || exit 0
+jq -r '.outputs // {} | to_entries[] | [.key, (.value.mode // ""), (.value.refresh // 0 | tostring), (.value.scale // 1 | tostring), (.value.transform // "normal"), (.value.enabled // true | tostring), (.value.x // "" | tostring), (.value.y // "" | tostring)] | @tsv' "$F" 2>/dev/null |
+while IFS="$(printf '\t')" read -r out mode rate scale tr en x y; do
+  case "$out$mode$rate$scale$tr$x$y" in *[!A-Za-z0-9._-]*) continue;; esac
+  if [ -n "$WAYLAND_DISPLAY" ] && command -v wlr-randr >/dev/null; then
+    set -- --output "$out"
+    if [ "$en" = false ]; then set -- "$@" --off; else
+      set -- "$@" --on
+      [ -n "$mode" ] && { if [ "$rate" != 0 ]; then set -- "$@" --mode "${mode}@${rate}Hz"; else set -- "$@" --mode "$mode"; fi; }
+      set -- "$@" --scale "$scale" --transform "$tr"
+      [ -n "$x" ] && [ -n "$y" ] && set -- "$@" --pos "$x,$y"
+    fi
+    wlr-randr "$@" 2>/dev/null
+  elif [ -n "$DISPLAY" ] && command -v xrandr >/dev/null; then
+    case $tr in 90) rot=left;; 180) rot=inverted;; 270) rot=right;; *) rot=normal;; esac
+    set -- --output "$out"
+    if [ "$en" = false ]; then set -- "$@" --off; else
+      if [ -n "$mode" ]; then set -- "$@" --mode "$mode"; [ "$rate" != 0 ] && set -- "$@" --rate "$rate"; else set -- "$@" --auto; fi
+      set -- "$@" --rotate "$rot"
+      [ -n "$x" ] && [ -n "$y" ] && set -- "$@" --pos "${x}x${y}"
+    fi
+    xrandr "$@" 2>/dev/null
+  fi
+done
+exit 0
