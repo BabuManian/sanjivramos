@@ -189,9 +189,10 @@ in_ch grub-mkstandalone --format=i386-pc --output=/tmp/core.img \
 cat "$CH/usr/lib/grub/i386-pc/cdboot.img" "$CH/tmp/core.img" > "$ISO/boot/grub/bios.img"
 rm -f "$CH/tmp/core.img" "$CH/tmp/grub-bios.cfg"
 # UEFI: Microsoft-signed shim -> Canonical-signed GRUB (Secure Boot works), which looks for /.disk/info and /boot/grub/grub.cfg.
-SHIM=$(ls "$CH"/usr/lib/shim/shimx64.efi.signed.latest "$CH"/usr/lib/shim/shimx64.efi.signed 2>/dev/null | head -1)
-GRUBEFI=$(ls "$CH"/usr/lib/grub/x86_64-efi-signed/gcdx64.efi.signed "$CH"/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed 2>/dev/null | head -1)
-MM=$(ls "$CH"/usr/lib/shim/mmx64.efi.signed "$CH"/usr/lib/shim/mmx64.efi 2>/dev/null | head -1)
+first() { local f; for f in "$@"; do [ -f "$f" ] && { echo "$f"; return 0; }; done; return 0; }
+SHIM=$(first "$CH"/usr/lib/shim/shimx64.efi.signed.latest "$CH"/usr/lib/shim/shimx64.efi.signed)
+GRUBEFI=$(first "$CH"/usr/lib/grub/x86_64-efi-signed/gcdx64.efi.signed "$CH"/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed)
+MM=$(first "$CH"/usr/lib/shim/mmx64.efi.signed "$CH"/usr/lib/shim/mmx64.efi)
 [ -n "$SHIM" ] && [ -n "$GRUBEFI" ] || { echo "Signed shim/GRUB not found"; exit 1; }
 cp "$SHIM" "$ISO/EFI/boot/bootx64.efi"; cp "$GRUBEFI" "$ISO/EFI/boot/grubx64.efi"; [ -n "$MM" ] && cp "$MM" "$ISO/EFI/boot/mmx64.efi"
 mkdir -p "$ISO/EFI/ubuntu"; printf 'search --no-floppy --set=root --file /.disk/info\nset prefix=($root)/boot/grub\nconfigfile ($root)/boot/grub/grub.cfg\n' > "$ISO/EFI/ubuntu/grub.cfg"
