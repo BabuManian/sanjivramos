@@ -7175,6 +7175,15 @@ const Setup = {
     Settings.set('setupDone', false);
     btn.disabled = false; this.step = 1; this.render();
   },
+  /** SanjivramOS Linux: your name and password were already set in the installer, so finish this screen with that name
+   *  instead of asking again. You can still sign in to a SanjivramOS account later in Settings → Account. */
+  auto() {
+    const u = SanjServer.native && SanjServer.linuxUser;
+    if (!u || !u.name) return false;
+    Settings.set('username', String(u.name).slice(0, 40));
+    this.finish();
+    return true;
+  },
   finish() {
     Settings.set('setupDone', true); Settings.set('firstLogin', true);
     $('#setup').hidden = true;
@@ -7544,7 +7553,7 @@ const Session = {
       status.textContent = msgs[Math.min(msgs.length - 1, Math.floor(p / 21))];
       if (p >= 100) {
         clearInterval(this._bt);
-        setTimeout(() => { boot.classList.add('hidden'); if (Settings.get('setupDone')) this.showLock(); else Setup.show(); }, 380);
+        setTimeout(() => { boot.classList.add('hidden'); if (Settings.get('setupDone')) this.showLock(); else if (!Setup.auto()) Setup.show(); }, 380);
       }
     }, 110);
   },
@@ -11027,7 +11036,7 @@ Apps.register({
 const SETTINGS_SECTIONS = [
   ['home', 'Quick Settings', 'sparkle'], ['appearance', 'Appearance', 'palette'], ['themes', 'Themes', 'sparkle'], ['layout', 'Desktop Layout', 'workspaces'], ['startmenu', 'Start Menu', 'apps'],
   ['windows', 'Windows', 'restore'], ['transparency', 'Transparency', 'droplet'], ['wallpaper', 'Wallpaper', 'image'], ['desktop', 'Desktop & Dock', 'grid'], ['widgets', 'Widgets', 'tiles'],
-  ['panel', 'Clock & Panel', 'clock'], ['display', 'Display & Sound', 'sun'], ['device', 'Mobile & Tablet', 'menu'], ['browser', 'Web Browser', 'globe'], ['files', 'Files', 'folder'], ['notifications', 'Notifications', 'bell'], ['accessibility', 'Accessibility', 'pointer'],
+  ['panel', 'Clock & Panel', 'clock'], ['display', 'Display & Sound', 'sun'], ['computer', 'This Computer', 'hdd'], ['device', 'Mobile & Tablet', 'menu'], ['browser', 'Web Browser', 'globe'], ['files', 'Files', 'folder'], ['notifications', 'Notifications', 'bell'], ['accessibility', 'Accessibility', 'pointer'],
   ['tuning', 'Fine Tuning', 'sliders'], ['extras', 'Rules & Extras', 'sparkle'], ['linux', 'Linux', 'penguin'], ['studio', 'UI Studio', 'edit'], ['shortcuts', 'Shortcuts', 'keyboard'], ['appicons', 'App Icons', 'star'], ['desktopapp', 'Desktop App', 'hdd'], ['offline', 'Offline Install', 'download'], ['boot', 'Boot & Lock Screen', 'power'], ['privacy', 'Lock & Privacy', 'lock'],
   ['account', 'Account', 'user'], ['reset', 'Reset & Recovery', 'reload'], ['about', 'About', 'info']
 ];
@@ -11176,7 +11185,7 @@ Apps.register({
       <nav class="set-nav">
         <label class="set-search">${svg('search')}<input type="search" placeholder="Search" spellcheck="false" autocomplete="off"></label>
         <div class="set-user" data-sec-go="account"><div class="avatar lg"></div><div><b class="su-name"></b><small>Local account</small></div></div>
-        ${SETTINGS_SECTIONS.map(([id, l, ic]) => `${SETTINGS_GROUP_BREAKS.includes(id) ? '<div class="set-sep"></div>' : ''}<button data-sec="${id}" title="${l}"${SETTINGS_ADVANCED.includes(id) ? ' data-adv' : ''}><span class="set-ic" style="--ic:${SETTINGS_COLORS[id] || '#8e8e93'}">${svg(ic)}</span><span>${l}</span></button>`).join('')}
+        ${SETTINGS_SECTIONS.filter(([id]) => id !== 'computer' || SanjServer.native).map(([id, l, ic]) => `${SETTINGS_GROUP_BREAKS.includes(id) ? '<div class="set-sep"></div>' : ''}<button data-sec="${id}" title="${l}"${SETTINGS_ADVANCED.includes(id) ? ' data-adv' : ''}><span class="set-ic" style="--ic:${SETTINGS_COLORS[id] || '#8e8e93'}">${svg(ic)}</span><span>${l}</span></button>`).join('')}
         <button class="set-more" data-xs="settings-all"><span class="m-more">Show all settings…</span><span class="m-less">Show fewer settings</span></button>
       </nav>
       <div class="set-col">
@@ -11303,6 +11312,16 @@ Apps.register({
           ${row('Different wallpaper on each workspace', 'Switch workspaces (Ctrl+Alt+← / →) and the wallpaper changes too.', sw('wsWallpaperOn'))}
           ${Array.from({ length: WM.wsCount() }, (_, i) => row(`Workspace ${i + 1}`, '', `<select class="input" data-wswp="${i + 1}"><option value="">Same as desktop</option>${WALLPAPERS.map(w => `<option value="${w.id}"${(Settings.get('wsWallpapers') || {})[i + 1] === w.id ? ' selected' : ''}>${esc(w.name)}</option>`).join('')}</select>`)).join('')}
         </div>`,
+      computer: () => !SanjServer.native ? `<h2>This Computer</h2><div class="set-card"><div class="st-empty">${tile('app-settings', 'linear-gradient(135deg,#fde68a,#f59e0b)')}<b>For SanjivramOS Linux</b><span>On a computer running SanjivramOS Linux, its screen, sound, Wi‑Fi, keyboard, time and power settings are here.</span></div></div>` : `<h2>This Computer</h2>
+        <p class="set-desc">Settings for this computer itself. Each one opens in its own window.</p>
+        ${stack(
+          row('Display', 'Resolution, scaling (make everything bigger or smaller), refresh rate and rotation.', `<button class="btn" data-sys="display">${svg('sun')}Open</button>`),
+          row('Sound', 'Volume, mute, and which speakers, headphones or microphone to use.', `<button class="btn" data-sys="sound">${svg('volume')}Open</button>`),
+          row('Wi‑Fi', 'Connect to a wireless network.', `<button class="btn" data-sys="wifi">${svg('wifi')}Open</button>`),
+          row('Keyboard', 'Keyboard layout and languages.', `<button class="btn" data-sys="keyboard">${svg('keyboard')}Open</button>`),
+          row('Date & time', 'Time zone and automatic time.', `<button class="btn" data-sys="datetime">${svg('clock')}Open</button>`),
+          row('Power', 'Power off, restart or sleep.', `<button class="btn" data-sys="power">${svg('power')}Open</button>`),
+          row('About this computer', 'Processor, memory, graphics, disk and version.', `<button class="btn" data-sys="about">${svg('info')}Open</button>`))}`,
       desktopapp: () => !Desk.ok ? `<h2>Desktop App</h2><div class="set-card"><div class="st-empty ex2-web">${tile('app-localfiles', 'linear-gradient(135deg,#bae6fd,#0369a1)')}<b>You’re using SanjivramOS in a web browser</b><span>The SanjivramOS desktop app (AppImage, .deb or Windows .exe) adds multi-monitor support, real Python with GUI windows, a system shell, your real files, Chrome extensions, a tray icon, screenshots and more.</span></div></div>` : `<h2>Desktop App</h2>
         <div class="set-card">
           ${row('Displays', 'Put SanjivramOS on any monitor, give every monitor its own desktop, or stretch across all of them.', `<span class="cust-presets"><button class="btn" data-dsp="span">${svg('fullscreen')}Span all</button><button class="btn" data-dsp="close-extended">${svg('close')}Close extra desktops</button></span>`)}
@@ -12035,6 +12054,7 @@ ${cat}`;
         setTimeout(() => { if (section === 'desktopapp') renderDesktopApp(); }, 500);
         return;
       }
+      if ((el = pick('[data-sys]'))) { const p = el.dataset.sys.replace(/[^a-z]/g, ''); NativeWins.run({ id: 'sys-' + p, name: ({ display: 'Display', sound: 'Sound', wifi: 'Wi‑Fi', keyboard: 'Keyboard', datetime: 'Date & time', power: 'Power', about: 'About this computer' })[p] || 'Settings', cmd: '/usr/lib/sanjivramos/system/run ' + p, mode: 'gui', distro: '' }); return; }
       if ((el = pick('[data-more]'))) { More.action(el.dataset.more, el, main, render); return; }
       if ((el = pick('[data-offline]'))) { Offline.action(el.dataset.offline, el, main); return; }
       if (pick('.wp-random')) { randomPhotoWallpaper(); return; }
@@ -18647,14 +18667,14 @@ Bus.on('ws', () => { if (Settings.get('wsWallpaperOn')) Theme.apply(); });
 const loadScript = src => new Promise((res, rej) => { if ($(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Couldn’t load ' + src)); document.head.appendChild(s); });
 const SanjServer = {
   base: new URL('.', location.href),
-  server: null, native: false, localTerminal: false, shell: false, claude: false, vip: false, slander: false, files: false, desktop: false, games: [],
+  server: null, native: false, localTerminal: false, linuxUser: null, shell: false, claude: false, vip: false, slander: false, files: false, desktop: false, games: [],
   web() { return /^https?:$/.test(location.protocol) && !Desk.ok; },
   async detect() {
     if (!this.web()) { this.server = false; return false; }
     try {
       const r = await fetch(new URL('sanjivram-server.json', this.base), { cache: 'no-store' });
       const j = r.ok ? await r.json() : {};
-      this.server = j.app === 'SanjivramOS'; this.native = !!j.native; this.localTerminal = !!j.localTerminal; this.httpsPort = +j.httpsPort || 0; this.shell = !!j.shell; this.claude = !!j.claude; this.vip = !!j.vip; this.slander = !!j.slander; this.files = !!j.files; this.desktop = !!j.desktop; this.games = j.games || [];
+      this.server = j.app === 'SanjivramOS'; this.native = !!j.native; this.localTerminal = !!j.localTerminal; this.linuxUser = j.linuxUser || null; this.httpsPort = +j.httpsPort || 0; this.shell = !!j.shell; this.claude = !!j.claude; this.vip = !!j.vip; this.slander = !!j.slander; this.files = !!j.files; this.desktop = !!j.desktop; this.games = j.games || [];
     } catch { this.server = false; }
     Bus.emit('server'); return this.server;
   }

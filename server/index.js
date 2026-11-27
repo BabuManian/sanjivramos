@@ -5,6 +5,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import ipaddr from 'ipaddr.js';
@@ -94,6 +95,15 @@ const isLocalBrowser = req => process.env.LOCAL_NO_PASSWORD !== '0'
  *  a SanjivramOS account. It's their own computer and their own Linux user. Other devices still need the owner account. */
 const localTerminal = req => process.env.SANJIVRAM_LOCAL_TERMINAL === '1' && isLocalBrowser(req);
 
+/** SanjivramOS Linux: the Linux account SanjivramOS runs as (its full name was typed in the installer), so the first-run setup
+ *  can use it instead of asking again. */
+const linuxUser = () => {
+  try {
+    const u = os.userInfo(), line = fs.readFileSync('/etc/passwd', 'utf8').split('\n').find(l => l.split(':')[0] === u.username) || '';
+    return { username: u.username, name: (line.split(':')[4] || '').split(',')[0].trim() || u.username };
+  } catch { return null; }
+};
+
 const authorized = req => {
   if (!PASSWORD || isLocalBrowser(req)) return true;
   const m = /^Basic (.+)$/.exec(req.headers.authorization || '');
@@ -141,7 +151,7 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/sanjivram-server.json') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ app: 'SanjivramOS', httpsPort: HTTPS_PORT && httpsUp ? HTTPS_PORT : 0, native: NATIVE && shellOk(req) && isLocalBrowser(req), localTerminal: shellOk(req) && localTerminal(req), shell: shellOk(req), claude: shellOk(req), slander: shellOk(req), vip: shellOk(req) && !!chromiumPath(), files: shellOk(req), desktop: shellOk(req), linuxApps: shellOk(req), android: shellOk(req), games: installedGames() }));
+    res.end(JSON.stringify({ app: 'SanjivramOS', httpsPort: HTTPS_PORT && httpsUp ? HTTPS_PORT : 0, native: NATIVE && shellOk(req) && isLocalBrowser(req), localTerminal: shellOk(req) && localTerminal(req), linuxUser: NATIVE && isLocalBrowser(req) ? linuxUser() : null, shell: shellOk(req), claude: shellOk(req), slander: shellOk(req), vip: shellOk(req) && !!chromiumPath(), files: shellOk(req), desktop: shellOk(req), linuxApps: shellOk(req), android: shellOk(req), games: installedGames() }));
     return;
   }
   if (gamesApi(req, res, url)) return;
