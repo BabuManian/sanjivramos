@@ -80,6 +80,7 @@ chmod 440 "$CH/etc/sudoers.d/sanjivramos"; in_ch visudo -cf /etc/sudoers.d/sanji
 chmod +x "$CH"/usr/lib/sanjivramos/*.sh "$CH"/usr/lib/sanjivramos/{display-restore,live-installer,prime-run,sanjivramos-session,server.sh,session,session-wayland,start-session,update.sh} "$CH"/usr/lib/sanjivramos/system/{run,sjos-install,sjos-admin}
 ln -sf /usr/lib/sanjivramos/prime-run "$CH/usr/local/bin/prime-run"
 ln -sf /usr/lib/sanjivramos/sanjivramos-session "$CH/usr/local/bin/sanjivramos-session"
+mkdir -p "$CH/etc/sanjivramos"
 cat > "$CH/etc/sanjivramos/sanjivramos.conf" <<CONF
 # SanjivramOS — where the OS downloads its updates from on every boot.
 SJ_REPO=$SJ_REPO
