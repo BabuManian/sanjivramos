@@ -90,6 +90,10 @@ const isLocalBrowser = req => process.env.LOCAL_NO_PASSWORD !== '0'
   && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(req.headers.host || '')
   && !PROXY_HEADERS.some(h => h in req.headers);
 
+/** SanjivramOS Linux (the distro sets SANJIVRAM_LOCAL_TERMINAL=1): the person at this computer may use the Terminal without
+ *  a SanjivramOS account. It's their own computer and their own Linux user. Other devices still need the owner account. */
+const localTerminal = req => process.env.SANJIVRAM_LOCAL_TERMINAL === '1' && isLocalBrowser(req);
+
 const authorized = req => {
   if (!PASSWORD || isLocalBrowser(req)) return true;
   const m = /^Basic (.+)$/.exec(req.headers.authorization || '');
@@ -137,7 +141,7 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/sanjivram-server.json') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ app: 'SanjivramOS', httpsPort: HTTPS_PORT && httpsUp ? HTTPS_PORT : 0, native: NATIVE && shellOk(req) && isLocalBrowser(req), shell: shellOk(req), claude: shellOk(req), slander: shellOk(req), vip: shellOk(req) && !!chromiumPath(), files: shellOk(req), desktop: shellOk(req), linuxApps: shellOk(req), android: shellOk(req), games: installedGames() }));
+    res.end(JSON.stringify({ app: 'SanjivramOS', httpsPort: HTTPS_PORT && httpsUp ? HTTPS_PORT : 0, native: NATIVE && shellOk(req) && isLocalBrowser(req), localTerminal: shellOk(req) && localTerminal(req), shell: shellOk(req), claude: shellOk(req), slander: shellOk(req), vip: shellOk(req) && !!chromiumPath(), files: shellOk(req), desktop: shellOk(req), linuxApps: shellOk(req), android: shellOk(req), games: installedGames() }));
     return;
   }
   if (gamesApi(req, res, url)) return;
@@ -262,7 +266,7 @@ server.on('upgrade', (req, socket, head) => {
     let sameSite = false;
     try { sameSite = new URL(req.headers.origin).host === req.headers.host; } catch {}
     if (!shellOk(req) || !sameSite) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
-    if (url.pathname === '/shell' && terminalGate(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }   // terminal: owner account only
+    if (url.pathname === '/shell' && !localTerminal(req) && terminalGate(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }   // terminal: owner account only (or the person at a SanjivramOS Linux computer)
     if (url.pathname === '/claude' && claudeGate(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }   // needs a Messages account
     if (vnc) handleVnc(req, socket, head, vnc); else if (url.pathname === '/claude') handleClaude(req, socket, head); else if (url.pathname === '/vip') handleVip(req, socket, head); else handleShell(req, socket, head);
     return;
